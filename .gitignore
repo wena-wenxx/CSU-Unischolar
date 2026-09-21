@@ -1,0 +1,12 @@
+backend/.env
+backend/.env.*
+backend/vendor/
+frontend/node_modules/
+ai-service/.venv/
+ai-service/__pycache__/
+backend/database/migrations_backup_*/
+*.log
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
