@@ -6,7 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class Scholarship extends Model
 {
-    protected $fillable = ['name', 'source_agency', 'description', 'active'];
+    protected $fillable = [
+        'name',
+        'description',
+        'provider',
+        'application_start',
+        'application_end',
+        'amount',
+        'status',
+    ];
 
     public function requirements()
     {

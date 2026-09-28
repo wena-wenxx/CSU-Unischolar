@@ -6,7 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 
 class Application extends Model
 {
-    protected $fillable = ['student_id', 'scholarship_id', 'status', 'submitted_at'];
+    protected $fillable = [
+        'student_id',
+        'scholarship_id',
+        'status',
+        'remarks',
+        'submitted_at',
+    ];
+
+    protected $casts = [
+        'submitted_at' => 'datetime',
+    ];
 
     public function student()
     {
