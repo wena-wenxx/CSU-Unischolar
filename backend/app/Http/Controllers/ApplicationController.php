@@ -23,13 +23,17 @@ class ApplicationController extends Controller
         ]);
 
         $student = Student::where('user_id', $request->user()->id)->first();
+
         if (!$student) {
             return response()->json(['message' => 'Student profile not found'], 404);
         }
 
         $scholarship = Scholarship::findOrFail($request->scholarship_id);
+
         if ($scholarship->status !== 'active') {
-            return response()->json(['message' => 'This scholarship is not open for applications.'], 422);
+            return response()->json([
+                'message' => 'This scholarship is not open for applications.',
+            ], 422);
         }
 
         // BUSINESS RULE: a student can only have ONE active scholarship at a time
@@ -53,10 +57,10 @@ class ApplicationController extends Controller
         }
 
         $application = Application::create([
-            'student_id'     => $student->id,
+            'student_id' => $student->id,
             'scholarship_id' => $scholarship->id,
-            'status'         => 'submitted',
-            'submitted_at'   => now(),
+            'status' => 'draft',
+            'submitted_at' => null,
         ]);
 
         return response()->json($application, 201);
@@ -66,6 +70,7 @@ class ApplicationController extends Controller
     public function myApplications(Request $request)
     {
         $student = Student::where('user_id', $request->user()->id)->first();
+
         if (!$student) {
             return response()->json(['message' => 'Student profile not found'], 404);
         }
@@ -96,16 +101,36 @@ class ApplicationController extends Controller
     public function uploadDocument(Request $request, $id)
     {
         $request->validate([
-            'file'                       => 'required|file|max:10240|mimes:pdf,jpg,jpeg,png',
+            'file' => 'required|file|max:10240|mimes:pdf,jpg,jpeg,png',
             'scholarship_requirement_id' => 'nullable|exists:scholarship_requirements,id',
-            'document_type'              => 'nullable|string|max:255',
+            'document_type' => 'nullable|string|max:255',
         ]);
 
         $application = Application::findOrFail($id);
 
+        if ($request->scholarship_requirement_id) {
+            $requirementBelongsToScholarship = $application->scholarship
+                ->requirements()
+                ->where('id', $request->scholarship_requirement_id)
+                ->exists();
+
+            if (!$requirementBelongsToScholarship) {
+                return response()->json([
+                    'message' => 'This requirement does not belong to the application scholarship.',
+                ], 422);
+            }
+        }
+
+        if (in_array($application->status, ['approved', 'rejected'])) {
+            return response()->json([
+                'message' => 'Documents cannot be uploaded after the application has been finalized.',
+            ], 422);
+        }
+
         // Students can only upload to their OWN application
         if ($request->user()->role === 'student') {
             $student = Student::where('user_id', $request->user()->id)->first();
+
             if (!$student || $student->id !== $application->student_id) {
                 return response()->json(['message' => 'Unauthorized'], 403);
             }
@@ -115,14 +140,94 @@ class ApplicationController extends Controller
         $path = $file->store('documents', 'public');
 
         $document = Document::create([
-            'application_id'             => $application->id,
+            'application_id' => $application->id,
             'scholarship_requirement_id' => $request->scholarship_requirement_id,
-            'original_filename'          => $file->getClientOriginalName(),
-            'file_path'                  => $path,
-            'document_type'              => $request->document_type,
-            'status'                     => 'uploaded',
+            'original_filename' => $file->getClientOriginalName(),
+            'file_path' => $path,
+            'document_type' => $request->document_type,
+            'status' => 'uploaded',
         ]);
 
         return response()->json($document, 201);
     }
+
+    public function submit(Request $request, $id)
+    {
+        $request->validate([
+            'id' => 'required|exists:applications,id',
+        ]);
+
+        $application = Application::findOrFail($id);
+
+        // Students can only submit their OWN application
+        if ($request->user()->role === 'student') {
+            $student = Student::where('user_id', $request->user()->id)->first();
+
+            if (!$student || $student->id !== $application->student_id) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+        }
+
+        if ($application->status !== 'draft') {
+            return response()->json(['message' => 'Only draft applications can be submitted.'], 422);
+        }
+
+        // Check if all required documents are uploaded
+        $requiredRequirements = Scholarship::findOrFail($application->scholarship_id)
+            ->requirements()
+            ->where('is_required', true)
+            ->get();
+
+        foreach ($requiredRequirements as $requirement) {
+            $documentExists = $application->documents()
+                ->where('scholarship_requirement_id', $requirement->id)
+                ->exists();
+
+            if (!$documentExists) {
+                return response()->json([
+                    'message' => 'Required documents are incomplete.',
+                    'missing_requirement' => $requirement->name,
+                ], 422);
+            }
+        }
+
+        $application->update([
+            'status' => 'submitted',
+            'submitted_at' => now(),
+        ]);
+
+        return response()->json([
+            'message' => 'Application submitted successfully.',
+            'application' => $application->fresh(),
+        ]);
+    }
+    public function review(Request $request, $id)
+{
+    if ($request->user()->role !== 'staff') {
+        return response()->json([
+            'message' => 'Unauthorized'
+        ], 403);
+    }
+
+    $validated = $request->validate([
+        'status' => 'required|in:under_review,needs_action,complete,approved,rejected',
+        'remarks' => 'nullable|string',
+    ]);
+
+    $application = Application::findOrFail($id);
+
+    $application->update([
+        'status' => $validated['status'],
+        'remarks' => $validated['remarks'] ?? null,
+    ]);
+
+    return response()->json([
+        'message' => 'Application review updated successfully.',
+        'application' => $application->fresh([
+            'student',
+            'scholarship',
+            'documents.validationResult'
+        ])
+    ]);
+}
 }
