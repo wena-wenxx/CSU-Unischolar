@@ -17,7 +17,6 @@ class ScholarshipController extends Controller
     public function index(Request $request)
     {
         $query = Scholarship::with('requirements')->orderBy('id', 'desc');
-
         if ($request->user()->role === 'student') {
             $query->where('status', 'active');
         }
@@ -25,13 +24,11 @@ class ScholarshipController extends Controller
         return response()->json($query->get());
     }
 
-    // View one scholarship
     public function show($id)
     {
         return response()->json(Scholarship::with('requirements')->findOrFail($id));
     }
 
-    // Create scholarship (staff only)
     public function store(Request $request)
     {
         if ($this->notStaff($request)) {
@@ -39,21 +36,18 @@ class ScholarshipController extends Controller
         }
 
         $data = $request->validate([
-            'name'              => 'required|string|max:255',
-            'description'       => 'nullable|string',
-            'provider'          => 'nullable|string|max:255',
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'provider' => 'nullable|string|max:255',
             'application_start' => 'nullable|date',
-            'application_end'   => 'nullable|date|after_or_equal:application_start',
-            'amount'            => 'nullable|numeric|min:0',
-            'status'            => 'nullable|in:active,inactive,closed',
+            'application_end' => 'nullable|date|after_or_equal:application_start',
+            'amount' => 'nullable|numeric|min:0',
+            'status' => 'nullable|in:active,inactive,closed',
         ]);
 
-        $scholarship = Scholarship::create($data);
-
-        return response()->json($scholarship, 201);
+        return response()->json(Scholarship::create($data), 201);
     }
 
-    // Update scholarship (staff only)
     public function update(Request $request, $id)
     {
         if ($this->notStaff($request)) {
@@ -61,13 +55,13 @@ class ScholarshipController extends Controller
         }
 
         $data = $request->validate([
-            'name'              => 'sometimes|required|string|max:255',
-            'description'       => 'nullable|string',
-            'provider'          => 'nullable|string|max:255',
+            'name' => 'sometimes|required|string|max:255',
+            'description' => 'nullable|string',
+            'provider' => 'nullable|string|max:255',
             'application_start' => 'nullable|date',
-            'application_end'   => 'nullable|date|after_or_equal:application_start',
-            'amount'            => 'nullable|numeric|min:0',
-            'status'            => 'nullable|in:active,inactive,closed',
+            'application_end' => 'nullable|date|after_or_equal:application_start',
+            'amount' => 'nullable|numeric|min:0',
+            'status' => 'nullable|in:active,inactive,closed',
         ]);
 
         $scholarship = Scholarship::findOrFail($id);
@@ -76,7 +70,6 @@ class ScholarshipController extends Controller
         return response()->json($scholarship);
     }
 
-    // Delete scholarship (staff only)
     public function destroy(Request $request, $id)
     {
         if ($this->notStaff($request)) {
@@ -88,7 +81,15 @@ class ScholarshipController extends Controller
         return response()->json(['message' => 'Scholarship deleted']);
     }
 
-    // Add a requirement to a scholarship (staff only)
+    // ---------------- Requirements (kept in this controller - see note) ----------------
+    // list requirements for one scholarship
+    public function listRequirements($scholarshipId)
+    {
+        $scholarship = Scholarship::findOrFail($scholarshipId);
+
+        return response()->json($scholarship->requirements);
+    }
+
     public function addRequirement(Request $request, $id)
     {
         if ($this->notStaff($request)) {
@@ -96,20 +97,48 @@ class ScholarshipController extends Controller
         }
 
         $scholarship = Scholarship::findOrFail($id);
-
         $data = $request->validate([
-            'name'        => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'is_required' => 'nullable|boolean',
         ]);
 
         $requirement = ScholarshipRequirement::create([
             'scholarship_id' => $scholarship->id,
-            'name'           => $data['name'],
-            'description'    => $data['description'] ?? null,
-            'is_required'    => $data['is_required'] ?? true,
+            'name' => $data['name'],
+            'description' => $data['description'] ?? null,
+            'is_required' => $data['is_required'] ?? true,
         ]);
 
         return response()->json($requirement, 201);
+    }
+
+    public function updateRequirement(Request $request, $id)
+    {
+        if ($this->notStaff($request)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'is_required' => 'boolean',
+        ]);
+
+        $requirement = ScholarshipRequirement::findOrFail($id);
+        $requirement->update($data);
+
+        return response()->json($requirement);
+    }
+
+    public function destroyRequirement(Request $request, $id)
+    {
+        if ($this->notStaff($request)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        ScholarshipRequirement::findOrFail($id)->delete();
+
+        return response()->json(['message' => 'Requirement deleted successfully.']);
     }
 }

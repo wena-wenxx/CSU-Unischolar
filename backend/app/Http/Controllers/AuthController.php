@@ -11,39 +11,38 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    // REGISTER (students only)
     public function register(Request $request)
     {
         $request->validate([
-            'first_name'     => 'required|string|max:255',
-            'middle_name'    => 'nullable|string|max:255',
-            'last_name'      => 'required|string|max:255',
-            'email'          => 'required|string|email|max:255|unique:users,email',
-            'password'       => 'required|string|min:8',
-            'student_id'     => 'required|string|unique:students,student_id',
-            'course'         => 'nullable|string|max:255',
-            'year_level'     => 'nullable|string|max:255',
-            'college'        => 'nullable|string|max:255',
+            'first_name' => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email',
+            'password' => 'required|string|min:8',
+            'student_id' => 'required|string|unique:students,student_id',
+            'course' => 'nullable|string|max:255',
+            'year_level' => 'nullable|string|max:255',
+            'college' => 'nullable|string|max:255',
             'contact_number' => 'nullable|string|max:255',
         ]);
 
         $user = DB::transaction(function () use ($request) {
             $user = User::create([
-                'name'     => trim($request->first_name . ' ' . $request->last_name),
-                'email'    => $request->email,
+                'name' => trim($request->first_name.' '.$request->last_name),
+                'email' => $request->email,
                 'password' => Hash::make($request->password),
-                'role'     => 'student',
+                'role' => 'student',
             ]);
 
             Student::create([
-                'user_id'        => $user->id,
-                'student_id'     => $request->student_id,
-                'first_name'     => $request->first_name,
-                'middle_name'    => $request->middle_name,
-                'last_name'      => $request->last_name,
-                'course'         => $request->course,
-                'year_level'     => $request->year_level,
-                'college'        => $request->college,
+                'user_id' => $user->id,
+                'student_id' => $request->student_id,
+                'first_name' => $request->first_name,
+                'middle_name' => $request->middle_name,
+                'last_name' => $request->last_name,
+                'course' => $request->course,
+                'year_level' => $request->year_level,
+                'college' => $request->college,
                 'contact_number' => $request->contact_number,
             ]);
 
@@ -52,39 +51,24 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        return response()->json([
-            'message' => 'Registration successful',
-            'user'    => $user,
-            'token'   => $token,
-        ], 201);
+        return response()->json(['message' => 'Registration successful', 'user' => $user, 'token' => $token], 201);
     }
 
-    // LOGIN (students and staff)
     public function login(Request $request)
     {
-        $request->validate([
-            'email'    => 'required|email',
-            'password' => 'required',
-        ]);
+        $request->validate(['email' => 'required|email', 'password' => 'required']);
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['Invalid credentials.'],
-            ]);
+        if (! $user || ! Hash::check($request->password, $user->password)) {
+            throw ValidationException::withMessages(['email' => ['Invalid credentials.']]);
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        return response()->json([
-            'message' => 'Login successful',
-            'user'    => $user,
-            'token'   => $token,
-        ]);
+        return response()->json(['message' => 'Login successful', 'user' => $user, 'token' => $token]);
     }
 
-    // LOGOUT
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();

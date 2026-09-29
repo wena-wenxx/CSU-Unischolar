@@ -32,4 +32,17 @@ class Application extends Model
     {
         return $this->hasMany(Document::class);
     }
+
+    /** Names of REQUIRED requirements that have no uploaded document yet. */
+    public function missingRequirementNames(): array
+    {
+        $this->loadMissing('scholarship.requirements', 'documents');
+
+        $covered = $this->documents->pluck('scholarship_requirement_id')->filter()->unique()->all();
+
+        return $this->scholarship->requirements
+            ->where('is_required', true)
+            ->reject(fn ($req) => in_array($req->id, $covered))
+            ->pluck('name')->values()->all();
+    }
 }
