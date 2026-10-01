@@ -6,13 +6,13 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
-class StaffSeeder extends Seeder
+class StudentSeeder extends Seeder
 {
     public function run(): void
     {
         User::updateOrCreate(
             [
-                'email' => 'oas.staff@carsu.edu.ph',
+                'email' => 'oas.student@carsu.edu.ph',
             ],
             [
                 'name' => 'OAS Demo Staff',
