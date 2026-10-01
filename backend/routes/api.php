@@ -2,51 +2,47 @@
 
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\EnrollmentController;
+use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\ScholarRecordController;
 use App\Http\Controllers\ScholarshipController;
+use App\Http\Controllers\StudentController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AIController;
-
-
-/*
-|--------------------------------------------------------------------------
-| PUBLIC
-|--------------------------------------------------------------------------
-*/
 
 Route::post('/register', [AuthController::class, 'register']);
-
 Route::post('/login', [AuthController::class, 'login']);
-
-
-/*
-|--------------------------------------------------------------------------
-| AUTHENTICATED
-|--------------------------------------------------------------------------
-*/
 
 Route::middleware('auth:sanctum')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | AUTH
+    | Authentication
     |--------------------------------------------------------------------------
     */
 
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    Route::get('/user', [AuthController::class, 'me']);
-
-
-    Route::post('/documents/{documentId}/validate', [AIController::class, 'validateDocument']);
-
+    Route::get('/user', function (Request $request) {
+        return $request->user()->load('student');
+    });
 
     /*
     |--------------------------------------------------------------------------
-    | SCHOLARSHIPS
+    | Student
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/profile', [StudentController::class, 'profile']);
+
+    Route::get(
+        '/student/history',
+        [StudentController::class, 'history']
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Scholarships
     |--------------------------------------------------------------------------
     */
 
@@ -80,14 +76,12 @@ Route::middleware('auth:sanctum')->group(function () {
         [ScholarshipController::class, 'addRequirement']
     );
 
-
     /*
     |--------------------------------------------------------------------------
-    | APPLICATIONS
+    | Applications
     |--------------------------------------------------------------------------
     */
 
-    // Student
     Route::post(
         '/applications',
         [ApplicationController::class, 'store']
@@ -98,18 +92,6 @@ Route::middleware('auth:sanctum')->group(function () {
         [ApplicationController::class, 'myApplications']
     );
 
-    Route::post(
-        '/applications/{id}/submit',
-        [ApplicationController::class, 'submit']
-    );
-
-    // Student + staff
-    Route::post(
-        '/applications/{id}/documents',
-        [ApplicationController::class, 'uploadDocument']
-    );
-
-    // Staff
     Route::get(
         '/applications',
         [ApplicationController::class, 'index']
@@ -120,27 +102,46 @@ Route::middleware('auth:sanctum')->group(function () {
         [ApplicationController::class, 'show']
     );
 
-    Route::put(
+    Route::patch(
         '/applications/{id}/review',
         [ApplicationController::class, 'review']
     );
 
+    Route::post(
+        '/applications/{id}/verify-enrollment',
+        [ApplicationController::class, 'verifyEnrollment']
+    );
 
     /*
     |--------------------------------------------------------------------------
-    | ENROLLMENT
+    | Staff Dashboard
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/staff/dashboard',
+        [ApplicationController::class, 'dashboard']
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Documents
     |--------------------------------------------------------------------------
     */
 
     Route::post(
-        '/applications/{applicationId}/enrollment',
-        [EnrollmentController::class, 'verify']
+        '/applications/{id}/documents',
+        [DocumentController::class, 'upload']
     );
 
+    Route::post(
+        '/documents/{id}/validate',
+        [DocumentController::class, 'validateDocument']
+    );
 
     /*
     |--------------------------------------------------------------------------
-    | SCHOLAR RECORDS
+    | Scholar Records
     |--------------------------------------------------------------------------
     */
 
@@ -149,25 +150,24 @@ Route::middleware('auth:sanctum')->group(function () {
         [ScholarRecordController::class, 'index']
     );
 
+    Route::get(
+        '/scholar-records/{id}',
+        [ScholarRecordController::class, 'show']
+    );
+
     Route::post(
-        '/scholar-records',
+        '/applications/{applicationId}/scholar-record',
         [ScholarRecordController::class, 'store']
     );
 
-    Route::put(
+    Route::patch(
         '/scholar-records/{id}',
         [ScholarRecordController::class, 'update']
     );
 
-    Route::get(
-        '/my-scholar-records',
-        [ScholarRecordController::class, 'myRecords']
-    );
-
-
     /*
     |--------------------------------------------------------------------------
-    | PAYROLL
+    | Payroll
     |--------------------------------------------------------------------------
     */
 
@@ -177,17 +177,12 @@ Route::middleware('auth:sanctum')->group(function () {
     );
 
     Route::post(
-        '/payroll',
+        '/scholar-records/{scholarRecordId}/payroll',
         [PayrollController::class, 'store']
     );
 
-    Route::put(
+    Route::patch(
         '/payroll/{id}',
         [PayrollController::class, 'update']
-    );
-
-    Route::get(
-        '/payroll/ready',
-        [PayrollController::class, 'ready']
     );
 });
