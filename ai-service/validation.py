@@ -16,11 +16,28 @@ NAME_SIMILAR_MIN = 75     # between  -> "similar but not exact" -> staff review
 MIN_TEXT_CHARS = 30       # less than this -> document unreadable / empty
 
 # ---- document kinds -> label patterns + words we expect to see ----------
-# (order matters: first match wins)
+# (kind, pattern matched against the requirement name, keywords expected in
+#  the document text, does this document normally show the student ID?)
+# Order matters: the first pattern that matches the requirement name wins.
+#
+# Only DISTINCTIVE words are listed. Generic words such as "CERTIFICATE",
+# "PHILIPPINES", "BARANGAY" or "RESIDENT" appear on almost every Philippine
+# certificate, so they would hide a wrong upload (e.g. a COR uploaded as a
+# Birth Certificate). A document is flagged as "wrong" only when NONE of the
+# keywords for its kind are found.
 DOC_KINDS = [
-    ("registration", r"registration|\bcor\b|enrol", ["REGISTRATION", "ENROLL", "UNITS", "SUBJECT", "SEMESTER"]),
-    ("grades",       r"grade|report card|transcript|\btor\b", ["GRADE", "GRADES", "GWA", "AVERAGE", "SEMESTER", "SUBJECT", "UNITS", "REPORT"]),
-    ("id",           r"\bid\b|identification", ["IDENTIFICATION", "VALID", "ID NO", "ID NUMBER", "SIGNATURE", "STUDENT"]),
+    ("registration", r"registration|\bcor\b|enrol",
+     ["REGISTRATION", "ENROLL", "UNITS", "SUBJECT", "SEMESTER"], True),
+    ("grades", r"grade|report card|transcript|\btor\b",
+     ["GRADE", "GRADES", "GWA", "AVERAGE", "SEMESTER", "SUBJECT", "UNITS", "REPORT"], True),
+    ("id", r"\bid\b|identification",
+     ["IDENTIFICATION", "VALID", "ID NO", "ID NUMBER", "SIGNATURE", "STUDENT"], True),
+    ("birth_certificate", r"birth",
+     ["BIRTH", "LIVE BIRTH", "PSA", "REGISTRY", "CIVIL REGISTRAR"], False),
+    ("indigency", r"indigen",
+     ["INDIGENCY", "INDIGENT", "LOW INCOME"], False),
+    ("barangay_clearance", r"clearance",
+     ["CLEARANCE"], False),
 ]
 
 
@@ -67,10 +84,15 @@ def best_name_match(expected_name: str, text: str):
 def detect_kind(label: str):
     """Which kind of document does the requirement label describe?"""
     label = (label or "").lower()
-    for kind, pattern, keywords in DOC_KINDS:
+    for kind, pattern, keywords, _shows_id in DOC_KINDS:
         if re.search(pattern, label):
             return kind, keywords
     return None, []
+
+
+def kind_shows_student_id(kind) -> bool:
+    """Only school documents (COR, grades, ID) are expected to show the student ID."""
+    return any(k == kind and shows_id for k, _p, _w, shows_id in DOC_KINDS)
 
 
 def student_id_found(expected_id: str, text: str) -> bool:
@@ -114,7 +136,7 @@ def validate_text(text: str, expected_name: str = "", expected_student_id: str =
     id_found = None
     if expected_student_id.strip() and readable:
         id_found = student_id_found(expected_student_id, text)
-        if not id_found and kind is not None:
+        if not id_found and kind_shows_student_id(kind):
             has_missing = True
             flags.append("Student ID number was not found on the document.")
 

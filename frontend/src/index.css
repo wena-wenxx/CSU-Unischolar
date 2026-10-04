@@ -1,17 +1,61 @@
 @import "tailwindcss";
 
-:root {
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+/* =========================================================
+   CARAGA STATE UNIVERSITY — ScholarGuide theme
+   Fonts (Playfair Display + Inter) are loaded in frontend/index.html.
 
-  color: #172033;
-  background: #f5f7fb;
+   Brand colours as requested. A few are also given an accessible
+   companion shade, because some pairings fail WCAG AA (4.5:1):
+     - Gold text on white is 1.6:1  -> gold is used on green, or as a
+       background; on white we use --csu-gold-text (6.3:1).
+     - White on Emerald is 3.6:1    -> success badges use an emerald tint
+       with --csu-emerald-text (6.0:1); success buttons use it as background.
+     - White on Orange is 2.9:1     -> orange buttons use dark text (5.8:1);
+       warning badges use an orange tint with --csu-orange-text (6.4:1).
+========================================================= */
+
+:root {
+  /* CSU colours (from the branding brief) */
+  --csu-green: #0a5c36;
+  --csu-gold: #f9c300;
+  --csu-orange: #e67e22;
+  --csu-emerald: #1a9b5e;
+  --csu-red: #c0392b;
+  --csu-gray: #4a4a4a;
+  --csu-light-gray: #f5f5f5;
+  --csu-white: #ffffff;
+
+  /* Accessible companions (same hues) */
+  --csu-green-dark: #063b22; /* gradients, hover, text on gold (7.8:1) */
+  --csu-green-hover: #084a2b;
+  --csu-green-tint: #e6f0eb;
+  --csu-gold-text: #7a5c00; /* gold-family text on white (6.3:1) */
+  --csu-gold-tint: #fff6d6;
+  --csu-emerald-text: #11683f; /* on emerald tint (6.0:1) */
+  --csu-emerald-tint: #e3f4ea;
+  --csu-orange-text: #8a4510; /* on orange tint (6.4:1) */
+  --csu-orange-tint: #fdf0e3;
+  --csu-red-tint: #fbeae8; /* red text on it: 4.7:1 */
+
+  /* Neutrals */
+  --text: var(--csu-gray);
+  --text-strong: #262626;
+  --text-muted: #5f5f5f; /* on light gray: 5.9:1 */
+  --border: #e3e3e3;
+  --border-strong: #c9c9c9;
+  --page-bg: var(--csu-light-gray);
+  --surface: var(--csu-white);
+  --surface-muted: #ececec;
+
+  --font-heading: "Playfair Display", Georgia, "Times New Roman", serif;
+  --font-body: Inter, "Segoe UI", Roboto, system-ui, -apple-system, sans-serif;
+
+  --radius: 10px;
+  --shadow: 0 18px 50px rgba(6, 59, 34, 0.14);
+
+  font-family: var(--font-body);
+  color: var(--text);
+  background: var(--page-bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -24,7 +68,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #f5f7fb;
+  background: var(--page-bg);
+  font-family: var(--font-body);
 }
 
 button,
@@ -38,9 +83,23 @@ button {
   cursor: pointer;
 }
 
-button:disabled {
+button:disabled,
+.button:disabled {
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.55;
+}
+
+a {
+  color: var(--csu-green);
+}
+
+a:hover {
+  color: var(--csu-green-dark);
+}
+
+:focus-visible {
+  outline: 3px solid var(--csu-gold);
+  outline-offset: 2px;
 }
 
 input,
@@ -50,21 +109,25 @@ textarea {
   padding: 11px 13px;
   margin-top: 6px;
   margin-bottom: 16px;
-
-  border: 1px solid #d8deea;
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
-
-  background: white;
-  color: #172033;
-
+  background: var(--surface);
+  color: var(--text-strong);
   outline: none;
 }
 
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: #3158d8;
-  box-shadow: 0 0 0 3px rgba(49, 88, 216, 0.1);
+  border-color: var(--csu-green);
+  box-shadow: 0 0 0 3px rgba(10, 92, 54, 0.18);
+}
+
+input[type="radio"],
+input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  accent-color: var(--csu-green);
 }
 
 textarea {
@@ -73,8 +136,20 @@ textarea {
 }
 
 label {
+  display: block;
   font-size: 14px;
   font-weight: 600;
+  color: var(--text-strong);
+}
+
+/* Headings: Playfair Display in CSU Green */
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading);
+  color: var(--csu-green);
+  font-weight: 700;
+  letter-spacing: 0.005em;
 }
 
 h1,
@@ -90,78 +165,168 @@ h1 {
 }
 
 h2 {
-  font-size: 19px;
+  font-size: 20px;
 }
 
 h3 {
-  font-size: 16px;
+  font-size: 17px;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 22px 0;
 }
 
 .muted {
-  color: #697386;
+  color: var(--text-muted);
 }
 
-/* LOGIN */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* =========================================================
+   LOGIN
+========================================================= */
 
 .login-page {
   min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(380px, 1fr);
+  background: linear-gradient(180deg, var(--csu-green) 0%, var(--csu-green-dark) 100%);
+}
 
+/* Campus photo with a CSU Green overlay (~85%) */
+.login-hero {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 48px;
+  background-size: cover;
+  background-position: center;
+  color: var(--csu-white);
+  text-align: center;
+}
 
-  padding: 24px;
+.login-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(10, 92, 54, 0.85), rgba(6, 59, 34, 0.9));
+}
+
+.login-hero-content {
+  position: relative;
+  max-width: 520px;
+}
+
+.login-hero-logo {
+  width: 110px;
+  height: auto;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35));
+}
+
+.login-hero-university {
+  margin: 18px 0 6px;
+  font-family: var(--font-heading);
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.03em;
+}
+
+.login-hero-tagline {
+  margin: 0 0 22px;
+  font-family: var(--font-heading);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 22px;
+  color: var(--csu-gold); /* gold on CSU Green: 4.9:1 */
+}
+
+.login-hero-motto {
+  display: inline-block;
+  margin: 0;
+  padding-top: 14px;
+  border-top: 1px solid rgba(249, 195, 0, 0.6);
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.login-hero-credit {
+  position: absolute;
+  right: 14px;
+  bottom: 10px;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.login-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
 }
 
 .login-card {
-  width: min(440px, 100%);
-
-  background: white;
-
-  border: 1px solid #e2e7f0;
-  border-radius: 18px;
-
-  padding: 36px;
-
-  box-shadow: 0 20px 50px rgba(23, 32, 51, 0.08);
+  width: min(430px, 100%);
+  background: var(--surface);
+  border-radius: 16px;
+  border-top: 5px solid var(--csu-gold);
+  padding: 32px 34px 22px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  text-align: center;
 }
 
-.login-card h1 {
-  margin-top: 18px;
+.login-card form,
+.login-card .alert,
+.login-card .demo-box {
+  text-align: left;
 }
 
-.brand-mark {
-  width: 62px;
-  height: 62px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  border-radius: 14px;
-
-  background: #172f76;
-  color: white;
-
-  font-weight: 800;
-  letter-spacing: 1px;
+.login-logo {
+  width: 120px;
+  max-width: 40%;
+  height: auto;
+  display: block;
+  margin: 0 auto 10px;
 }
 
-.brand-mark.small {
-  width: 42px;
-  height: 42px;
-  font-size: 12px;
-  border-radius: 10px;
+.login-title {
+  margin: 0;
+  font-size: 34px;
+  color: var(--csu-green);
+}
+
+.login-university {
+  margin: 2px 0 4px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.login-motto {
+  margin: 0 0 22px;
+  font-style: italic;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--csu-gold-text);
 }
 
 .demo-box {
-  margin-top: 24px;
-  padding: 14px;
-
+  margin-top: 20px;
+  padding: 12px 14px;
   border-radius: 10px;
-
-  background: #f3f6fc;
-
+  background: var(--csu-green-tint);
+  border-left: 4px solid var(--csu-gold);
+  color: var(--csu-green-dark);
   font-size: 13px;
 }
 
@@ -169,130 +334,210 @@ h3 {
   margin: 5px 0;
 }
 
-/* APP */
+.login-footer {
+  margin: 18px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* =========================================================
+   APP SHELL: sidebar + top bar
+========================================================= */
 
 .app-shell {
   min-height: 100vh;
-
   display: flex;
 }
 
 .sidebar {
-  width: 250px;
-
-  background: #172f76;
-  color: white;
-
-  padding: 20px;
-
+  width: 260px;
+  background: var(--csu-green);
+  color: var(--csu-white);
+  padding: 20px 18px;
   display: flex;
   flex-direction: column;
-
   position: fixed;
   left: 0;
   top: 0;
   bottom: 0;
+  z-index: 40;
+  border-right: 4px solid var(--csu-gold);
 }
 
 .sidebar-brand {
   display: flex;
   gap: 12px;
   align-items: center;
-
-  margin-bottom: 30px;
+  padding-bottom: 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
 }
 
-.sidebar-brand strong {
+.sidebar-logo {
+  width: 50px;
+  height: auto;
+  flex: none;
+}
+
+.sidebar-university {
   display: block;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.sidebar-app {
+  display: block;
+  margin-top: 3px;
+  color: var(--csu-gold); /* gold on CSU Green: 4.9:1 */
+  font-weight: 700;
+  font-size: 14px;
 }
 
 .sidebar-brand small {
   display: block;
-  margin-top: 3px;
-  opacity: 0.7;
+  margin-top: 2px;
+  font-size: 12px;
+  opacity: 0.9;
 }
 
 .sidebar nav {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  overflow-y: auto;
 }
 
 .nav-item {
-  border: 0;
-  background: transparent;
-
-  color: rgba(255, 255, 255, 0.78);
-
-  text-align: left;
-
-  padding: 12px 14px;
-
+  display: block;
+  color: var(--csu-white);
+  text-decoration: none;
+  padding: 11px 14px;
   border-radius: 8px;
-
-  transition: 0.2s;
+  font-weight: 500;
+  transition: background 0.2s, color 0.2s;
 }
 
-.nav-item:hover,
-.nav-item.active {
+.nav-item:hover {
   background: rgba(255, 255, 255, 0.12);
-  color: white;
+  color: var(--csu-white);
+}
+
+/* Active page: CSU Gold with dark green text (7.8:1) */
+.nav-item.active,
+.nav-item.active:hover {
+  background: var(--csu-gold);
+  color: var(--csu-green-dark);
+  font-weight: 700;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 16px;
+}
+
+.sidebar-motto {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-style: italic;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .logout-button {
-  margin-top: auto;
-
-  border: 1px solid rgba(255, 255, 255, 0.2);
-
+  width: 100%;
+  border: 1px solid var(--csu-white);
   background: transparent;
-
-  color: white;
-
-  padding: 11px;
-
+  color: var(--csu-white);
+  padding: 10px;
   border-radius: 8px;
+  font-weight: 600;
+}
+
+.logout-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.sidebar-overlay {
+  display: none;
 }
 
 .main-content {
-  margin-left: 250px;
-
-  width: calc(100% - 250px);
+  margin-left: 260px;
+  width: calc(100% - 260px);
+  min-width: 0;
 }
 
 .topbar {
-  height: 68px;
-
-  background: white;
-
-  border-bottom: 1px solid #e2e7f0;
-
+  height: 66px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--csu-green);
   display: flex;
   justify-content: space-between;
   align-items: center;
-
+  gap: 12px;
   padding: 0 28px;
-
   position: sticky;
   top: 0;
   z-index: 10;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.topbar-title {
+  font-family: var(--font-heading);
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--csu-green);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-button {
+  display: none;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--csu-green);
+  font-size: 20px;
+  line-height: 1;
 }
 
 .user-menu {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  color: var(--text-strong);
 }
 
+.user-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Role badge: CSU Gold with dark text */
 .role-label {
-  background: #eef2ff;
-  color: #3158d8;
-
-  padding: 5px 9px;
-
+  background: var(--csu-gold);
+  color: var(--csu-green-dark);
+  padding: 5px 10px;
   border-radius: 20px;
-
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .content {
@@ -300,23 +545,34 @@ h3 {
   max-width: 1500px;
 }
 
-/* HEADER */
+/* Printed-only parts are hidden on screen */
+.print-header,
+.print-footer {
+  display: none;
+}
+
+/* =========================================================
+   PAGE PARTS
+========================================================= */
 
 .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px 20px;
   margin-bottom: 24px;
 }
 
-/* CARDS */
+.page-header p {
+  margin-bottom: 0;
+}
 
 .card {
-  background: white;
-
-  border: 1px solid #e2e7f0;
-
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
-
   padding: 22px;
-
   margin-bottom: 20px;
 }
 
@@ -324,120 +580,129 @@ h3 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-
   gap: 15px;
-
   margin-bottom: 18px;
 }
 
 .card-header h2 {
-  margin-bottom: 0;
+  margin-bottom: 4px;
 }
 
 .card-grid {
   display: grid;
-
-  grid-template-columns:
-    repeat(auto-fit, minmax(280px, 1fr));
-
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 20px;
 }
 
 .dashboard-grid {
   display: grid;
-
-  grid-template-columns:
-    repeat(2, minmax(0, 1fr));
-
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
+}
+
+.dashboard-recent {
+  margin-top: 24px;
 }
 
 .stats-grid {
   display: grid;
-
-  grid-template-columns:
-    repeat(4, minmax(0, 1fr));
-
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
-
   margin-bottom: 24px;
 }
 
 .stat-card {
-  background: white;
-
-  border: 1px solid #e2e7f0;
-
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--csu-gold);
   border-radius: 12px;
-
-  padding: 20px;
+  padding: 18px 20px;
 }
 
 .stat-card span {
   display: block;
-
-  color: #697386;
-
+  color: var(--text-muted);
   font-size: 13px;
-
-  margin-bottom: 10px;
+  font-weight: 500;
+  margin-bottom: 8px;
 }
 
 .stat-card strong {
   display: block;
-
-  font-size: 30px;
+  font-family: var(--font-heading);
+  font-size: 32px;
+  color: var(--csu-green);
 }
 
-/* BUTTONS */
+/* =========================================================
+   BUTTONS (also used on links: <Link className="button ...">)
+========================================================= */
 
 .button {
-  border: 0;
-
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
   border-radius: 8px;
-
-  padding: 10px 15px;
-
+  padding: 10px 16px;
   font-weight: 600;
-
-  transition: 0.2s;
+  text-decoration: none;
+  transition: background 0.2s, border-color 0.2s;
 }
 
 .button-primary {
-  background: #3158d8;
-  color: white;
+  background: var(--csu-green);
+  color: var(--csu-white);
 }
 
 .button-primary:hover {
-  background: #2748b4;
+  background: var(--csu-green-hover);
+  color: var(--csu-white);
 }
 
 .button-secondary {
-  background: #edf1f7;
-  color: #26324a;
+  background: var(--surface-muted);
+  color: var(--csu-green);
+  border-color: var(--border);
 }
 
 .button-secondary:hover {
-  background: #e0e6f0;
+  background: var(--csu-green-tint);
+  color: var(--csu-green-dark);
 }
 
 .button-success {
-  background: #16855b;
-  color: white;
+  background: var(--csu-emerald-text);
+  color: var(--csu-white);
+}
+
+.button-success:hover {
+  background: #0c5232;
+  color: var(--csu-white);
 }
 
 .button-warning {
-  background: #c47b0a;
-  color: white;
+  background: var(--csu-orange);
+  color: #1f1f1f;
+}
+
+.button-warning:hover {
+  background: #cf6d17;
 }
 
 .button-danger {
-  background: #c83b4a;
-  color: white;
+  background: var(--csu-red);
+  color: var(--csu-white);
+}
+
+.button-danger:hover {
+  background: #a33024;
+  color: var(--csu-white);
 }
 
 .button-small {
-  padding: 7px 10px;
+  padding: 7px 11px;
   font-size: 12px;
 }
 
@@ -445,10 +710,16 @@ h3 {
   width: 100%;
 }
 
-.button-row {
+.button-row,
+.filter-row {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.filter-row {
+  margin-bottom: 14px;
 }
 
 .quick-actions {
@@ -457,97 +728,140 @@ h3 {
   gap: 10px;
 }
 
-/* TABLE */
+.inline-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.inline-form input {
+  flex: 1;
+  min-width: 12rem;
+  margin: 0;
+}
+
+/* =========================================================
+   TABLES (wide tables scroll inside their card)
+========================================================= */
 
 .table-wrapper {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
+  color: var(--text-strong);
 }
 
 th,
 td {
   padding: 13px 10px;
-
-  border-bottom: 1px solid #e8ebf1;
-
+  border-bottom: 1px solid var(--border);
   text-align: left;
+  vertical-align: middle;
+}
 
+th,
+td .status,
+td .button {
   white-space: nowrap;
+}
+
+td {
+  min-width: 70px;
 }
 
 th {
   font-size: 12px;
-  color: #697386;
+  font-weight: 600;
+  color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
+  border-bottom: 2px solid var(--csu-green-tint);
 }
 
-/* STATUS */
+tbody tr:hover {
+  background: #fafafa;
+}
+
+/* =========================================================
+   STATUS BADGES (Inter, uppercase)
+========================================================= */
 
 .status {
   display: inline-flex;
-
-  padding: 5px 9px;
-
+  padding: 4px 9px;
   border-radius: 20px;
-
-  font-size: 12px;
-
+  font-family: var(--font-body);
+  font-size: 11px;
   font-weight: 700;
-
-  text-transform: capitalize;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
 }
 
+/* approved, complete, active, validated, ready, processed */
 .status-success {
-  background: #e3f6ee;
-  color: #16734f;
+  background: var(--csu-emerald-tint);
+  color: var(--csu-emerald-text);
+  box-shadow: inset 0 0 0 1px rgba(26, 155, 94, 0.45);
 }
 
+/* needs_action, flagged, under_review, submitted */
 .status-warning {
-  background: #fff1d6;
-  color: #95610c;
+  background: var(--csu-orange-tint);
+  color: var(--csu-orange-text);
+  box-shadow: inset 0 0 0 1px rgba(230, 126, 34, 0.5);
 }
 
+/* rejected, inactive, closed */
 .status-danger {
-  background: #fde7ea;
-  color: #a72c3b;
+  background: var(--csu-red-tint);
+  color: var(--csu-red);
+  box-shadow: inset 0 0 0 1px rgba(192, 57, 43, 0.4);
 }
 
 .status-neutral {
-  background: #edf0f5;
-  color: #5c6678;
+  background: var(--surface-muted);
+  color: var(--csu-gray);
 }
 
-/* SCHOLARSHIP */
+/* =========================================================
+   SCHOLARSHIPS, DOCUMENTS, PROFILE
+========================================================= */
+
+.scholarship-card {
+  border-top: 4px solid var(--csu-green);
+}
 
 .scholarship-card h2 {
   margin-top: 14px;
 }
 
 .amount {
+  font-family: var(--font-heading);
   font-size: 25px;
-  font-weight: 800;
-
+  font-weight: 700;
   margin: 20px 0;
+  color: var(--csu-green);
 }
 
 .badge {
   display: inline-block;
-
-  padding: 5px 9px;
-
-  background: #eef2ff;
-  color: #3158d8;
-
+  padding: 4px 9px;
+  background: var(--csu-gold-tint);
+  color: var(--csu-gold-text);
+  border: 1px solid var(--csu-gold);
   border-radius: 20px;
-
-  font-size: 12px;
-
-  text-transform: capitalize;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .requirements-list {
@@ -560,66 +874,76 @@ th {
 
 .required {
   margin-left: 8px;
-
   font-size: 11px;
-
-  color: #a72c3b;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--csu-orange-text);
 }
-
-/* DOCUMENTS */
 
 .document-row {
   display: flex;
-
   justify-content: space-between;
-
   align-items: center;
-
   gap: 15px;
-
   padding: 14px 0;
-
-  border-bottom: 1px solid #e8ebf1;
+  border-bottom: 1px solid var(--border);
 }
 
-/* PROFILE */
+.ai-result {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.ai-result p {
+  margin-bottom: 2px;
+}
+
+.ai-result ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: var(--csu-orange-text);
+}
+
+.ai-ok {
+  color: var(--csu-emerald-text);
+  font-weight: 600;
+}
 
 .profile-grid,
 .detail-grid {
   display: grid;
-
-  grid-template-columns:
-    repeat(2, minmax(0, 1fr));
-
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+  margin-bottom: 18px;
 }
 
 .profile-item {
   padding: 15px;
-
-  background: #f7f9fc;
-
+  background: var(--csu-light-gray);
+  border-left: 3px solid var(--csu-green);
   border-radius: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .profile-item span {
   display: block;
-
-  color: #697386;
-
+  color: var(--text-muted);
   font-size: 12px;
-
   margin-bottom: 5px;
 }
 
-/* FORM */
+.profile-item strong {
+  color: var(--text-strong);
+}
+
+/* =========================================================
+   FORMS AND LISTS
+========================================================= */
 
 .form-grid {
   display: grid;
-
-  grid-template-columns:
-    repeat(2, minmax(0, 1fr));
-
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 5px 18px;
 }
 
@@ -627,131 +951,219 @@ th {
   grid-column: 1 / -1;
 }
 
-/* LIST */
+.choice-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin: 0 0 16px;
+}
+
+.choice-group legend {
+  padding: 0 6px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  font-weight: 500;
+  cursor: pointer;
+}
 
 .list-item {
   display: flex;
-
   justify-content: space-between;
-
   align-items: center;
-
   gap: 15px;
-
   padding: 14px 0;
-
-  border-bottom: 1px solid #e8ebf1;
+  border-bottom: 1px solid var(--border);
 }
 
-/* MODAL */
+/* =========================================================
+   MODALS, ALERTS, TOASTS
+========================================================= */
 
 .modal-backdrop {
   position: fixed;
-
   inset: 0;
-
-  background: rgba(15, 24, 43, 0.55);
-
+  background: rgba(6, 59, 34, 0.6);
   display: flex;
-
   align-items: center;
-
   justify-content: center;
-
   padding: 20px;
-
   z-index: 100;
 }
 
 .modal {
   width: min(600px, 100%);
-
   max-height: 90vh;
-
   overflow-y: auto;
-
-  background: white;
-
+  background: var(--surface);
   border-radius: 14px;
-
+  border-top: 5px solid var(--csu-gold);
   padding: 24px;
-
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
 }
 
 .modal-large {
   width: min(950px, 100%);
 }
 
-.close-button {
-  width: 36px;
-  height: 36px;
-
-  border: 0;
-
-  border-radius: 50%;
-
-  background: #eef1f5;
-
-  font-size: 22px;
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }
 
-/* ALERT */
+.close-button {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-muted);
+  color: var(--csu-green);
+  font-size: 22px;
+  line-height: 1;
+}
 
 .alert {
   padding: 12px 14px;
-
   border-radius: 8px;
-
   margin-bottom: 18px;
-
   font-size: 14px;
-}
-
-.alert-danger {
-  background: #fde7ea;
-  color: #a72c3b;
+  border-left: 4px solid transparent;
 }
 
 .alert-info {
-  background: #eaf1ff;
-  color: #3158d8;
+  background: var(--csu-green-tint);
+  color: var(--csu-green-dark);
+  border-left-color: var(--csu-green);
 }
 
-/* EMPTY */
+.alert-success {
+  background: var(--csu-emerald-tint);
+  color: var(--csu-emerald-text);
+  border-left-color: var(--csu-emerald);
+}
+
+.alert-warning {
+  background: var(--csu-orange-tint);
+  color: var(--csu-orange-text);
+  border-left-color: var(--csu-orange);
+}
+
+.alert-danger {
+  background: var(--csu-red-tint);
+  color: var(--csu-red);
+  border-left-color: var(--csu-red);
+}
+
+.toast-stack {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(380px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 14px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 6px solid var(--csu-green);
+  color: var(--text-strong);
+  box-shadow: var(--shadow);
+  font-size: 14px;
+  animation: toast-in 0.2s ease-out;
+}
+
+.toast-success {
+  border-left-color: var(--csu-emerald);
+}
+
+.toast-info {
+  border-left-color: var(--csu-gold);
+}
+
+.toast-error {
+  border-left-color: var(--csu-red);
+}
+
+.toast-close {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* =========================================================
+   EMPTY / LOADING
+========================================================= */
 
 .empty-state {
   padding: 35px 20px;
-
   text-align: center;
-
-  color: #697386;
+  color: var(--text-muted);
 }
 
-/* LOADING */
+.empty-state .button {
+  margin-top: 6px;
+}
 
 .loading {
   min-height: 200px;
-
   display: flex;
-
   flex-direction: column;
-
   align-items: center;
-
   justify-content: center;
+  color: var(--text-muted);
+}
+
+.loading p {
+  margin: 12px 0 4px;
+}
+
+.loading-motto {
+  font-style: italic;
+  font-size: 12px;
+  color: var(--csu-gold-text);
 }
 
 .spinner {
   width: 30px;
   height: 30px;
-
-  border: 3px solid #dce3f0;
-
-  border-top-color: #3158d8;
-
+  border: 3px solid var(--csu-green-tint);
+  border-top-color: var(--csu-gold);
+  border-right-color: var(--csu-green);
   border-radius: 50%;
-
   animation: spin 0.8s linear infinite;
 }
 
@@ -762,35 +1174,77 @@ th {
 }
 
 .report-count {
-  font-size: 34px;
-
-  font-weight: 800;
-
+  font-family: var(--font-heading);
+  font-size: 36px;
+  font-weight: 700;
   margin: 20px 0;
+  color: var(--csu-green);
 }
 
-/* RESPONSIVE */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
 
 @media (max-width: 1100px) {
   .stats-grid {
-    grid-template-columns:
-      repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
+
+  .login-page {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr);
+  }
+
+  .login-hero-university {
+    font-size: 30px;
+  }
 }
 
-@media (max-width: 800px) {
+/* Tablets and phones: sidebar becomes a slide-in menu (☰),
+   login photo becomes a short banner above the card. */
+@media (max-width: 900px) {
   .sidebar {
-    width: 210px;
+    width: 270px;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+
+  .menu-open .sidebar {
+    transform: translateX(0);
+    box-shadow: var(--shadow);
+  }
+
+  .menu-open .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: rgba(6, 59, 34, 0.5);
+  }
+
+  .menu-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .main-content {
-    margin-left: 210px;
+    margin-left: 0;
+    width: 100%;
+  }
 
-    width: calc(100% - 210px);
+  .topbar {
+    padding: 0 16px;
   }
 
   .content {
@@ -802,91 +1256,240 @@ th {
   .detail-grid {
     grid-template-columns: 1fr;
   }
+
+  .login-page {
+    grid-template-columns: 1fr;
+  }
+
+  .login-hero {
+    padding: 28px 20px 34px;
+  }
+
+  .login-hero-logo {
+    display: none;
+  }
+
+  .login-hero-university {
+    margin-top: 0;
+    font-size: 24px;
+  }
+
+  .login-hero-tagline {
+    font-size: 17px;
+    margin-bottom: 12px;
+  }
+
+  .login-panel {
+    padding: 20px 14px 32px;
+    align-items: flex-start;
+  }
 }
 
-@media (max-width: 650px) {
-  .app-shell {
-    display: block;
-  }
-
-  .sidebar {
-    position: static;
-
-    width: 100%;
-
-    min-height: auto;
-  }
-
-  .sidebar nav {
-    flex-direction: row;
-
-    overflow-x: auto;
-  }
-
-  .nav-item {
-    white-space: nowrap;
-  }
-
-  .logout-button {
-    margin-top: 15px;
-  }
-
-  .main-content {
-    margin-left: 0;
-
-    width: 100%;
-  }
-
-  .topbar {
-    padding: 0 16px;
+@media (max-width: 600px) {
+  h1 {
+    font-size: 25px;
   }
 
   .content {
+    padding: 16px 14px;
+  }
+
+  .card {
     padding: 16px;
   }
 
   .stats-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .stat-card {
+    padding: 14px;
+  }
+
+  .stat-card strong {
+    font-size: 26px;
+  }
+
+  .user-name {
+    display: none;
   }
 
   .document-row,
   .list-item {
     align-items: flex-start;
-
     flex-direction: column;
   }
-}
-/* ---------- Added for AI results, forms in modals, and search ---------- */
 
-.ai-result {
-  margin-top: 0.35rem;
-  font-size: 0.85rem;
+  .page-header .button-row,
+  .page-header .button {
+    width: 100%;
+  }
+
+  .modal-backdrop {
+    padding: 10px;
+    align-items: flex-end;
+  }
+
+  .modal {
+    max-height: 92vh;
+    padding: 18px;
+  }
+
+  .modal-footer .button {
+    flex: 1;
+  }
+
+  .toast-stack {
+    right: 16px;
+    left: 16px;
+    bottom: 16px;
+    width: auto;
+  }
+
+  .login-card {
+    padding: 26px 20px 18px;
+  }
+
+  .login-title {
+    font-size: 30px;
+  }
 }
 
-.ai-result ul {
-  margin: 0.25rem 0 0;
-  padding-left: 1.1rem;
-  color: #b45309;
+/* =========================================================
+   PRINT (Ctrl+P on any staff or student page)
+   Hides the menus and buttons and adds a CSU letterhead:
+   logo + "Caraga State University" + office, page title,
+   print time, and the CSU motto at the bottom of each page.
+========================================================= */
+
+@page {
+  size: A4;
+  margin: 14mm 12mm 18mm;
 }
 
-.modal textarea,
-.modal input,
-.modal select {
-  width: 100%;
-}
+@media print {
+  :root,
+  body {
+    background: #fff;
+  }
 
-.modal label {
-  display: block;
-  margin-top: 0.75rem;
-  font-weight: 600;
-}
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 
-.button-row input {
-  flex: 1;
-  min-width: 12rem;
-}
+  .sidebar,
+  .sidebar-overlay,
+  .topbar,
+  .toast-stack,
+  .modal-backdrop,
+  .menu-button,
+  .button,
+  .filter-row,
+  .quick-actions,
+  .inline-form,
+  .page-header .button-row,
+  form button {
+    display: none !important;
+  }
 
-.button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
+  .main-content {
+    margin: 0;
+    width: 100%;
+  }
+
+  .content {
+    padding: 0;
+    max-width: none;
+  }
+
+  .print-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+    border-bottom: 3px solid var(--csu-green);
+  }
+
+  .print-logo {
+    width: 52px;
+    height: auto;
+  }
+
+  .print-wordmark {
+    height: 34px;
+    width: auto;
+    display: block;
+  }
+
+  .print-office {
+    margin: 4px 0 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--csu-green);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .print-meta {
+    margin-left: auto;
+    text-align: right;
+    font-size: 11px;
+    color: #333;
+  }
+
+  .print-meta strong {
+    display: block;
+    font-family: var(--font-heading);
+    font-size: 16px;
+    color: var(--csu-green);
+  }
+
+  /* Repeats at the bottom of every printed page */
+  .print-footer {
+    display: block;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin: 0;
+    padding-top: 4px;
+    border-top: 1px solid var(--csu-gold);
+    font-size: 10px;
+    font-style: italic;
+    text-align: center;
+    color: #444;
+  }
+
+  .card,
+  .stat-card {
+    border: 1px solid #ccc;
+    box-shadow: none;
+    break-inside: avoid;
+  }
+
+  .table-wrapper {
+    overflow: visible;
+  }
+
+  table {
+    font-size: 11px;
+  }
+
+  th,
+  td {
+    padding: 6px 6px;
+    border-bottom: 1px solid #bbb;
+  }
+
+  tr {
+    break-inside: avoid;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 }

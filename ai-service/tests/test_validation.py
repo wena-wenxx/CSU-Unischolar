@@ -126,3 +126,45 @@ def test_middle_name_on_document_is_accepted():
     text = "CERTIFICATE OF REGISTRATION Name: WENA ROSE CONTIGA Student ID: 2026-00100 Semester Subjects units"
     r = validate_text(text, "Wena Contiga", "2026-00100", "Certificate of Registration")
     assert r["has_name_mismatch"] is False
+
+
+# ---------- new document kinds (birth certificate, indigency, barangay clearance) ----------
+BIRTH = "Republic of the Philippines PSA Office of the Civil Registrar General CERTIFICATE OF LIVE BIRTH Child: MARIA SANTOS"
+INDIGENCY = "Republic of the Philippines Barangay Ampayon CERTIFICATE OF INDIGENCY This certifies that MARIA SANTOS is an indigent resident"
+CLEARANCE = "Republic of the Philippines Barangay Ampayon BARANGAY CLEARANCE This certifies that MARIA SANTOS is a resident of good standing"
+
+
+def test_correct_birth_certificate_has_no_flags():
+    r = validate_text(BIRTH, "Maria Santos", "2026-00100", "Birth Certificate")
+    assert r["flags"] == [] and r["is_complete"]
+    assert r["extracted_data"]["document_kind"] == "birth_certificate"
+
+
+def test_birth_certificate_does_not_need_student_id():
+    r = validate_text(BIRTH, "Maria Santos", "2026-00100", "Birth Certificate")
+    assert not r["has_missing_information"]
+
+
+def test_cor_uploaded_as_birth_certificate_is_flagged():
+    r = validate_text(GOOD, "Maria Santos", "2026-00100", "Birth Certificate")
+    assert r["has_wrong_document"]
+
+
+def test_correct_indigency_has_no_flags():
+    r = validate_text(INDIGENCY, "Maria Santos", "2026-00100", "Certificate of Indigency")
+    assert r["flags"] == [] and r["extracted_data"]["document_kind"] == "indigency"
+
+
+def test_clearance_uploaded_as_indigency_is_flagged():
+    r = validate_text(CLEARANCE, "Maria Santos", "2026-00100", "Certificate of Indigency")
+    assert r["has_wrong_document"]
+
+
+def test_correct_barangay_clearance_has_no_flags():
+    r = validate_text(CLEARANCE, "Maria Santos", "2026-00100", "Barangay Clearance")
+    assert r["flags"] == [] and r["extracted_data"]["document_kind"] == "barangay_clearance"
+
+
+def test_indigency_uploaded_as_clearance_is_flagged():
+    r = validate_text(INDIGENCY, "Maria Santos", "2026-00100", "Barangay Clearance")
+    assert r["has_wrong_document"]

@@ -1,22 +1,35 @@
 # CSU UniScholar — End-to-End Test Plan
 
-Follow the steps in order. Each step says **what to do**, **what to send**, and **what you should see**.
-Tick the box when it passes. If a step fails, write down the exact error message.
+Follow the steps in order. Each step says **what to do** and **what you should see**.
+Tick the box when it passes. If a step fails, write down the exact message.
 
-Demo accounts (created by `php artisan migrate:fresh --seed`):
+Demo accounts (created by `php artisan migrate:fresh --seed`, all fictional):
 
 | Role | Email | Password |
 |---|---|---|
 | Staff (OAS) | oas.staff@carsu.edu.ph | Staff@12345 |
-| Student 1 (Juan) | student1@carsu.edu.ph | Student@12345 |
-| Student 2 (Maria) | student2@carsu.edu.ph | Student@12345 |
-| Student 3 (Ana) | student3@carsu.edu.ph | Student@12345 |
+| Students | student1@carsu.edu.ph … student10@carsu.edu.ph | Student@12345 |
+
+What the demo data contains (one scenario per student):
+
+| Student | Login | Scholarship | Starts as |
+|---|---|---|---|
+| Juan | student1 | CMSP | Approved + enrollment verified → ready to tag |
+| Maria | student2 | TES | Submitted; her Indigency upload is really a Barangay Clearance |
+| Ana | student3 | DOST-SEI | Under review; also a completed past scholarship (Data Bank) |
+| Pedro | student4 | LGU Butuan | Needs action (clearer Barangay Clearance) |
+| Liza | student5 | CSU Student Assistance | Rejected by the agency |
+| Carlo | student6 | CSU Cultural Grant | Draft, 1 of 3 documents |
+| Rosa | student7 | CSU Student Assistance | Complete; her COR belongs to another person |
+| Mark | student8 | TES | Approved, enrollment **not** verified |
+| Jose | student9 | TES | Active grantee, payroll entry **Ready** |
+| Grace | student10 | CMSP | Active grantee, no payroll yet |
 
 ---
 
 ## 0. Start everything (3 terminals in VS Code)
 
-Open **Terminal → New Terminal** three times (or press the **+** in the terminal panel).
+Open **Terminal → New Terminal** three times (or press **+** in the terminal panel).
 
 **Terminal 1 — backend**
 ```
@@ -25,9 +38,9 @@ php artisan migrate:fresh --seed
 php artisan storage:link
 php artisan serve
 ```
-Expect: `Server running on [http://127.0.0.1:8000]`. (`storage:link` may say the link already exists — that is fine.)
+Expect: `Server running on [http://127.0.0.1:8000]`. (`storage:link` may say the link already exists — fine.)
 
-> ⚠ `migrate:fresh` **erases all data**. Only run it when you want a clean demo database.
+> ⚠ `migrate:fresh` **erases all data** and rebuilds the demo data. Run it before every rehearsal.
 
 **Terminal 2 — AI service**
 ```
@@ -36,8 +49,8 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 uvicorn main:app --port 8001
 ```
 Expect: `Uvicorn running on http://127.0.0.1:8001`.
-Check: open http://127.0.0.1:8001/ocr-status — `"paddleocr_ready": true` means scanned images can be read.
-(Typed PDFs are read without PaddleOCR.)
+Optional check: http://127.0.0.1:8001/ocr-status — `"paddleocr_ready": true` means images (PNG/JPG) can be read.
+Typed PDFs (like the demo files) are read without PaddleOCR.
 
 **Terminal 3 — frontend**
 ```
@@ -45,105 +58,115 @@ cd frontend
 npm install
 npm run dev
 ```
-Expect: `Local: http://localhost:5173/`. Open that address in your browser.
+Expect: `Local: http://localhost:5173/`. Open it in Chrome.
 
 ---
 
 ## Part A — Postman checks (API)
 
-In Postman, every request needs the header **Accept: application/json**.
-After logging in, put the token in **Authorization → Bearer Token**.
+Every request needs the header **Accept: application/json**. After logging in, put the token in
+**Authorization → Bearer Token**.
 
-- [ ] **A1. Staff login** — `POST http://127.0.0.1:8000/api/login`, Body → x-www-form-urlencoded: `email=oas.staff@carsu.edu.ph`, `password=Staff@12345`.
-  Expect **200**, `"message": "Login successful"`, a `token`, and `"role": "staff"`. Save this as the *staff token*.
-- [ ] **A2. Student login** — same request with `student1@carsu.edu.ph` / `Student@12345`.
-  Expect **200** and `"role": "student"`. Save as the *student token*.
-- [ ] **A3. Wrong password** — send A1 with `password=wrong`. Expect **422** "Invalid credentials."
-- [ ] **A4. Scholarships** — `GET /api/scholarships` with the student token. Expect **200** and **6** programs, each with a `requirements` list.
-- [ ] **A5. Staff dashboard** — `GET /api/staff/dashboard` with the staff token. Expect **200** with `total_applicants`, `needs_action`, `approved`, `active_scholars`, `payroll_ready`, `ai_flags`, `scholarships` (= 6).
-- [ ] **A6. Students are blocked from staff data** — A5 with the *student* token. Expect **403**.
-- [ ] **A7. Data Bank search** — `GET /api/staff/data-bank?q=juan` with the staff token. Expect **200** and Juan in the list.
+- [ ] **A1. Staff login** — `POST http://127.0.0.1:8000/api/login`, Body → x-www-form-urlencoded:
+  `email=oas.staff@carsu.edu.ph`, `password=Staff@12345`. Expect **200**, a `token`, `"role": "staff"`.
+- [ ] **A2. Student login** — same with `student5@carsu.edu.ph` / `Student@12345`. Expect **200**, `"role": "student"`.
+- [ ] **A3. Wrong password** — A1 with `password=wrong`. Expect **422** "Invalid credentials."
+- [ ] **A4. Scholarships** — `GET /api/scholarships` (student token). Expect **200** and **6** programs with `requirements`.
+- [ ] **A5. Staff dashboard** — `GET /api/staff/dashboard` (staff token). Expect **200**, `scholarships: 6`, `active_scholars: 2`, `payroll_ready: 1`.
+- [ ] **A6. Students are blocked** — A5 with the *student* token. Expect **403**.
+- [ ] **A7. Data Bank** — `GET /api/staff/data-bank?q=ana` (staff token). Expect **200** and Ana in the list.
 
 ---
 
 ## Part B — Browser walkthrough (the full OAS workflow)
 
-### Student: apply
+### Student: apply (Liza, student5)
 
-- [ ] **B1. Student login** — Open http://localhost:5173, type `student1@carsu.edu.ph` / `Student@12345`, click **Sign in**.
-  Expect: Student Dashboard, "Welcome, Juan", **Available Scholarships = 6**.
-- [ ] **B2. Browse scholarships** — Click **Scholarships** in the left menu. Click **Details** on any card.
-  Expect: a window listing the program's requirements, each marked *Required*. Close it with **×**.
-- [ ] **B3. Create application** — Click **Apply** on *CHED Merit Scholarship Program (CMSP)*.
-  Expect: a window opens with the message "Your application was saved as a draft…" and status **Draft**.
-  The **Submit application** button is greyed out, and the text lists the documents still needed.
-- [ ] **B4. Upload documents** — In the window: choose a requirement in **Select requirement**, click **Choose File**, pick a PDF/JPG/PNG (max 10 MB), click **Upload document**. Repeat for every requirement.
-  Expect: "Document uploaded." each time and a new row under **Documents** with status **Uploaded**.
-  Tip: for a good AI demo, run `python make_sample_docs.py` in `ai-service/` and use the PDFs in `ai-service/sample_docs/`.
-- [ ] **B5. Submit** — When nothing is listed as "Still needed", click **Submit application**, then **OK**.
-  Expect: "Application submitted to OAS." and status **Submitted**. The upload section disappears.
-- [ ] **B6. My Applications** — Click **My Applications**. Expect the CMSP row with today's date and **Submitted**.
-- [ ] **B7. Duplicate prevention** — Go to **Scholarships** and click **Apply** on CMSP again.
-  Expect: "You already applied to this scholarship."
-- [ ] Click **Sign out**.
+- [ ] **B1. Login** — Open http://localhost:5173. Sign in as `student5@carsu.edu.ph` / `Student@12345`.
+  Expect: address bar shows **/student/dashboard**, "Welcome, Liza".
+- [ ] **B2. Details** — Click **Scholarships**, then **Details** on *Tertiary Education Subsidy (TES)*.
+  Expect: a page at **/student/scholarships/3** listing 4 required documents. Click **← All scholarships**.
+- [ ] **B3. Apply** — Click **Apply** on TES.
+  Expect: a page at **/student/applications/<number>** with the green note "Your application was saved as a draft…".
+  **Submit application** is greyed out and "Still needed…" lists the 4 documents.
+- [ ] **B4. Upload** — Choose a requirement, click **Choose File**, pick the matching PDF from
+  `csu-unischolar-demo-files/students/2026-00005-liza-mendoza/`, click **Upload document**. Repeat for all 4.
+  Expect: a green message "Document uploaded." in the bottom-right corner each time.
+- [ ] **B5. Submit** — Click **Submit application**. A window asks "Submit application?" → click **Submit application**.
+  Expect: corner message "Application submitted to OAS.", status **Submitted**, upload form gone.
+- [ ] **B6. Back and refresh** — Click **My Applications**, then the browser **Back** button.
+  Expect: you return to the application page. Press **F5** (refresh): you stay on the same page.
+- [ ] **B7. Duplicate prevention** — Go to **Scholarships**, click **Apply** on TES again.
+  Expect: a red corner message "You already applied to this scholarship."
+- [ ] **B8. Staff pages are protected** — Type http://localhost:5173/staff/dashboard in the address bar.
+  Expect: you are sent back to **/student/dashboard**. Click **Sign out**.
 
-### Staff: review documents with AI help
+### Staff: review with AI help
 
-- [ ] **B8. Staff login** — Sign in as `oas.staff@carsu.edu.ph` / `Staff@12345`.
-  Expect: Staff Dashboard with **Total Applicants 1**, **Applications 1**.
-- [ ] **B9. Open the application** — Click **Applications**, then **Review** on Juan's row.
-  Expect: Juan's details, the documents (click a file name to open it in a new tab), "AI check: not run yet" under each.
-- [ ] **B10. AI validation** *(AI service must be running)* — Click **Run AI check** on a document.
-  Expect one of:
-  - "AI check finished: no issues found." → document status **Validated**.
-  - "…possible issues flagged…" → status **Flagged** and the reasons listed in orange (e.g. name not found).
-  - "The file could not be read automatically…" → status **Needs Review** (check it yourself).
-  The AI never approves or rejects — staff decide.
-- [ ] **B11. AI service offline** — Stop Terminal 2 (Ctrl+C), click **Re-run AI check**.
-  Expect: "Unable to connect to AI service…" and status **Needs Review**. Start Terminal 2 again.
-- [ ] **B12. Needs Action** — Type in **Remarks**: `Please upload a clearer Valid ID.` Click **Needs Action**.
-  Expect status **Needs Action**. (As Student 1 later, **My Applications → Continue** shows "OAS says: …" and allows re-upload and re-submit.)
-- [ ] **B13. Record the agency's decision** — Click **Complete (forward to agency)**, then **Approved by agency**.
-  Expect status **Approved**; the Enrollment field says **Not yet verified**.
+- [ ] **B9. Staff login** — Sign in as `oas.staff@carsu.edu.ph` / `Staff@12345`.
+  Expect: **/staff/dashboard** with 8 numbers (Scholarship Programs **6**, Active Scholars **2**, Payroll Ready **1**).
+- [ ] **B10. AI check, good documents** *(AI service running)* — **Applications** → **Submitted** filter → **Review** on Liza.
+  Click **Run AI check** on each document.
+  Expect: each becomes **Validated** with "AI check · name match score … · No issues flagged."
+- [ ] **B11. AI check, wrong document** — Close the window (×, Escape, or click outside). **Review** Maria →
+  **Run AI check** on *Certificate of Indigency*.
+  Expect: **Flagged** — "This does not look like the requested document (Certificate of Indigency)."
+- [ ] **B12. AI check, wrong person** — **Complete** filter → **Review** Rosa → **Run AI check** on the COR.
+  Expect: **Flagged** — "Applicant name not found on the document" and "Student ID number was not found".
+- [ ] **B13. AI service offline** — Stop Terminal 2 (Ctrl+C), click **Re-run AI check**.
+  Expect: red message "Unable to connect to AI service…", status **Needs Review**. Start Terminal 2 again.
+- [ ] **B14. Needs Action** — Review Liza. Leave **Remarks** empty and click **Needs Action**:
+  a red message asks you to type remarks. Type `Please upload a clearer Valid ID.`, click **Needs Action** again → status **Needs Action**.
+- [ ] **B15. Record the agency's decision** — Click **Complete (forward to agency)**, then **Approved by agency**.
+  Expect: status **Approved**, Enrollment "Not yet verified".
 
 ### Staff: enrollment → grantee → payroll
 
-- [ ] **B14. Verify enrollment** — In the same window click **Verify enrollment**, then **OK** (= currently enrolled).
-  Expect: "Enrollment verified. You can now tag this student as a grantee." and Enrollment **Verified (today)**.
-  (Clicking **Cancel** records "NOT currently enrolled", and the student cannot be tagged.)
-- [ ] **B15. Tag grantee** — Close the window. Click **Scholar Records**. Juan is under **Ready to Tag as Grantee**.
-  Click **Tag as Grantee**, answer the ATM question (OK = Yes).
-  Expect: Juan in **Current Scholar Records** with status **Active**, Enrolled **Yes**.
-- [ ] **B16. One active scholarship rule** — Sign in as Student 1 and click **Apply** on any other scholarship.
+- [ ] **B16. Verify enrollment** — In the same window click **Verify enrollment**. A form asks
+  "Is this student currently enrolled?" → keep **Yes, currently enrolled** → **Save verification**.
+  Expect: "Enrollment verified. You can now tag this student as a grantee."
+- [ ] **B17. Tag grantee** — Close the window. **Scholar Records** → Liza and Juan are under *Ready to Tag as Grantee*.
+  Click **Tag as Grantee** on Juan. Choose **Yes, has an ATM card** → **Tag as grantee**.
+  Expect: "Juan Demo Student is now tagged as a grantee." and Juan under *Current Scholar Records*.
+- [ ] **B18. One active scholarship rule** — Sign in as `student1` (Juan), click **Apply** on any other scholarship.
   Expect: "You already have an active scholarship. Only one active scholarship is allowed." Sign back in as staff.
-- [ ] **B17. Prepare payroll** — Click **Payroll**. On Juan's row click **Add to Payroll**.
-  Type an amount (e.g. `5000`) → OK, keep or change the period → OK.
-  Expect a row under **Payroll Records** with status **Draft**.
-- [ ] **B18. Payroll status** — Click **Mark Ready** (status → **Ready**), then **Mark Processed** (status → **Processed**).
-  The Dashboard's **Payroll Ready** counts entries currently in *Ready*.
-- [ ] **B19. Data Bank** — Click **Data Bank**, type `juan`, click **Search**, then **Full history**.
-  Expect: Juan's profile, his grantee record with payroll entries, and his application with "Verified …".
+- [ ] **B19. Batch payroll** — **Payroll** → click **Prepare payroll for all enrolled scholars (3)**.
+  Type `5000` as the amount, keep the period → click **Prepare payroll for 3 scholars**.
+  Expect: "Payroll prepared for 2 scholars. 1 skipped (already had "1st Semester AY 2026-2027")."
+  (Jose already had an entry for that period.)
+- [ ] **B20. No double payment** — Click the batch button again with the same period.
+  Expect: "Payroll prepared for 0 scholars. 3 skipped…"
+- [ ] **B21. Payroll status** — Click **Mark Ready** on a Draft row (→ **Ready**), then **Mark Processed** (→ **Processed**).
+- [ ] **B22. Data Bank** — **Data Bank** → type `ana` → **Search** → **Full history**.
+  Expect: Ana's completed CSU Student Assistance record with a processed payroll entry, and her current DOST-SEI application.
 
-### Reports
+### Reports and settings
 
-- [ ] **B20. CSV export** — Click **Reports**. Click **Export CSV** on each card.
-  Expect 4 downloads: `scholarship-applications.csv`, `scholar-records.csv`, `payroll-report.csv`, `scholarship-programs.csv`.
-  Open each in Excel: student names, IDs, scholarships and amounts appear in columns; "ñ" displays correctly.
-- [ ] **B21. Edit a program** — Click **Scholarships → Manage** on a program. Set **Amount**, click **Save changes** ("Saved.").
-  Add a requirement, then **Remove** it. Adding a requirement that is already listed shows "This scholarship already lists that requirement."
+- [ ] **B23. CSV export** — **Reports** → **Export CSV** on each card. Expect 4 downloads and a corner message for each.
+  Open them in Excel: names, IDs, scholarships and amounts appear in columns; "ñ" displays correctly.
+- [ ] **B24. Edit a program** — **Scholarships** → **Manage**. Set **Amount** → **Save changes** ("Scholarship saved.").
+  Click **Remove** on a requirement: a window asks "Remove requirement?" — click **Cancel**.
+
+### Phone layout
+
+- [ ] **B25.** In Chrome press **F12**, click the phone icon (Toggle device toolbar), choose a phone (e.g. iPhone 12 Pro).
+  Expect: the green menu is hidden and a **☰** button appears top-left. Tap ☰ → the menu slides in; tap **Payroll** →
+  the menu closes and the Payroll page shows. Wide tables scroll sideways inside their cards; the page itself does not.
+  Forms (e.g. batch payroll) open from the bottom of the screen.
 
 ---
 
 ## What has and has not been tested
 
-Tested by Claude on 4 Oct 2026 — Laravel 12 on **SQLite**, the React app in headless Chromium,
-and a **stand-in AI service** that returns the same JSON shape as `ai-service/main.py`:
-
-- In the browser: B1–B6, B8–B10, B12–B15, B17–B21.
-- Through the API: A1–A7, B7, B11, B12 (re-upload + re-submit), B14 (not-enrolled path), B16,
-  B18 (Processed), and tagging one student for two approved scholarships (second one is refused).
+Tested by Claude on 4 Oct 2026 — Laravel 12 on **SQLite**, the React app in headless Chromium at 1366×900 and
+390×844, after `migrate:fresh --seed`:
+B1–B11, B14–B17 and B19–B25 in the browser, and A1–A7, B12, B13 and B18 through the API.
+The AI steps used a test server that runs the **real `validation.py` rules** on text extracted from the demo PDFs
+(FastAPI and PyMuPDF could not be installed in Claude's environment). The **19 rule tests** in
+`ai-service/tests/test_validation.py` pass (run with an exact re-implementation of RapidFuzz's `token_sort_ratio`).
 
 **Not yet tested — please run these yourselves:**
 - Everything on **MySQL/MariaDB** (your real database).
-- The **real AI service** with PaddleOCR on real scanned documents (B10), and `pytest` in `ai-service/`.
-- `npm run build` / `npm run lint` with Vite (the app was compiled with esbuild for the test instead).
+- The **real AI service** (`uvicorn main:app`) and `pytest` in `ai-service/`, including PaddleOCR on the PNG images.
+- The real **React Router** library and `npm run dev` / `npm run build` / `npm run lint` with Vite.
+  (Claude's test used a small stand-in for React Router because npm downloads were blocked.)

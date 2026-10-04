@@ -7,11 +7,13 @@ use Illuminate\Database\Seeder;
 /**
  * Runs with: php artisan migrate:fresh --seed
  *
- * Demo logins created:
- *   Staff     oas.staff@carsu.edu.ph  / Staff@12345
- *   Student 1 student1@carsu.edu.ph   / Student@12345
- *   Student 2 student2@carsu.edu.ph   / Student@12345
- *   Student 3 student3@carsu.edu.ph   / Student@12345
+ * Demo logins created (all fictional):
+ *   Staff        oas.staff@carsu.edu.ph                      / Staff@12345
+ *   Students     student1@carsu.edu.ph ... student10@carsu.edu.ph / Student@12345
+ *
+ * DemoDataSeeder then adds 6 scholarship programs and one application per
+ * student in different stages (see the list inside DemoDataSeeder.php).
+ * Run "php artisan storage:link" once so staff can open the demo files.
  */
 class DatabaseSeeder extends Seeder
 {

@@ -1,0 +1,449 @@
+import { useCallback, useEffect, useState } from "react";
+import api, { errMsg } from "../../services/api";
+import { enrollmentText, fileUrl, fullName, missingRequirements } from "../../lib/format";
+import { useToast } from "../../components/Toast";
+import Modal from "../../components/Modal";
+import PageHeader from "../../components/PageHeader";
+import ProfileItem from "../../components/ProfileItem";
+import StatusBadge from "../../components/StatusBadge";
+import EmptyState from "../../components/EmptyState";
+import Loading from "../../components/Loading";
+
+const FILTERS = [
+  ["all", "All"],
+  ["submitted", "Submitted"],
+  ["under_review", "Under review"],
+  ["needs_action", "Needs action"],
+  ["complete", "Complete"],
+  ["approved", "Approved"],
+  ["to_verify", "Approved, enrollment not verified"],
+  ["draft", "Drafts"],
+];
+
+export default function StaffApplicationsPage() {
+  const toast = useToast();
+
+  const [applications, setApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("all");
+  const [selected, setSelected] = useState(null);
+  const [verifying, setVerifying] = useState(null);
+
+  const load = useCallback(async () => {
+    try {
+      const response = await api.get("/applications");
+      setApplications(response.data);
+    } catch (err) {
+      toast.error(errMsg(err, "Unable to load applications."));
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function openApplication(id) {
+    try {
+      const response = await api.get(`/applications/${id}`);
+      setSelected(response.data);
+    } catch (err) {
+      toast.error(errMsg(err, "Unable to load application."));
+    }
+  }
+
+  // Refresh both the table and the open review window.
+  async function refresh(id) {
+    await load();
+    if (selected?.id === id) await openApplication(id);
+  }
+
+  const shown = applications.filter((application) => {
+    if (filter === "all") return true;
+    if (filter === "to_verify") {
+      return application.status === "approved" && !application.enrollment_verified;
+    }
+    return application.status === filter;
+  });
+
+  if (loading) return <Loading />;
+
+  return (
+    <div>
+      <PageHeader
+        title="Application Review"
+        subtitle="Check documents, record the agency's decision, and verify enrollment"
+      />
+
+      <div className="card">
+        <div className="filter-row" role="group" aria-label="Filter applications">
+          {FILTERS.map(([key, label]) => (
+            <button
+              key={key}
+              className={
+                filter === key
+                  ? "button button-small button-primary"
+                  : "button button-small button-secondary"
+              }
+              aria-pressed={filter === key}
+              onClick={() => setFilter(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {shown.length === 0 ? (
+          <EmptyState message="No applications in this list." />
+        ) : (
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Student ID</th>
+                  <th>Scholarship</th>
+                  <th>Status</th>
+                  <th>Enrollment</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {shown.map((application) => (
+                  <tr key={application.id}>
+                    <td>{fullName(application.student)}</td>
+                    <td>{application.student?.student_id}</td>
+                    <td>{application.scholarship?.name}</td>
+                    <td>
+                      <StatusBadge status={application.status} />
+                    </td>
+                    <td>{enrollmentText(application)}</td>
+                    <td>
+                      <div className="button-row">
+                        <button
+                          className="button button-small button-secondary"
+                          onClick={() => openApplication(application.id)}
+                        >
+                          Review
+                        </button>
+
+                        {application.status === "approved" && (
+                          <button
+                            className="button button-small button-success"
+                            onClick={() => setVerifying(application)}
+                          >
+                            {application.enrollment_verified ? "Re-verify" : "Verify enrollment"}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {selected && (
+        <ReviewModal
+          application={selected}
+          onClose={() => setSelected(null)}
+          onChanged={() => refresh(selected.id)}
+          onVerify={() => setVerifying(selected)}
+        />
+      )}
+
+      {verifying && (
+        <VerifyEnrollmentModal
+          application={verifying}
+          onClose={() => setVerifying(null)}
+          onDone={async () => {
+            const id = verifying.id;
+            setVerifying(null);
+            await refresh(id);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ---------- Review one application ---------- */
+
+function ReviewModal({ application, onClose, onChanged, onVerify }) {
+  const toast = useToast();
+
+  const [remarks, setRemarks] = useState(application.remarks || "");
+  const [busy, setBusy] = useState(false);
+  const [busyDocumentId, setBusyDocumentId] = useState(null);
+
+  async function review(status) {
+    if (status === "needs_action" && !remarks.trim()) {
+      toast.error("Type in Remarks what the student needs to fix, then press Needs Action again.");
+      return;
+    }
+
+    setBusy(true);
+
+    try {
+      await api.patch(`/applications/${application.id}/review`, {
+        status,
+        remarks: remarks.trim() || null,
+      });
+
+      toast.success(`Status changed to "${status.replaceAll("_", " ")}".`);
+      await onChanged();
+    } catch (err) {
+      toast.error(errMsg(err, "Unable to update application."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function validateDocument(documentId) {
+    setBusyDocumentId(documentId);
+
+    try {
+      const response = await api.post(`/documents/${documentId}/validate`);
+      const status = response.data?.document?.status;
+
+      if (status === "validated") toast.success(response.data.message);
+      else toast.info(response.data?.message || "AI check finished.");
+    } catch (err) {
+      toast.error(errMsg(err, "AI validation failed."));
+    } finally {
+      setBusyDocumentId(null);
+    }
+
+    await onChanged();
+  }
+
+  const missing = missingRequirements(application);
+
+  return (
+    <Modal
+      size="large"
+      title="Application Review"
+      subtitle={<StatusBadge status={application.status} />}
+      onClose={onClose}
+    >
+      <div className="detail-grid">
+        <ProfileItem label="Student" value={fullName(application.student)} />
+        <ProfileItem label="Student ID" value={application.student?.student_id} />
+        <ProfileItem label="Course" value={application.student?.course} />
+        <ProfileItem label="Year Level" value={application.student?.year_level} />
+        <ProfileItem label="Enrollment" value={enrollmentText(application)} />
+        <ProfileItem label="Scholarship" value={application.scholarship?.name} />
+      </div>
+
+      {missing.length > 0 && (
+        <div className="alert alert-danger">
+          Missing required documents: {missing.map((requirement) => requirement.name).join(", ")}
+        </div>
+      )}
+
+      <h3>Submitted Documents</h3>
+
+      {application.documents?.length ? (
+        application.documents.map((document) => (
+          <div className="document-row" key={document.id}>
+            <div>
+              <strong>{document.requirement?.name || document.document_type || "Document"}</strong>
+
+              <p className="muted">
+                <a href={fileUrl(document)} target="_blank" rel="noreferrer">
+                  {document.original_filename}
+                </a>
+              </p>
+
+              <AiResult result={document.validation_result} />
+            </div>
+
+            <div className="button-row">
+              <StatusBadge status={document.status} />
+
+              <button
+                className="button button-small button-secondary"
+                onClick={() => validateDocument(document.id)}
+                disabled={busyDocumentId === document.id}
+              >
+                {busyDocumentId === document.id
+                  ? "Checking..."
+                  : document.validation_result
+                    ? "Re-run AI check"
+                    : "Run AI check"}
+              </button>
+            </div>
+          </div>
+        ))
+      ) : (
+        <EmptyState message="No documents submitted." />
+      )}
+
+      <label htmlFor="remarks">Remarks (shown to the student)</label>
+
+      <textarea
+        id="remarks"
+        value={remarks}
+        onChange={(event) => setRemarks(event.target.value)}
+        placeholder="Example: Your Certificate of Grades is blurry. Please upload a clearer copy."
+      />
+
+      <p className="muted">
+        OAS checks the documents. The external agency makes the final decision; use Approved /
+        Rejected to record it.
+      </p>
+
+      <div className="button-row">
+        <button className="button button-secondary" disabled={busy} onClick={() => review("under_review")}>
+          Under Review
+        </button>
+        <button className="button button-warning" disabled={busy} onClick={() => review("needs_action")}>
+          Needs Action
+        </button>
+        <button className="button button-secondary" disabled={busy} onClick={() => review("complete")}>
+          Complete (forward to agency)
+        </button>
+        <button className="button button-primary" disabled={busy} onClick={() => review("approved")}>
+          Approved by agency
+        </button>
+        <button className="button button-danger" disabled={busy} onClick={() => review("rejected")}>
+          Rejected by agency
+        </button>
+
+        {application.status === "approved" && (
+          <button className="button button-success" onClick={onVerify}>
+            Verify enrollment
+          </button>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+/* ---------- Enrollment verification form ---------- */
+
+function VerifyEnrollmentModal({ application, onClose, onDone }) {
+  const toast = useToast();
+
+  const [enrolled, setEnrolled] = useState("yes");
+  const [remarks, setRemarks] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function save(event) {
+    event.preventDefault();
+    setSaving(true);
+
+    try {
+      const response = await api.post(`/applications/${application.id}/verify-enrollment`, {
+        currently_enrolled: enrolled === "yes",
+        remarks: remarks.trim() || undefined,
+      });
+
+      if (enrolled === "yes") toast.success(response.data?.message || "Enrollment verified.");
+      else toast.info(response.data?.message || "Recorded as not enrolled.");
+
+      await onDone();
+    } catch (err) {
+      toast.error(errMsg(err, "Unable to verify enrollment."));
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal title="Verify Enrollment" onClose={onClose}>
+      <form onSubmit={save}>
+        <p>
+          <strong>{fullName(application.student)}</strong> · {application.student?.student_id}
+          <br />
+          <span className="muted">{application.scholarship?.name}</span>
+        </p>
+
+        <fieldset className="choice-group">
+          <legend>Is this student currently enrolled this semester?</legend>
+
+          <label className="choice">
+            <input
+              type="radio"
+              name="enrolled"
+              value="yes"
+              checked={enrolled === "yes"}
+              onChange={() => setEnrolled("yes")}
+            />
+            Yes, currently enrolled
+          </label>
+
+          <label className="choice">
+            <input
+              type="radio"
+              name="enrolled"
+              value="no"
+              checked={enrolled === "no"}
+              onChange={() => setEnrolled("no")}
+            />
+            No, not enrolled
+          </label>
+        </fieldset>
+
+        <label htmlFor="enrollment-remarks">Remarks (optional)</label>
+
+        <textarea
+          id="enrollment-remarks"
+          value={remarks}
+          onChange={(event) => setRemarks(event.target.value)}
+          placeholder="Example: Checked against the Registrar's enrollment list."
+        />
+
+        <div className="modal-footer">
+          <button type="button" className="button button-secondary" onClick={onClose}>
+            Cancel
+          </button>
+
+          <button className="button button-primary" disabled={saving}>
+            {saving ? "Saving..." : "Save verification"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/* ---------- What the AI found (it only FLAGS; staff decide) ---------- */
+
+function AiResult({ result }) {
+  if (!result) {
+    return <p className="muted">AI check: not run yet</p>;
+  }
+
+  const flags = String(result.flags || "")
+    .split(/\n|;\s*/)
+    .map((flag) => flag.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="ai-result">
+      <p className="muted">
+        AI check
+        {result.confidence_score !== null && result.confidence_score !== undefined
+          ? ` · name match score ${Number(result.confidence_score)}`
+          : ""}
+        {result.extracted_data?.detected_name
+          ? ` · name found: ${result.extracted_data.detected_name}`
+          : ""}
+      </p>
+
+      {flags.length ? (
+        <ul>
+          {flags.map((flag) => (
+            <li key={flag}>{flag}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="ai-ok">No issues flagged.</p>
+      )}
+    </div>
+  );
+}
