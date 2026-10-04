@@ -25,16 +25,22 @@ class DataBankController extends Controller
 
         $q = trim((string) $request->query('q', ''));
 
+        // Every word typed must match the student ID, a name or the course.
+        // "juan student" finds Juan ... Student. Works on MySQL and SQLite.
+        $words = array_filter(preg_split('/\s+/', $q));
+
         $students = Student::query()
-            ->when($q !== '', function ($query) use ($q) {
-                $like = '%'.$q.'%';
-                $query->where(function ($w) use ($like) {
-                    $w->where('student_id', 'like', $like)
-                        ->orWhere('first_name', 'like', $like)
-                        ->orWhere('last_name', 'like', $like)
-                        ->orWhere('course', 'like', $like)
-                        ->orWhereRaw("CONCAT(first_name, ' ', last_name) like ?", [$like]);
-                });
+            ->when($words, function ($query) use ($words) {
+                foreach ($words as $word) {
+                    $like = '%'.$word.'%';
+                    $query->where(function ($w) use ($like) {
+                        $w->where('student_id', 'like', $like)
+                            ->orWhere('first_name', 'like', $like)
+                            ->orWhere('middle_name', 'like', $like)
+                            ->orWhere('last_name', 'like', $like)
+                            ->orWhere('course', 'like', $like);
+                    });
+                }
             })
             ->with(['applications.scholarship', 'scholarRecords.scholarship'])
             ->orderBy('last_name')->limit(50)->get()

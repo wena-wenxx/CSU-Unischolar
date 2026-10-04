@@ -856,3 +856,37 @@ th {
     flex-direction: column;
   }
 }
+/* ---------- Added for AI results, forms in modals, and search ---------- */
+
+.ai-result {
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.ai-result ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+  color: #b45309;
+}
+
+.modal textarea,
+.modal input,
+.modal select {
+  width: 100%;
+}
+
+.modal label {
+  display: block;
+  margin-top: 0.75rem;
+  font-weight: 600;
+}
+
+.button-row input {
+  flex: 1;
+  min-width: 12rem;
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

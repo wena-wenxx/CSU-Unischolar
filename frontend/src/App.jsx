@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import api from "./services/api";
+import api, { errMsg, FILES_URL } from "./services/api";
 
 /* =========================================================
    HELPERS
@@ -24,22 +24,80 @@ function formatDate(date) {
 }
 
 function formatMoney(value) {
-  return `₱${Number(value || 0).toLocaleString("en-PH", {
+  // Amounts can be empty until OAS enters the official figure.
+  if (value === null || value === undefined || value === "") {
+    return "Amount not set";
+  }
+
+  return `₱${Number(value).toLocaleString("en-PH", {
     minimumFractionDigits: 2,
   })}`;
+}
+
+// "needs_action" -> "needs action"
+function statusLabel(status) {
+  return String(status || "—").replaceAll("_", " ");
+}
+
+function fullName(student) {
+  if (!student) return "—";
+
+  return [student.first_name, student.middle_name, student.last_name]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function fileUrl(document) {
+  return `${FILES_URL}/${document.file_path}`;
+}
+
+// Required requirements that have no uploaded document yet.
+function missingRequirements(application) {
+  const uploaded = new Set(
+    (application.documents || []).map(
+      (document) => document.scholarship_requirement_id
+    )
+  );
+
+  return (application.scholarship?.requirements || []).filter(
+    (requirement) =>
+      requirement.is_required && !uploaded.has(requirement.id)
+  );
+}
+
+function enrollmentText(application) {
+  if (application.status !== "approved") return "—";
+
+  return application.enrollment_verified
+    ? `Verified ${formatDate(application.enrollment_verified_at)}`
+    : "Not yet verified";
 }
 
 function statusClass(status) {
   const value = String(status || "").toLowerCase();
 
   if (
-    ["approved", "complete", "active", "ready", "validated"].includes(value)
+    [
+      "approved",
+      "complete",
+      "active",
+      "ready",
+      "validated",
+      "processed",
+    ].includes(value)
   ) {
     return "status status-success";
   }
 
   if (
-    ["needs_action", "flagged", "needs_review", "under_review"].includes(value)
+    [
+      "needs_action",
+      "flagged",
+      "needs_review",
+      "under_review",
+      "submitted",
+      "processing",
+    ].includes(value)
   ) {
     return "status status-warning";
   }
@@ -65,8 +123,13 @@ export default function App() {
     setUser(data.user);
   }
 
-  function logout() {
-    api.post("/logout").catch(() => {});
+  async function logout() {
+    // Tell the server to revoke the token BEFORE forgetting it locally.
+    try {
+      await api.post("/logout");
+    } catch {
+      // Already expired or server offline: still log out locally.
+    }
 
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -364,7 +427,9 @@ function StudentDashboard({ setPage }) {
 function StudentScholarships() {
   const [scholarships, setScholarships] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [openApplicationId, setOpenApplicationId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [applyingId, setApplyingId] = useState(null);
   const [message, setMessage] = useState("");
 
   async function loadScholarships() {
@@ -372,7 +437,7 @@ function StudentScholarships() {
       const response = await api.get("/scholarships");
       setScholarships(response.data);
     } catch (err) {
-      setMessage("Unable to load scholarships.");
+      setMessage(errMsg(err, "Unable to load scholarships."));
     } finally {
       setLoading(false);
     }
@@ -388,23 +453,28 @@ function StudentScholarships() {
     try {
       const response = await api.get(`/scholarships/${id}`);
       setSelected(response.data);
-    } catch {
-      setMessage("Unable to load scholarship details.");
+    } catch (err) {
+      setMessage(errMsg(err, "Unable to load scholarship details."));
     }
   }
 
+  // Step 1 of applying: create a DRAFT application, then open it so the
+  // student can upload documents and press "Submit application".
   async function apply(id) {
+    setMessage("");
+    setApplyingId(id);
+
     try {
-      await api.post("/applications", {
+      const response = await api.post("/applications", {
         scholarship_id: id,
       });
 
-      setMessage("Application submitted successfully.");
+      setSelected(null);
+      setOpenApplicationId(response.data.id);
     } catch (err) {
-      setMessage(
-        err.response?.data?.message ||
-          "Unable to submit application."
-      );
+      setMessage(errMsg(err, "Unable to start your application."));
+    } finally {
+      setApplyingId(null);
     }
   }
 
@@ -421,6 +491,12 @@ function StudentScholarships() {
 
       {message && (
         <div className="alert alert-info">{message}</div>
+      )}
+
+      {scholarships.length === 0 && (
+        <div className="card">
+          <EmptyState message="No scholarships are open right now." />
+        </div>
       )}
 
       <div className="card-grid">
@@ -459,8 +535,11 @@ function StudentScholarships() {
               <button
                 className="button button-primary"
                 onClick={() => apply(scholarship.id)}
+                disabled={applyingId === scholarship.id}
               >
-                Apply
+                {applyingId === scholarship.id
+                  ? "Starting..."
+                  : "Apply"}
               </button>
             </div>
           </div>
@@ -510,15 +589,21 @@ function StudentScholarships() {
 
             <button
               className="button button-primary full-width"
-              onClick={() => {
-                apply(selected.id);
-                setSelected(null);
-              }}
+              onClick={() => apply(selected.id)}
+              disabled={applyingId === selected.id}
             >
               Apply for this scholarship
             </button>
           </div>
         </div>
+      )}
+
+      {openApplicationId && (
+        <ApplicationModal
+          applicationId={openApplicationId}
+          intro="Your application was saved as a draft. Upload each required document below, then press Submit application."
+          close={() => setOpenApplicationId(null)}
+        />
       )}
     </div>
   );
@@ -530,7 +615,7 @@ function StudentScholarships() {
 
 function StudentApplications() {
   const [applications, setApplications] = useState([]);
-  const [selected, setSelected] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   async function load() {
@@ -548,15 +633,6 @@ function StudentApplications() {
     load();
   }, []);
 
-  async function viewApplication(id) {
-    try {
-      const response = await api.get(`/applications/${id}`);
-      setSelected(response.data);
-    } catch {
-      alert("Unable to load application.");
-    }
-  }
-
   if (loading) return <Loading />;
 
   return (
@@ -568,7 +644,7 @@ function StudentApplications() {
 
       <div className="card">
         {applications.length === 0 ? (
-          <EmptyState message="No applications found." />
+          <EmptyState message="You have not applied yet. Go to Scholarships and press Apply." />
         ) : (
           <div className="table-wrapper">
             <table>
@@ -577,6 +653,7 @@ function StudentApplications() {
                   <th>Scholarship</th>
                   <th>Submitted</th>
                   <th>Status</th>
+                  <th>Enrollment</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -590,7 +667,9 @@ function StudentApplications() {
                     </td>
 
                     <td>
-                      {formatDate(application.submitted_at)}
+                      {application.submitted_at
+                        ? formatDate(application.submitted_at)
+                        : "Not submitted yet"}
                     </td>
 
                     <td>
@@ -599,18 +678,24 @@ function StudentApplications() {
                           application.status
                         )}
                       >
-                        {application.status}
+                        {statusLabel(application.status)}
                       </span>
                     </td>
+
+                    <td>{enrollmentText(application)}</td>
 
                     <td>
                       <button
                         className="button button-small"
                         onClick={() =>
-                          viewApplication(application.id)
+                          setSelectedId(application.id)
                         }
                       >
-                        View
+                        {["draft", "needs_action"].includes(
+                          application.status
+                        )
+                          ? "Continue"
+                          : "View"}
                       </button>
                     </td>
                   </tr>
@@ -621,11 +706,13 @@ function StudentApplications() {
         )}
       </div>
 
-      {selected && (
+      {selectedId && (
         <ApplicationModal
-          application={selected}
-          close={() => setSelected(null)}
-          refresh={load}
+          applicationId={selectedId}
+          close={() => {
+            setSelectedId(null);
+            load();
+          }}
         />
       )}
     </div>
@@ -633,14 +720,31 @@ function StudentApplications() {
 }
 
 /* =========================================================
-   APPLICATION MODAL
+   APPLICATION MODAL (STUDENT)
+   Upload documents -> Submit application.
 ========================================================= */
 
-function ApplicationModal({ application, close, refresh }) {
+function ApplicationModal({ applicationId, intro, close }) {
+  const [application, setApplication] = useState(null);
   const [file, setFile] = useState(null);
+  const [fileInputKey, setFileInputKey] = useState(0);
   const [requirementId, setRequirementId] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState(intro || "");
+
+  async function load() {
+    try {
+      const response = await api.get(`/applications/${applicationId}`);
+      setApplication(response.data);
+    } catch (err) {
+      setMessage(errMsg(err, "Unable to load application."));
+    }
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicationId]);
 
   async function uploadDocument() {
     if (!file || !requirementId) {
@@ -650,18 +754,18 @@ function ApplicationModal({ application, close, refresh }) {
 
     const formData = new FormData();
 
-    formData.append("document", file);
+    formData.append("file", file);
     formData.append(
       "scholarship_requirement_id",
       requirementId
     );
 
-    setUploading(true);
+    setBusy(true);
     setMessage("");
 
     try {
       await api.post(
-        `/applications/${application.id}/documents`,
+        `/applications/${applicationId}/documents`,
         formData,
         {
           headers: {
@@ -670,20 +774,64 @@ function ApplicationModal({ application, close, refresh }) {
         }
       );
 
-      setMessage("Document uploaded successfully.");
-
       setFile(null);
+      setRequirementId("");
+      setFileInputKey((key) => key + 1);
 
-      await refresh();
+      await load();
+      setMessage("Document uploaded.");
     } catch (err) {
-      setMessage(
-        err.response?.data?.message ||
-          "Document upload failed."
-      );
+      setMessage(errMsg(err, "Document upload failed."));
     } finally {
-      setUploading(false);
+      setBusy(false);
     }
   }
+
+  async function submitApplication() {
+    if (
+      !window.confirm(
+        "Submit this application to OAS? You cannot upload more documents unless OAS asks you to."
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setMessage("");
+
+    try {
+      await api.post(`/applications/${applicationId}/submit`);
+      await load();
+      setMessage("Application submitted to OAS.");
+    } catch (err) {
+      setMessage(errMsg(err, "Unable to submit application."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!application) {
+    return (
+      <div className="modal-backdrop">
+        <div className="modal">
+          {message ? (
+            <div className="alert alert-danger">{message}</div>
+          ) : (
+            <Loading />
+          )}
+
+          <button className="button button-secondary" onClick={close}>
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const editable = ["draft", "needs_action"].includes(
+    application.status
+  );
+  const missing = missingRequirements(application);
 
   return (
     <div className="modal-backdrop">
@@ -698,7 +846,7 @@ function ApplicationModal({ application, close, refresh }) {
             <span
               className={statusClass(application.status)}
             >
-              {application.status}
+              {statusLabel(application.status)}
             </span>
           </div>
 
@@ -709,6 +857,19 @@ function ApplicationModal({ application, close, refresh }) {
 
         {message && (
           <div className="alert alert-info">{message}</div>
+        )}
+
+        {application.status === "needs_action" &&
+          application.remarks && (
+            <div className="alert alert-danger">
+              <strong>OAS says:</strong> {application.remarks}
+            </div>
+          )}
+
+        {application.status === "approved" && (
+          <p>
+            Enrollment: <strong>{enrollmentText(application)}</strong>
+          </p>
         )}
 
         <h3>Documents</h3>
@@ -731,7 +892,7 @@ function ApplicationModal({ application, close, refresh }) {
               <span
                 className={statusClass(document.status)}
               >
-                {document.status}
+                {statusLabel(document.status)}
               </span>
             </div>
           ))
@@ -739,47 +900,74 @@ function ApplicationModal({ application, close, refresh }) {
           <EmptyState message="No documents uploaded yet." />
         )}
 
-        <hr />
+        {editable && (
+          <>
+            <hr />
 
-        <h3>Upload Requirement</h3>
+            <h3>Upload Requirement</h3>
 
-        <select
-          value={requirementId}
-          onChange={(e) =>
-            setRequirementId(e.target.value)
-          }
-        >
-          <option value="">
-            Select requirement
-          </option>
-
-          {application.scholarship?.requirements?.map(
-            (requirement) => (
-              <option
-                key={requirement.id}
-                value={requirement.id}
+            <div className="form-grid">
+              <select
+                value={requirementId}
+                onChange={(e) =>
+                  setRequirementId(e.target.value)
+                }
               >
-                {requirement.name}
-              </option>
-            )
-          )}
-        </select>
+                <option value="">
+                  Select requirement
+                </option>
 
-        <input
-          type="file"
-          accept=".pdf,.jpg,.jpeg,.png"
-          onChange={(e) =>
-            setFile(e.target.files?.[0] || null)
-          }
-        />
+                {application.scholarship?.requirements?.map(
+                  (requirement) => (
+                    <option
+                      key={requirement.id}
+                      value={requirement.id}
+                    >
+                      {requirement.name}
+                      {requirement.is_required ? " (required)" : ""}
+                    </option>
+                  )
+                )}
+              </select>
 
-        <button
-          className="button button-primary"
-          onClick={uploadDocument}
-          disabled={uploading}
-        >
-          {uploading ? "Uploading..." : "Upload document"}
-        </button>
+              <input
+                key={fileInputKey}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={(e) =>
+                  setFile(e.target.files?.[0] || null)
+                }
+              />
+            </div>
+
+            <p className="muted">PDF, JPG or PNG, up to 10 MB.</p>
+
+            <div className="button-row">
+              <button
+                className="button button-secondary"
+                onClick={uploadDocument}
+                disabled={busy}
+              >
+                {busy ? "Please wait..." : "Upload document"}
+              </button>
+
+              <button
+                className="button button-primary"
+                onClick={submitApplication}
+                disabled={busy || missing.length > 0}
+              >
+                Submit application
+              </button>
+            </div>
+
+            {missing.length > 0 && (
+              <p className="muted">
+                Still needed before you can submit:{" "}
+                {missing.map((requirement) => requirement.name).join(", ")}
+              </p>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -846,11 +1034,6 @@ function StudentProfile() {
             <ProfileItem
               label="College"
               value={student.college}
-            />
-
-            <ProfileItem
-              label="Enrollment Status"
-              value={student.enrollment_status}
             />
 
             <ProfileItem
@@ -977,6 +1160,10 @@ function StaffApplication({ logout, user }) {
         <StaffScholarships />
       )}
 
+      {page === "databank" && (
+        <DataBank />
+      )}
+
       {page === "reports" && (
         <Reports />
       )}
@@ -1071,6 +1258,13 @@ function StaffDashboard({ setPage }) {
 
         <button
           className="button button-secondary"
+          onClick={() => setPage("databank")}
+        >
+          Data Bank
+        </button>
+
+        <button
+          className="button button-secondary"
           onClick={() => setPage("reports")}
         >
           Reports
@@ -1087,6 +1281,9 @@ function StaffDashboard({ setPage }) {
 function StaffApplications() {
   const [applications, setApplications] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [remarks, setRemarks] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [busyDocumentId, setBusyDocumentId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   async function load() {
@@ -1104,50 +1301,67 @@ function StaffApplications() {
     load();
   }, []);
 
+  async function openApplication(id) {
+    try {
+      const response = await api.get(`/applications/${id}`);
+      setSelected(response.data);
+      setRemarks(response.data.remarks || "");
+    } catch (err) {
+      alert(errMsg(err, "Unable to load application."));
+    }
+  }
+
   async function review(id, status) {
+    if (status === "needs_action" && !remarks.trim()) {
+      alert("Type in Remarks what the student needs to fix, then press Needs Action again.");
+      return;
+    }
+
     try {
       await api.patch(`/applications/${id}/review`, {
         status,
+        remarks: remarks.trim() || null,
       });
 
       await load();
 
       if (selected) {
-        const response = await api.get(
-          `/applications/${id}`
-        );
-
-        setSelected(response.data);
+        await openApplication(id);
       }
     } catch (err) {
-      alert(
-        err.response?.data?.message ||
-          "Unable to update application."
-      );
+      alert(errMsg(err, "Unable to update application."));
     }
   }
 
-  async function verifyEnrollment(id) {
+  // OAS confirms the approved student is currently enrolled.
+  async function verifyEnrollment(application) {
+    const enrolled = window.confirm(
+      `Is ${fullName(application.student)} CURRENTLY ENROLLED this semester?\n\nOK = Yes, enrolled\nCancel = No, not enrolled`
+    );
+
     try {
-      await api.post(
-        `/applications/${id}/verify-enrollment`,
+      const response = await api.post(
+        `/applications/${application.id}/verify-enrollment`,
         {
-          enrollment_status: "active",
+          currently_enrolled: enrolled,
         }
       );
 
+      alert(response.data?.message || "Enrollment recorded.");
+
       await load();
 
-      alert("Enrollment verified.");
+      if (selected?.id === application.id) {
+        await openApplication(application.id);
+      }
     } catch (err) {
-      alert(
-        err.response?.data?.message ||
-          "Unable to verify enrollment."
-      );
+      alert(errMsg(err, "Unable to verify enrollment."));
     }
   }
 
   async function validateDocument(documentId) {
+    setBusyDocumentId(documentId);
+
     try {
       const response = await api.post(
         `/documents/${documentId}/validate`
@@ -1157,15 +1371,29 @@ function StaffApplications() {
         response.data?.message ||
           "AI validation completed."
       );
-
-      await load();
     } catch (err) {
-      alert(
-        err.response?.data?.message ||
-          "AI validation failed."
-      );
+      alert(errMsg(err, "AI validation failed."));
+    } finally {
+      setBusyDocumentId(null);
+    }
+
+    await load();
+
+    if (selected) {
+      await openApplication(selected.id);
     }
   }
+
+  const shown = applications.filter((application) => {
+    if (filter === "all") return true;
+    if (filter === "to_verify") {
+      return (
+        application.status === "approved" &&
+        !application.enrollment_verified
+      );
+    }
+    return application.status === filter;
+  });
 
   if (loading) return <Loading />;
 
@@ -1173,12 +1401,37 @@ function StaffApplications() {
     <div>
       <PageHeader
         title="Application Review"
-        subtitle="Review and verify student scholarship applications"
+        subtitle="Check documents, record the agency's decision, and verify enrollment"
       />
 
       <div className="card">
-        {applications.length === 0 ? (
-          <EmptyState message="No applications found." />
+        <div className="button-row">
+          {[
+            ["all", "All"],
+            ["submitted", "Submitted"],
+            ["under_review", "Under review"],
+            ["needs_action", "Needs action"],
+            ["complete", "Complete"],
+            ["approved", "Approved"],
+            ["to_verify", "Approved, enrollment not verified"],
+            ["draft", "Drafts"],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              className={
+                filter === key
+                  ? "button button-small button-primary"
+                  : "button button-small button-secondary"
+              }
+              onClick={() => setFilter(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {shown.length === 0 ? (
+          <EmptyState message="No applications in this list." />
         ) : (
           <div className="table-wrapper">
             <table>
@@ -1194,12 +1447,9 @@ function StaffApplications() {
               </thead>
 
               <tbody>
-                {applications.map((application) => (
+                {shown.map((application) => (
                   <tr key={application.id}>
-                    <td>
-                      {application.student?.first_name}{" "}
-                      {application.student?.last_name}
-                    </td>
+                    <td>{fullName(application.student)}</td>
 
                     <td>
                       {application.student?.student_id}
@@ -1215,53 +1465,33 @@ function StaffApplications() {
                           application.status
                         )}
                       >
-                        {application.status}
+                        {statusLabel(application.status)}
                       </span>
                     </td>
 
-                    <td>
-                      {application.student
-                        ?.enrollment_status || "—"}
-                    </td>
+                    <td>{enrollmentText(application)}</td>
 
                     <td>
                       <div className="button-row">
                         <button
                           className="button button-small"
-                          onClick={async () => {
-                            const response = await api.get(
-                              `/applications/${application.id}`
-                            );
-
-                            setSelected(response.data);
-                          }}
+                          onClick={() =>
+                            openApplication(application.id)
+                          }
                         >
                           Review
                         </button>
 
-                        <button
-                          className="button button-small button-success"
-                          onClick={() =>
-                            verifyEnrollment(
-                              application.id
-                            )
-                          }
-                        >
-                          Verify
-                        </button>
-
-                        {application.status ===
-                          "under_review" && (
+                        {application.status === "approved" && (
                           <button
-                            className="button button-small button-primary"
+                            className="button button-small button-success"
                             onClick={() =>
-                              review(
-                                application.id,
-                                "approved"
-                              )
+                              verifyEnrollment(application)
                             }
                           >
-                            Approve
+                            {application.enrollment_verified
+                              ? "Re-verify"
+                              : "Verify enrollment"}
                           </button>
                         )}
                       </div>
@@ -1286,7 +1516,7 @@ function StaffApplications() {
                     selected.status
                   )}
                 >
-                  {selected.status}
+                  {statusLabel(selected.status)}
                 </span>
               </div>
 
@@ -1301,9 +1531,7 @@ function StaffApplications() {
             <div className="detail-grid">
               <ProfileItem
                 label="Student"
-                value={`${selected.student?.first_name || ""} ${
-                  selected.student?.last_name || ""
-                }`}
+                value={fullName(selected.student)}
               />
 
               <ProfileItem
@@ -1323,9 +1551,7 @@ function StaffApplications() {
 
               <ProfileItem
                 label="Enrollment"
-                value={
-                  selected.student?.enrollment_status
-                }
+                value={enrollmentText(selected)}
               />
 
               <ProfileItem
@@ -1333,6 +1559,15 @@ function StaffApplications() {
                 value={selected.scholarship?.name}
               />
             </div>
+
+            {missingRequirements(selected).length > 0 && (
+              <div className="alert alert-danger">
+                Missing required documents:{" "}
+                {missingRequirements(selected)
+                  .map((requirement) => requirement.name)
+                  .join(", ")}
+              </div>
+            )}
 
             <h3>Submitted Documents</h3>
 
@@ -1350,8 +1585,16 @@ function StaffApplications() {
                     </strong>
 
                     <p className="muted">
-                      {document.original_filename}
+                      <a
+                        href={fileUrl(document)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {document.original_filename}
+                      </a>
                     </p>
+
+                    <AiResult result={document.validation_result} />
                   </div>
 
                   <div className="button-row">
@@ -1360,7 +1603,7 @@ function StaffApplications() {
                         document.status
                       )}
                     >
-                      {document.status}
+                      {statusLabel(document.status)}
                     </span>
 
                     <button
@@ -1368,8 +1611,13 @@ function StaffApplications() {
                       onClick={() =>
                         validateDocument(document.id)
                       }
+                      disabled={busyDocumentId === document.id}
                     >
-                      Run AI
+                      {busyDocumentId === document.id
+                        ? "Checking..."
+                        : document.validation_result
+                          ? "Re-run AI check"
+                          : "Run AI check"}
                     </button>
                   </div>
                 </div>
@@ -1378,7 +1626,29 @@ function StaffApplications() {
               <EmptyState message="No documents submitted." />
             )}
 
+            <label>Remarks (shown to the student)</label>
+
+            <textarea
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="Example: Your Certificate of Grades is blurry. Please upload a clearer copy."
+            />
+
+            <p className="muted">
+              OAS checks the documents. The external agency makes the
+              final decision; use Approved / Rejected to record it.
+            </p>
+
             <div className="button-row">
+              <button
+                className="button button-secondary"
+                onClick={() =>
+                  review(selected.id, "under_review")
+                }
+              >
+                Under Review
+              </button>
+
               <button
                 className="button button-warning"
                 onClick={() =>
@@ -1394,7 +1664,7 @@ function StaffApplications() {
                   review(selected.id, "complete")
                 }
               >
-                Mark Complete
+                Complete (forward to agency)
               </button>
 
               <button
@@ -1403,7 +1673,7 @@ function StaffApplications() {
                   review(selected.id, "approved")
                 }
               >
-                Approve
+                Approved by agency
               </button>
 
               <button
@@ -1412,11 +1682,57 @@ function StaffApplications() {
                   review(selected.id, "rejected")
                 }
               >
-                Reject
+                Rejected by agency
               </button>
+
+              {selected.status === "approved" && (
+                <button
+                  className="button button-success"
+                  onClick={() => verifyEnrollment(selected)}
+                >
+                  Verify enrollment
+                </button>
+              )}
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/* The AI only FLAGS possible problems. Staff always decide. */
+function AiResult({ result }) {
+  if (!result) {
+    return <p className="muted">AI check: not run yet</p>;
+  }
+
+  const flags = String(result.flags || "")
+    .split(/\n|;\s*/)
+    .map((flag) => flag.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="ai-result">
+      <p className="muted">
+        AI check
+        {result.confidence_score !== null &&
+        result.confidence_score !== undefined
+          ? ` · name match score ${Number(result.confidence_score)}`
+          : ""}
+        {result.extracted_data?.detected_name
+          ? ` · name found: ${result.extracted_data.detected_name}`
+          : ""}
+      </p>
+
+      {flags.length ? (
+        <ul>
+          {flags.map((flag) => (
+            <li key={flag}>{flag}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted">No issues flagged.</p>
       )}
     </div>
   );
@@ -1458,27 +1774,53 @@ function StaffScholars() {
     load();
   }, []);
 
-  async function createScholar(applicationId) {
+  // Approved applications not yet tagged as a grantee.
+  const untagged = applications.filter(
+    (application) =>
+      !records.some(
+        (record) =>
+          record.student_id === application.student_id &&
+          record.scholarship_id === application.scholarship_id
+      )
+  );
+  const readyToTag = untagged.filter(
+    (application) => application.enrollment_verified
+  );
+  const waitingForVerification = untagged.filter(
+    (application) => !application.enrollment_verified
+  );
+
+  async function tagGrantee(application) {
     const hasAtm = window.confirm(
-      "Does this student have an ATM?"
+      `Does ${fullName(application.student)} already have an ATM card for the stipend?\n\nOK = Yes\nCancel = No`
     );
 
     try {
       await api.post(
-        `/applications/${applicationId}/scholar-record`,
+        `/applications/${application.id}/scholar-record`,
         {
+          application_id: application.id,
+          currently_enrolled: true,
           has_atm: hasAtm,
         }
       );
 
-      alert("Scholar record created.");
+      alert(`${fullName(application.student)} is now tagged as a grantee.`);
 
       await load();
     } catch (err) {
-      alert(
-        err.response?.data?.message ||
-          "Unable to create scholar record."
-      );
+      alert(errMsg(err, "Unable to tag grantee."));
+    }
+  }
+
+  async function updateRecord(record, changes, confirmText) {
+    if (confirmText && !window.confirm(confirmText)) return;
+
+    try {
+      await api.patch(`/scholar-records/${record.id}`, changes);
+      await load();
+    } catch (err) {
+      alert(errMsg(err, "Unable to update scholar record."));
     }
   }
 
@@ -1488,42 +1830,50 @@ function StaffScholars() {
     <div>
       <PageHeader
         title="Scholar Records"
-        subtitle="Manage confirmed scholarship grantees"
+        subtitle="Tag verified students as grantees and manage active scholars"
       />
 
       <section className="card">
-        <h2>Approved Applications</h2>
+        <h2>Ready to Tag as Grantee</h2>
 
-        {applications.length === 0 ? (
-          <EmptyState message="No approved applications waiting for tagging." />
+        <p className="muted">
+          Approved by the agency and enrollment verified by OAS.
+        </p>
+
+        {readyToTag.length === 0 ? (
+          <EmptyState message="No students are ready for tagging." />
         ) : (
-          applications.map((application) => (
+          readyToTag.map((application) => (
             <div
               className="list-item"
               key={application.id}
             >
               <div>
-                <strong>
-                  {application.student?.first_name}{" "}
-                  {application.student?.last_name}
-                </strong>
+                <strong>{fullName(application.student)}</strong>
 
                 <p className="muted">
                   {application.student?.student_id} ·{" "}
-                  {application.scholarship?.name}
+                  {application.scholarship?.name} ·{" "}
+                  {enrollmentText(application)}
                 </p>
               </div>
 
               <button
                 className="button button-primary"
-                onClick={() =>
-                  createScholar(application.id)
-                }
+                onClick={() => tagGrantee(application)}
               >
                 Tag as Grantee
               </button>
             </div>
           ))
+        )}
+
+        {waitingForVerification.length > 0 && (
+          <p className="muted">
+            {waitingForVerification.length} approved application(s)
+            still need enrollment verification. Go to Applications and
+            press "Verify enrollment".
+          </p>
         )}
       </section>
 
@@ -1542,16 +1892,15 @@ function StaffScholars() {
                   <th>Status</th>
                   <th>Enrolled</th>
                   <th>ATM</th>
+                  <th>Tagged</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
 
               <tbody>
                 {records.map((record) => (
                   <tr key={record.id}>
-                    <td>
-                      {record.student?.first_name}{" "}
-                      {record.student?.last_name}
-                    </td>
+                    <td>{fullName(record.student)}</td>
 
                     <td>{record.scholarship?.name}</td>
 
@@ -1573,6 +1922,55 @@ function StaffScholars() {
 
                     <td>
                       {record.has_atm ? "Yes" : "No"}
+                    </td>
+
+                    <td>{formatDate(record.grantee_tagged_at)}</td>
+
+                    <td>
+                      <div className="button-row">
+                        <button
+                          className="button button-small"
+                          onClick={() =>
+                            updateRecord(record, {
+                              has_atm: !record.has_atm,
+                            })
+                          }
+                        >
+                          {record.has_atm
+                            ? "Mark no ATM"
+                            : "Mark has ATM"}
+                        </button>
+
+                        {record.status === "active" && (
+                          <>
+                            <button
+                              className="button button-small button-success"
+                              onClick={() =>
+                                updateRecord(
+                                  record,
+                                  { status: "completed" },
+                                  `Mark ${fullName(record.student)}'s scholarship as COMPLETED?`
+                                )
+                              }
+                            >
+                              Completed
+                            </button>
+
+                            <button
+                              className="button button-small button-danger"
+                              onClick={() =>
+                                updateRecord(
+                                  record,
+                                  { status: "inactive" },
+                                  `Set ${fullName(record.student)}'s scholarship to INACTIVE?`
+                                )
+                              }
+                            >
+                              Inactive
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1616,33 +2014,57 @@ function StaffPayroll() {
     load();
   }, []);
 
-  async function createPayroll(id, amount) {
+  async function createPayroll(record) {
+    const amountText = window.prompt(
+      `Amount for ${fullName(record.student)} (pesos):`,
+      record.scholarship?.amount ?? ""
+    );
+
+    if (amountText === null) return;
+
+    const amount = Number(String(amountText).replaceAll(",", ""));
+
+    if (!amountText.trim() || Number.isNaN(amount) || amount < 0) {
+      alert("Please type a valid amount, for example 5000.");
+      return;
+    }
+
     const period = window.prompt(
-      "Enter payroll period:",
-      "Semester 1"
+      "Payroll period:",
+      "1st Semester AY 2026-2027"
     );
 
     if (!period) return;
 
     try {
       await api.post(
-        `/scholar-records/${id}/payroll`,
+        `/scholar-records/${record.id}/payroll`,
         {
+          scholar_record_id: record.id,
           amount,
           period,
+          bank_atm_status: record.has_atm ? "Yes" : "No",
         }
       );
 
-      alert("Payroll record created.");
-
       await load();
     } catch (err) {
-      alert(
-        err.response?.data?.message ||
-          "Unable to create payroll record."
-      );
+      alert(errMsg(err, "Unable to create payroll record."));
     }
   }
+
+  async function setPayrollStatus(item, status) {
+    try {
+      await api.patch(`/payroll/${item.id}`, { status });
+      await load();
+    } catch (err) {
+      alert(errMsg(err, "Unable to update payroll record."));
+    }
+  }
+
+  const activeRecords = records.filter(
+    (record) => record.status === "active"
+  );
 
   if (loading) return <Loading />;
 
@@ -1650,14 +2072,14 @@ function StaffPayroll() {
     <div>
       <PageHeader
         title="Payroll Preparation"
-        subtitle="Prepare payroll-ready scholarship records"
+        subtitle="Prepare payroll entries for active, enrolled grantees"
       />
 
       <section className="card">
         <h2>Active Scholars</h2>
 
-        {records.length === 0 ? (
-          <EmptyState message="No scholar records available." />
+        {activeRecords.length === 0 ? (
+          <EmptyState message="No active scholars yet. Tag grantees on the Scholar Records page first." />
         ) : (
           <div className="table-wrapper">
             <table>
@@ -1665,54 +2087,52 @@ function StaffPayroll() {
                 <tr>
                   <th>Student</th>
                   <th>Scholarship</th>
-                  <th>Amount</th>
+                  <th>Program amount</th>
+                  <th>Enrolled</th>
                   <th>ATM</th>
                   <th>Action</th>
                 </tr>
               </thead>
 
               <tbody>
-                {records
-                  .filter(
-                    (record) =>
-                      record.status === "active"
-                  )
-                  .map((record) => (
-                    <tr key={record.id}>
-                      <td>
-                        {record.student?.first_name}{" "}
-                        {record.student?.last_name}
-                      </td>
+                {activeRecords.map((record) => (
+                  <tr key={record.id}>
+                    <td>{fullName(record.student)}</td>
 
-                      <td>
-                        {record.scholarship?.name}
-                      </td>
+                    <td>
+                      {record.scholarship?.name}
+                    </td>
 
-                      <td>
-                        {formatMoney(
-                          record.scholarship?.amount
-                        )}
-                      </td>
+                    <td>
+                      {formatMoney(
+                        record.scholarship?.amount
+                      )}
+                    </td>
 
-                      <td>
-                        {record.has_atm ? "Yes" : "No"}
-                      </td>
+                    <td>
+                      {record.currently_enrolled ? "Yes" : "No"}
+                    </td>
 
-                      <td>
-                        <button
-                          className="button button-small button-primary"
-                          onClick={() =>
-                            createPayroll(
-                              record.id,
-                              record.scholarship?.amount
-                            )
-                          }
-                        >
-                          Prepare Payroll
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                    <td>
+                      {record.has_atm ? "Yes" : "No"}
+                    </td>
+
+                    <td>
+                      <button
+                        className="button button-small button-primary"
+                        onClick={() => createPayroll(record)}
+                        disabled={!record.currently_enrolled}
+                        title={
+                          record.currently_enrolled
+                            ? ""
+                            : "Student must be currently enrolled"
+                        }
+                      >
+                        Add to Payroll
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -1722,6 +2142,10 @@ function StaffPayroll() {
       <section className="card">
         <h2>Payroll Records</h2>
 
+        <p className="muted">
+          Draft → Ready (checked and ready to send) → Processed (released).
+        </p>
+
         {payroll.length === 0 ? (
           <EmptyState message="No payroll records yet." />
         ) : (
@@ -1730,37 +2154,73 @@ function StaffPayroll() {
               <thead>
                 <tr>
                   <th>Student</th>
+                  <th>Scholarship</th>
                   <th>Amount</th>
                   <th>Period</th>
                   <th>ATM</th>
                   <th>Status</th>
+                  <th>Action</th>
                 </tr>
               </thead>
 
               <tbody>
-                {payroll.map((record) => (
-                  <tr key={record.id}>
-                    <td>
-                      {record.scholar_record?.student
-                        ?.first_name}{" "}
-                      {record.scholar_record?.student
-                        ?.last_name}
-                    </td>
+                {payroll.map((item) => (
+                  <tr key={item.id}>
+                    <td>{fullName(item.scholar_record?.student)}</td>
 
-                    <td>{formatMoney(record.amount)}</td>
+                    <td>{item.scholar_record?.scholarship?.name}</td>
 
-                    <td>{record.period}</td>
+                    <td>{formatMoney(item.amount)}</td>
 
-                    <td>{record.bank_atm_status}</td>
+                    <td>{item.period}</td>
+
+                    <td>{item.bank_atm_status}</td>
 
                     <td>
                       <span
                         className={statusClass(
-                          record.status
+                          item.status
                         )}
                       >
-                        {record.status}
+                        {item.status}
                       </span>
+                    </td>
+
+                    <td>
+                      {item.status === "draft" && (
+                        <button
+                          className="button button-small button-primary"
+                          onClick={() =>
+                            setPayrollStatus(item, "ready")
+                          }
+                        >
+                          Mark Ready
+                        </button>
+                      )}
+
+                      {item.status === "ready" && (
+                        <div className="button-row">
+                          <button
+                            className="button button-small button-success"
+                            onClick={() =>
+                              setPayrollStatus(item, "processed")
+                            }
+                          >
+                            Mark Processed
+                          </button>
+
+                          <button
+                            className="button button-small button-secondary"
+                            onClick={() =>
+                              setPayrollStatus(item, "draft")
+                            }
+                          >
+                            Back to Draft
+                          </button>
+                        </div>
+                      )}
+
+                      {item.status === "processed" && "—"}
                     </td>
                   </tr>
                 ))}
@@ -1779,14 +2239,17 @@ function StaffPayroll() {
 
 function StaffScholarships() {
   const [scholarships, setScholarships] = useState([]);
+  const [managing, setManaging] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const [form, setForm] = useState({
+  const emptyForm = {
     name: "",
     description: "",
     provider: "",
     amount: "",
-  });
+  };
+
+  const [form, setForm] = useState(emptyForm);
 
   async function load() {
     try {
@@ -1809,25 +2272,17 @@ function StaffScholarships() {
     try {
       await api.post("/scholarships", {
         ...form,
-        amount: Number(form.amount),
+        amount: form.amount === "" ? null : Number(form.amount),
         status: "active",
       });
 
-      setForm({
-        name: "",
-        description: "",
-        provider: "",
-        amount: "",
-      });
+      setForm(emptyForm);
 
       await load();
 
-      alert("Scholarship created.");
+      alert("Scholarship created. Press Manage to add its requirements.");
     } catch (err) {
-      alert(
-        err.response?.data?.message ||
-          "Unable to create scholarship."
-      );
+      alert(errMsg(err, "Unable to create scholarship."));
     }
   }
 
@@ -1837,7 +2292,7 @@ function StaffScholarships() {
     <div>
       <PageHeader
         title="Scholarship Programs"
-        subtitle="Manage scholarship programs"
+        subtitle="Manage scholarship programs and their requirements"
       />
 
       <section className="card">
@@ -1877,10 +2332,12 @@ function StaffScholarships() {
           </div>
 
           <div>
-            <label>Amount</label>
+            <label>Amount (optional)</label>
 
             <input
               type="number"
+              min="0"
+              step="0.01"
               value={form.amount}
               onChange={(e) =>
                 setForm({
@@ -1888,7 +2345,6 @@ function StaffScholarships() {
                   amount: e.target.value,
                 })
               }
-              required
             />
           </div>
 
@@ -1915,43 +2371,291 @@ function StaffScholarships() {
       <section className="card">
         <h2>Existing Scholarships</h2>
 
-        <div className="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Provider</th>
-                <th>Amount</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {scholarships.map((scholarship) => (
-                <tr key={scholarship.id}>
-                  <td>{scholarship.name}</td>
-
-                  <td>{scholarship.provider}</td>
-
-                  <td>
-                    {formatMoney(scholarship.amount)}
-                  </td>
-
-                  <td>
-                    <span
-                      className={statusClass(
-                        scholarship.status
-                      )}
-                    >
-                      {scholarship.status}
-                    </span>
-                  </td>
+        {scholarships.length === 0 ? (
+          <EmptyState message="No scholarship programs yet." />
+        ) : (
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Provider</th>
+                  <th>Amount</th>
+                  <th>Requirements</th>
+                  <th>Status</th>
+                  <th>Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+
+              <tbody>
+                {scholarships.map((scholarship) => (
+                  <tr key={scholarship.id}>
+                    <td>{scholarship.name}</td>
+
+                    <td>{scholarship.provider}</td>
+
+                    <td>
+                      {formatMoney(scholarship.amount)}
+                    </td>
+
+                    <td>{scholarship.requirements?.length || 0}</td>
+
+                    <td>
+                      <span
+                        className={statusClass(
+                          scholarship.status
+                        )}
+                      >
+                        {scholarship.status}
+                      </span>
+                    </td>
+
+                    <td>
+                      <button
+                        className="button button-small"
+                        onClick={() => setManaging(scholarship)}
+                      >
+                        Manage
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
+
+      {managing && (
+        <ManageScholarshipModal
+          scholarshipId={managing.id}
+          close={() => {
+            setManaging(null);
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ManageScholarshipModal({ scholarshipId, close }) {
+  const [form, setForm] = useState(null);
+  const [requirements, setRequirements] = useState([]);
+  const [newRequirement, setNewRequirement] = useState("");
+  const [message, setMessage] = useState("");
+
+  async function load() {
+    try {
+      const response = await api.get(`/scholarships/${scholarshipId}`);
+      const data = response.data;
+
+      setForm({
+        name: data.name || "",
+        provider: data.provider || "",
+        description: data.description || "",
+        amount: data.amount ?? "",
+        application_start: data.application_start || "",
+        application_end: data.application_end || "",
+        status: data.status || "active",
+      });
+      setRequirements(data.requirements || []);
+    } catch (err) {
+      setMessage(errMsg(err, "Unable to load scholarship."));
+    }
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scholarshipId]);
+
+  async function save(e) {
+    e.preventDefault();
+    setMessage("");
+
+    try {
+      await api.put(`/scholarships/${scholarshipId}`, {
+        ...form,
+        amount: form.amount === "" ? null : Number(form.amount),
+        application_start: form.application_start || null,
+        application_end: form.application_end || null,
+      });
+
+      setMessage("Saved.");
+    } catch (err) {
+      setMessage(errMsg(err, "Unable to save scholarship."));
+    }
+  }
+
+  async function addRequirement(e) {
+    e.preventDefault();
+
+    if (!newRequirement.trim()) return;
+
+    try {
+      await api.post(`/scholarships/${scholarshipId}/requirements`, {
+        name: newRequirement.trim(),
+        is_required: true,
+      });
+
+      setNewRequirement("");
+      await load();
+    } catch (err) {
+      setMessage(errMsg(err, "Unable to add requirement."));
+    }
+  }
+
+  async function removeRequirement(requirement) {
+    if (!window.confirm(`Remove "${requirement.name}" from this scholarship?`)) {
+      return;
+    }
+
+    try {
+      await api.delete(`/requirements/${requirement.id}`);
+      await load();
+    } catch (err) {
+      setMessage(errMsg(err, "Unable to remove requirement."));
+    }
+  }
+
+  function field(key, value) {
+    setForm({ ...form, [key]: value });
+  }
+
+  return (
+    <div className="modal-backdrop">
+      <div className="modal modal-large">
+        <div className="card-header">
+          <h2>Manage Scholarship</h2>
+
+          <button className="close-button" onClick={close}>
+            ×
+          </button>
+        </div>
+
+        {message && <div className="alert alert-info">{message}</div>}
+
+        {!form ? (
+          <Loading />
+        ) : (
+          <>
+            <form className="form-grid" onSubmit={save}>
+              <div className="full-column">
+                <label>Name</label>
+                <input
+                  value={form.name}
+                  onChange={(e) => field("name", e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <label>Provider</label>
+                <input
+                  value={form.provider}
+                  onChange={(e) => field("provider", e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label>Amount</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.amount}
+                  onChange={(e) => field("amount", e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label>Application start</label>
+                <input
+                  type="date"
+                  value={String(form.application_start).slice(0, 10)}
+                  onChange={(e) =>
+                    field("application_start", e.target.value)
+                  }
+                />
+              </div>
+
+              <div>
+                <label>Application end</label>
+                <input
+                  type="date"
+                  value={String(form.application_end).slice(0, 10)}
+                  onChange={(e) =>
+                    field("application_end", e.target.value)
+                  }
+                />
+              </div>
+
+              <div>
+                <label>Status</label>
+                <select
+                  value={form.status}
+                  onChange={(e) => field("status", e.target.value)}
+                >
+                  <option value="active">active (students can apply)</option>
+                  <option value="inactive">inactive</option>
+                  <option value="closed">closed</option>
+                </select>
+              </div>
+
+              <div className="full-column">
+                <label>Description</label>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => field("description", e.target.value)}
+                />
+              </div>
+
+              <button className="button button-primary">
+                Save changes
+              </button>
+            </form>
+
+            <hr />
+
+            <h3>Requirements</h3>
+
+            {requirements.length === 0 ? (
+              <EmptyState message="No requirements yet." />
+            ) : (
+              requirements.map((requirement) => (
+                <div className="list-item" key={requirement.id}>
+                  <span>
+                    {requirement.name}
+                    {requirement.is_required && (
+                      <span className="required">Required</span>
+                    )}
+                  </span>
+
+                  <button
+                    className="button button-small button-danger"
+                    onClick={() => removeRequirement(requirement)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))
+            )}
+
+            <form className="button-row" onSubmit={addRequirement}>
+              <input
+                value={newRequirement}
+                onChange={(e) => setNewRequirement(e.target.value)}
+                placeholder="e.g. Certificate of Registration (COR)"
+              />
+
+              <button className="button button-secondary">
+                Add requirement
+              </button>
+            </form>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -2013,7 +2717,8 @@ function Reports() {
       ),
     ].join("\n");
 
-    const blob = new Blob([csv], {
+    // "\uFEFF" makes Excel read the file as UTF-8 (keeps ñ and Ñ intact).
+    const blob = new Blob(["\uFEFF" + csv], {
       type: "text/csv;charset=utf-8;",
     });
 
@@ -2045,17 +2750,31 @@ function Reports() {
               "scholarship-applications.csv",
               applications.map((item) => ({
                 ID: item.id,
-                Student:
-                  `${item.student?.first_name || ""} ${
-                    item.student?.last_name || ""
-                  }`.trim(),
                 Student_ID:
                   item.student?.student_id || "",
+                Last_Name: item.student?.last_name || "",
+                First_Name: item.student?.first_name || "",
+                Middle_Name: item.student?.middle_name || "",
+                Course: item.student?.course || "",
+                Year_Level: item.student?.year_level || "",
+                College: item.student?.college || "",
+                Contact_Number: item.student?.contact_number || "",
                 Scholarship:
                   item.scholarship?.name || "",
                 Status: item.status || "",
-                Submitted:
-                  item.submitted_at || "",
+                Missing_Documents: missingRequirements(item)
+                  .map((requirement) => requirement.name)
+                  .join("; "),
+                AI_Flagged_Documents: (item.documents || []).filter(
+                  (document) => document.status === "flagged"
+                ).length,
+                Submitted: item.submitted_at
+                  ? formatDate(item.submitted_at)
+                  : "",
+                Enrollment_Verified: item.enrollment_verified
+                  ? "Yes"
+                  : "No",
+                Remarks: item.remarks || "",
               }))
             )
           }
@@ -2069,12 +2788,10 @@ function Reports() {
               "scholar-records.csv",
               scholars.map((item) => ({
                 ID: item.id,
-                Student:
-                  `${item.student?.first_name || ""} ${
-                    item.student?.last_name || ""
-                  }`.trim(),
                 Student_ID:
                   item.student?.student_id || "",
+                Student: fullName(item.student),
+                Course: item.student?.course || "",
                 Scholarship:
                   item.scholarship?.name || "",
                 Status: item.status || "",
@@ -2083,6 +2800,9 @@ function Reports() {
                     ? "Yes"
                     : "No",
                 ATM: item.has_atm ? "Yes" : "No",
+                Tagged: item.grantee_tagged_at
+                  ? formatDate(item.grantee_tagged_at)
+                  : "",
               }))
             )
           }
@@ -2096,11 +2816,18 @@ function Reports() {
               "payroll-report.csv",
               payroll.map((item) => ({
                 ID: item.id,
+                Student_ID:
+                  item.scholar_record?.student?.student_id || "",
+                Student: fullName(item.scholar_record?.student),
+                Course: item.scholar_record?.student?.course || "",
+                Scholarship:
+                  item.scholar_record?.scholarship?.name || "",
                 Amount: item.amount,
                 Period: item.period,
                 ATM_Status:
                   item.bank_atm_status || "",
                 Status: item.status || "",
+                Signature: item.signature || "",
               }))
             )
           }
@@ -2123,6 +2850,266 @@ function Reports() {
           }
         />
       </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   DATA BANK (STAFF)
+   One place to search any student and see every application,
+   scholarship and payroll entry they have ever had.
+========================================================= */
+
+function DataBank() {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [searched, setSearched] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [student, setStudent] = useState(null);
+  const [message, setMessage] = useState("");
+
+  async function search(e) {
+    e?.preventDefault();
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const response = await api.get("/staff/data-bank", {
+        params: { q: query },
+      });
+
+      setResults(response.data);
+      setSearched(true);
+    } catch (err) {
+      setMessage(errMsg(err, "Search failed."));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function openStudent(id) {
+    try {
+      const response = await api.get(`/staff/data-bank/${id}`);
+      setStudent(response.data);
+    } catch (err) {
+      setMessage(errMsg(err, "Unable to load student history."));
+    }
+  }
+
+  useEffect(() => {
+    search();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div>
+      <PageHeader
+        title="Scholarship Data Bank"
+        subtitle="Search any student and see their complete scholarship history"
+      />
+
+      <section className="card">
+        <form className="button-row" onSubmit={search}>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Student ID, name or course (e.g. 2026-00001 or Juan)"
+          />
+
+          <button className="button button-primary" disabled={loading}>
+            {loading ? "Searching..." : "Search"}
+          </button>
+        </form>
+
+        {message && <div className="alert alert-danger">{message}</div>}
+
+        {searched && results.length === 0 ? (
+          <EmptyState message="No students matched your search." />
+        ) : (
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Student ID</th>
+                  <th>Name</th>
+                  <th>Course</th>
+                  <th>Applications</th>
+                  <th>Scholarship history</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {results.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.student_id}</td>
+
+                    <td>{fullName(item)}</td>
+
+                    <td>{item.course || "—"}</td>
+
+                    <td>{item.applications?.length || 0}</td>
+
+                    <td>
+                      {item.scholar_records?.length ? (
+                        item.scholar_records.map((record) => (
+                          <div key={record.id}>
+                            {record.scholarship?.name}{" "}
+                            <span className={statusClass(record.status)}>
+                              {record.status}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="muted">None</span>
+                      )}
+                    </td>
+
+                    <td>
+                      <button
+                        className="button button-small"
+                        onClick={() => openStudent(item.id)}
+                      >
+                        Full history
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {results.length === 50 && (
+          <p className="muted">Showing the first 50 matches. Type more to narrow the search.</p>
+        )}
+      </section>
+
+      {student && (
+        <div className="modal-backdrop">
+          <div className="modal modal-large">
+            <div className="card-header">
+              <div>
+                <h2>{fullName(student)}</h2>
+
+                {student.has_active_scholarship ? (
+                  <span className="status status-success">
+                    Has an active scholarship
+                  </span>
+                ) : (
+                  <span className="status status-neutral">
+                    No active scholarship
+                  </span>
+                )}
+              </div>
+
+              <button
+                className="close-button"
+                onClick={() => setStudent(null)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="detail-grid">
+              <ProfileItem label="Student ID" value={student.student_id} />
+              <ProfileItem label="Course" value={student.course} />
+              <ProfileItem label="Year Level" value={student.year_level} />
+              <ProfileItem label="College" value={student.college} />
+              <ProfileItem label="Contact" value={student.contact_number} />
+              <ProfileItem label="Email" value={student.user?.email} />
+            </div>
+
+            <h3>Scholarships (grantee records)</h3>
+
+            {student.scholar_records?.length ? (
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Scholarship</th>
+                      <th>Status</th>
+                      <th>Tagged</th>
+                      <th>Enrolled</th>
+                      <th>Payroll entries</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {student.scholar_records.map((record) => (
+                      <tr key={record.id}>
+                        <td>{record.scholarship?.name}</td>
+                        <td>
+                          <span className={statusClass(record.status)}>
+                            {record.status}
+                          </span>
+                        </td>
+                        <td>{formatDate(record.grantee_tagged_at)}</td>
+                        <td>{record.currently_enrolled ? "Yes" : "No"}</td>
+                        <td>
+                          {record.payroll_records?.length
+                            ? record.payroll_records
+                                .map(
+                                  (item) =>
+                                    `${item.period}: ${formatMoney(item.amount)} (${item.status})`
+                                )
+                                .join("; ")
+                            : "None"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState message="Never tagged as a grantee." />
+            )}
+
+            <h3>Applications</h3>
+
+            {student.applications?.length ? (
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Scholarship</th>
+                      <th>Status</th>
+                      <th>Submitted</th>
+                      <th>Enrollment</th>
+                      <th>Documents</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {student.applications.map((application) => (
+                      <tr key={application.id}>
+                        <td>{application.scholarship?.name}</td>
+                        <td>
+                          <span className={statusClass(application.status)}>
+                            {statusLabel(application.status)}
+                          </span>
+                        </td>
+                        <td>{formatDate(application.submitted_at)}</td>
+                        <td>{enrollmentText(application)}</td>
+                        <td>
+                          {application.documents?.length || 0} uploaded
+                          {application.documents?.some(
+                            (document) => document.status === "flagged"
+                          )
+                            ? " · AI flagged"
+                            : ""}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState message="No applications." />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2152,6 +3139,7 @@ function AppShell({
     ["applications", "Applications"],
     ["scholars", "Scholar Records"],
     ["payroll", "Payroll"],
+    ["databank", "Data Bank"],
     ["scholarships", "Scholarships"],
     ["reports", "Reports"],
   ];

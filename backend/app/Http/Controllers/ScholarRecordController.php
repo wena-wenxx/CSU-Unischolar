@@ -60,8 +60,12 @@ class ScholarRecordController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | STAFF - CREATE SCHOLAR RECORD
+    | STAFF - TAG GRANTEE (CREATE SCHOLAR RECORD)
     |--------------------------------------------------------------------------
+    | Allowed only after the agency approved the application AND OAS
+    | verified enrollment (POST /applications/{id}/verify-enrollment).
+    | Body: has_atm (boolean), remarks (optional).
+    | currently_enrolled is optional; it defaults to the verification result.
     */
 
     public function store(Request $request, $applicationId = null)
@@ -81,8 +85,8 @@ class ScholarRecordController extends Controller
 
         $data = $request->validate([
             'application_id' => 'required|exists:applications,id',
-            'currently_enrolled' => 'required|boolean',
-            'has_atm' => 'required|boolean',
+            'currently_enrolled' => 'sometimes|boolean',
+            'has_atm' => 'sometimes|boolean',
             'remarks' => 'nullable|string|max:5000',
         ]);
 
@@ -99,6 +103,13 @@ class ScholarRecordController extends Controller
             ], 422);
         }
 
+        if (!$application->enrollment_verified) {
+            return response()->json([
+                'message' => 'Verify this student\'s enrollment before tagging them as a grantee.'
+            ], 422);
+        }
+
+        // Hard rule: one active scholarship per student.
         $alreadyActive = ScholarRecord::where(
             'student_id',
             $application->student_id
@@ -127,9 +138,9 @@ class ScholarRecordController extends Controller
             [
                 'status' => 'active',
                 'currently_enrolled' =>
-                    $data['currently_enrolled'],
+                    $data['currently_enrolled'] ?? true,
                 'has_atm' =>
-                    $data['has_atm'],
+                    $data['has_atm'] ?? false,
                 'grantee_tagged_at' => now(),
                 'remarks' =>
                     $data['remarks'] ?? null,
@@ -137,7 +148,7 @@ class ScholarRecordController extends Controller
         );
 
         return response()->json([
-            'message' => 'Scholar record created successfully.',
+            'message' => 'Student tagged as grantee.',
             'scholar_record' => $record->load([
                 'student',
                 'scholarship'

@@ -15,5 +15,5 @@ uvicorn==0.53.0
 rapidfuzz
 pymupdf
 pillow
-paddleocr
-paddlepaddle
+pytest
+httpx

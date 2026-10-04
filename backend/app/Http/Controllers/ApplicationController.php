@@ -350,10 +350,19 @@ class ApplicationController extends Controller
 
         $application = Application::findOrFail($id);
 
-        $application->update([
+        $changes = [
             'status' => $data['status'],
             'remarks' => $data['remarks'] ?? null,
-        ]);
+        ];
+
+        // Enrollment verification only makes sense for approved
+        // applications. If staff move it away from "approved", clear it.
+        if ($data['status'] !== 'approved') {
+            $changes['enrollment_verified'] = false;
+            $changes['enrollment_verified_at'] = null;
+        }
+
+        $application->update($changes);
 
         return response()->json([
             'message' => 'Application review updated successfully.',

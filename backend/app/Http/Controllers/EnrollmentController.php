@@ -8,6 +8,18 @@ use Illuminate\Http\Request;
 
 class EnrollmentController extends Controller
 {
+    /*
+    |--------------------------------------------------------------------------
+    | STAFF - VERIFY ENROLLMENT OF AN APPROVED APPLICANT
+    |--------------------------------------------------------------------------
+    | OAS workflow: the agency approves -> OAS verifies enrollment ->
+    | OAS tags the grantee. This step ONLY records the verification on the
+    | application. Tagging the grantee is a separate step
+    | (POST /applications/{id}/scholar-record).
+    |
+    | Body: currently_enrolled (boolean, required), remarks (optional)
+    */
+
     public function verify(Request $request, $applicationId)
     {
         if ($request->user()->role !== 'staff') {
@@ -32,37 +44,31 @@ class EnrollmentController extends Controller
             ], 422);
         }
 
-        $scholar = ScholarRecord::firstOrCreate(
-            [
-                'student_id' => $application->student_id,
-                'scholarship_id' => $application->scholarship_id,
-            ],
-            [
-                'status' => 'active',
-                'currently_enrolled' =>
-                    $data['currently_enrolled'],
-                'has_atm' => false,
-                'grantee_tagged_at' => now(),
-                'remarks' => $data['remarks'] ?? null,
-            ]
-        );
+        $enrolled = (bool) $data['currently_enrolled'];
 
-        $scholar->update([
-            'currently_enrolled' =>
-                $data['currently_enrolled'],
-            'remarks' =>
-                $data['remarks'] ?? $scholar->remarks,
+        $application->update([
+            'enrollment_verified' => $enrolled,
+            'enrollment_verified_at' => $enrolled ? now() : null,
+            'remarks' => $data['remarks'] ?? $application->remarks,
         ]);
 
+        // If this student was already tagged as a grantee for this
+        // scholarship, keep the scholar record's enrollment flag in step,
+        // because payroll checks it.
+        ScholarRecord::where('student_id', $application->student_id)
+            ->where('scholarship_id', $application->scholarship_id)
+            ->update(['currently_enrolled' => $enrolled]);
+
         return response()->json([
-            'message' => 'Enrollment verification recorded successfully.',
-            'currently_enrolled' =>
-                $scholar->currently_enrolled,
-            'scholar_record' =>
-                $scholar->load([
-                    'student',
-                    'scholarship'
-                ])
+            'message' => $enrolled
+                ? 'Enrollment verified. You can now tag this student as a grantee.'
+                : 'Recorded: student is NOT currently enrolled.',
+            'enrollment_verified' => $application->enrollment_verified,
+            'enrollment_verified_at' => $application->enrollment_verified_at,
+            'application' => $application->fresh()->load([
+                'student',
+                'scholarship'
+            ]),
         ]);
     }
 }

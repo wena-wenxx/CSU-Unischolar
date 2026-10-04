@@ -1,415 +1,130 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+"""
+CSU UniScholar AI service (ASSISTIVE ONLY).
 
+It reads an uploaded document and returns FLAGS for OAS staff to review.
+It never approves or rejects anyone.
+
+    ocr_engine.py  -> gets the text out of the file (PDF text or PaddleOCR)
+    validation.py  -> turns that text into flags (name, student ID, document kind)
+
+Run (inside ai-service/, with the virtual environment active):
+    uvicorn main:app --reload --port 8001
+"""
+import os
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from rapidfuzz import fuzz
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 
-import os
-import re
-import json
-
+from ocr_engine import extract_text, ocr_status
+from validation import validate_text
 
 app = FastAPI(
     title="CSU UniScholar AI Service",
-    version="1.0.0"
+    version="1.1.0",
 )
-
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-UPLOAD_DIR = Path("temp_uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
+ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
 
 
 @app.get("/")
 def read_root():
     return {
         "message": "CSU UniScholar AI service is running",
-        "status": "ready"
+        "status": "ready",
     }
 
 
-def normalize_text(text: str) -> str:
-    text = text.upper()
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
-
-
-def normalize_name(name: str) -> str:
-    name = normalize_text(name)
-    name = re.sub(r"[^A-Z0-9 ]", "", name)
-    return name
-
-
-def extract_name_candidates(text: str):
-    candidates = []
-
-    lines = [
-        line.strip()
-        for line in text.splitlines()
-        if line.strip()
-    ]
-
-    for line in lines:
-
-        upper = line.upper()
-
-        if any(keyword in upper for keyword in [
-            "NAME",
-            "STUDENT NAME",
-            "FULL NAME",
-            "APPLICANT"
-        ]):
-
-            parts = re.split(
-                r":|-",
-                line,
-                maxsplit=1
-            )
-
-            if len(parts) == 2:
-                value = parts[1].strip()
-
-                if len(value.split()) >= 2:
-                    candidates.append(value)
-
-    return candidates
-
-
-def check_name_match(
-    expected_name: str,
-    extracted_text: str
-):
-    expected = normalize_name(expected_name)
-
-    candidates = extract_name_candidates(
-        extracted_text
-    )
-
-    if not candidates:
-        return {
-            "matched": False,
-            "score": 0,
-            "candidate": None
-        }
-
-    best_score = 0
-    best_candidate = None
-
-    for candidate in candidates:
-
-        candidate_normalized = normalize_name(
-            candidate
-        )
-
-        score = fuzz.token_set_ratio(
-            expected,
-            candidate_normalized
-        )
-
-        if score > best_score:
-            best_score = score
-            best_candidate = candidate
-
-    return {
-        "matched": best_score >= 80,
-        "score": best_score,
-        "candidate": best_candidate
-    }
-
-
-def check_required_information(text: str):
-    normalized = normalize_text(text)
-
-    missing = []
-
-    if len(normalized) < 20:
-        missing.append(
-            "Very little readable information was extracted."
-        )
-
-    return missing
-
-
-def check_document_type(
-    document_type: str,
-    text: str
-):
-    normalized = normalize_text(text)
-
-    keywords = {
-        "COR": [
-            "CERTIFICATE OF REGISTRATION",
-            "REGISTRATION",
-            "COURSE",
-            "SUBJECT"
-        ],
-        "GRADES": [
-            "GRADE",
-            "GRADES",
-            "SEMESTER",
-            "SUBJECT"
-        ],
-        "BIRTH_CERTIFICATE": [
-            "BIRTH",
-            "CERTIFICATE",
-            "PHILIPPINES"
-        ],
-        "VALID_ID": [
-            "REPUBLIC",
-            "IDENTIFICATION",
-            "ID"
-        ],
-    }
-
-    if not document_type:
-        return {
-            "possible_wrong_document": False,
-            "matched_keywords": []
-        }
-
-    expected_keywords = keywords.get(
-        document_type.upper(),
-        []
-    )
-
-    if not expected_keywords:
-        return {
-            "possible_wrong_document": False,
-            "matched_keywords": []
-        }
-
-    matched = [
-        keyword
-        for keyword in expected_keywords
-        if keyword in normalized
-    ]
-
-    # If none of the expected keywords appear,
-    # flag it for human review.
-    wrong = len(matched) == 0
-
-    return {
-        "possible_wrong_document": wrong,
-        "matched_keywords": matched
-    }
-
-
-def run_ocr(file_path: str):
-
-    try:
-        from paddleocr import PaddleOCR
-
-        ocr = PaddleOCR(
-            lang="en"
-        )
-
-        results = ocr.predict(
-            file_path
-        )
-
-        collected_text = []
-
-        for result in results:
-
-            try:
-
-                if hasattr(result, "json"):
-                    data = result.json
-
-                    if callable(data):
-                        data = data()
-
-                    if isinstance(data, str):
-                        data = json.loads(data)
-
-                    def walk(value):
-
-                        if isinstance(value, dict):
-                            for key, item in value.items():
-
-                                if key in [
-                                    "rec_texts",
-                                    "text",
-                                    "texts"
-                                ]:
-                                    if isinstance(item, list):
-                                        for t in item:
-                                            if isinstance(t, str):
-                                                collected_text.append(t)
-
-                                walk(item)
-
-                        elif isinstance(value, list):
-                            for item in value:
-                                walk(item)
-
-                    walk(data)
-
-            except Exception:
-                continue
-
-        return "\n".join(collected_text)
-
-    except Exception as error:
-
-        raise RuntimeError(
-            f"OCR processing failed: {str(error)}"
-        )
+@app.get("/ocr-status")
+def get_ocr_status():
+    """Is PaddleOCR installed and loaded? (Typed PDFs work even without it.)"""
+    return ocr_status()
 
 
 @app.post("/validate-document")
 async def validate_document(
     file: UploadFile = File(...),
     expected_name: str = Form(...),
-    document_type: str = Form("")
+    expected_student_id: str = Form(""),
+    document_label: str = Form(""),
+    # Older name for document_label, still accepted.
+    document_type: str = Form(""),
 ):
-
     if not file.filename:
-        raise HTTPException(
-            status_code=400,
-            detail="No file supplied."
-        )
+        raise HTTPException(status_code=400, detail="No file supplied.")
 
-    suffix = Path(
-        file.filename
-    ).suffix.lower()
+    suffix = Path(file.filename).suffix.lower()
 
-    if suffix not in [
-        ".jpg",
-        ".jpeg",
-        ".png",
-        ".pdf"
-    ]:
-        raise HTTPException(
-            status_code=422,
-            detail="Unsupported file type."
-        )
+    if suffix not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=422, detail="Unsupported file type.")
 
     file_bytes = await file.read()
 
     if not file_bytes:
-        raise HTTPException(
-            status_code=422,
-            detail="Uploaded file is empty."
-        )
+        raise HTTPException(status_code=422, detail="Uploaded file is empty.")
 
-    with NamedTemporaryFile(
-        delete=False,
-        suffix=suffix,
-        dir=UPLOAD_DIR
-    ) as temp_file:
-
+    with NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
         temp_file.write(file_bytes)
-
         temp_path = temp_file.name
 
     try:
-
-        extracted_text = run_ocr(
-            temp_path
-        )
-
-        normalized_text = normalize_text(
-            extracted_text
-        )
-
-        missing_information = (
-            check_required_information(
-                extracted_text
-            )
-        )
-
-        name_result = check_name_match(
-            expected_name,
-            extracted_text
-        )
-
-        document_result = check_document_type(
-            document_type,
-            extracted_text
-        )
-
-        flags = []
-
-        if missing_information:
-            flags.extend(
-                missing_information
-            )
-
-        if not name_result["matched"]:
-            flags.append(
-                "Possible student name mismatch."
-            )
-
-        if document_result[
-            "possible_wrong_document"
-        ]:
-            flags.append(
-                "Possible wrong document type."
-            )
-
-        is_complete = (
-            len(missing_information) == 0
-            and len(normalized_text) >= 20
-        )
-
-        confidence = (
-            max(
-                0,
-                min(
-                    100,
-                    (
-                        name_result["score"]
-                        if name_result["candidate"]
-                        else 50
-                    )
-                )
-            )
-        )
-
-        return {
-            "success": True,
-            "is_complete": is_complete,
-            "has_name_mismatch":
-                not name_result["matched"],
-            "has_missing_information":
-                len(missing_information) > 0,
-            "has_wrong_document":
-                document_result[
-                    "possible_wrong_document"
-                ],
-            "confidence_score":
-                round(confidence, 2),
-            "extracted_text":
-                extracted_text,
-            "extracted_data": {
-                "expected_name":
-                    expected_name,
-                "detected_name":
-                    name_result["candidate"],
-                "document_type":
-                    document_type,
-                "matched_keywords":
-                    document_result[
-                        "matched_keywords"
-                    ],
-            },
-            "flags": flags
-        }
-
+        extraction = extract_text(temp_path, file.filename)
     finally:
-
         try:
             os.remove(temp_path)
         except OSError:
             pass
+
+    label = document_label or document_type
+
+    if extraction["ocr_status"] != "ok":
+        # Could not read the file at all: send it to a human, do not guess.
+        return {
+            "success": True,
+            "ocr_status": "failed",
+            "engine": extraction["engine"],
+            "is_complete": False,
+            "has_name_mismatch": False,
+            "has_missing_information": False,
+            "has_wrong_document": False,
+            "confidence_score": None,
+            "extracted_text": "",
+            "extracted_data": {"document_label": label},
+            "flags": [
+                "The file could not be read automatically. Please check it manually. "
+                f"({extraction['error']})"
+            ],
+        }
+
+    result = validate_text(
+        extraction["text"],
+        expected_name=expected_name,
+        expected_student_id=expected_student_id,
+        document_label=label,
+    )
+
+    extracted_data = result["extracted_data"]
+    extracted_data["document_label"] = label
+    extracted_data["detected_name"] = extracted_data.get("best_name_window") or None
+
+    return {
+        "success": True,
+        "ocr_status": "ok",
+        "engine": extraction["engine"],
+        "is_complete": result["is_complete"],
+        "has_name_mismatch": result["has_name_mismatch"],
+        "has_missing_information": result["has_missing_information"],
+        "has_wrong_document": result["has_wrong_document"],
+        "confidence_score": result["confidence_score"],
+        "extracted_text": extraction["text"],
+        "extracted_data": extracted_data,
+        "flags": result["flags"],
+    }

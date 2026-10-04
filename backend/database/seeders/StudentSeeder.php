@@ -66,5 +66,33 @@ class StudentSeeder extends Seeder
                 'contact_number' => '09000000002',
             ]
         );
+
+        // Student 3
+        $student3 = User::updateOrCreate(
+            [
+                'email' => 'student3@carsu.edu.ph',
+            ],
+            [
+                'name' => 'Ana Demo Student',
+                'password' => Hash::make('Student@12345'),
+                'role' => 'student',
+            ]
+        );
+
+        Student::updateOrCreate(
+            [
+                'student_id' => '2026-00003',
+            ],
+            [
+                'user_id' => $student3->id,
+                'first_name' => 'Ana',
+                'middle_name' => 'Demo',
+                'last_name' => 'Student',
+                'course' => 'Bachelor of Science in Computer Science',
+                'year_level' => '2nd Year',
+                'college' => 'College of Computing and Information Sciences',
+                'contact_number' => '09000000003',
+            ]
+        );
     }
 }

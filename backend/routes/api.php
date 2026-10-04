@@ -4,6 +4,7 @@ use App\Http\Controllers\AIController;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DataBankController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\ScholarRecordController;
@@ -56,6 +57,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/scholarships/{id}', [ScholarshipController::class, 'update']);
     Route::delete('/scholarships/{id}', [ScholarshipController::class, 'destroy']);
     Route::post('/scholarships/{id}/requirements', [ScholarshipController::class, 'addRequirement']);
+    Route::delete('/requirements/{id}', [ScholarshipController::class, 'destroyRequirement']);
 
     /*
     |--------------------------------------------------------------------------
@@ -78,6 +80,15 @@ Route::middleware('auth:sanctum')->group(function () {
     */
 
     Route::get('/staff/dashboard', [DashboardController::class, 'index']);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Scholarship Data Bank (staff): search a student, see full history
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/staff/data-bank', [DataBankController::class, 'search']);
+    Route::get('/staff/data-bank/{studentId}', [DataBankController::class, 'show']);
 
     /*
     |--------------------------------------------------------------------------

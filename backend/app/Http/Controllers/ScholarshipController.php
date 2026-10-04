@@ -103,6 +103,16 @@ class ScholarshipController extends Controller
             'is_required' => 'nullable|boolean',
         ]);
 
+        $alreadyListed = $scholarship->requirements()
+            ->where('name', $data['name'])
+            ->exists();
+
+        if ($alreadyListed) {
+            return response()->json([
+                'message' => 'This scholarship already lists that requirement.'
+            ], 422);
+        }
+
         $requirement = ScholarshipRequirement::create([
             'scholarship_id' => $scholarship->id,
             'name' => $data['name'],

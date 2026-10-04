@@ -15,12 +15,7 @@ class Student extends Model
         'course',
         'year_level',
         'college',
-        'enrollment_status',
         'contact_number',
-    ];
-
-    protected $casts = [
-        'enrollment_status' => 'string',
     ];
 
     public function user()

@@ -12,10 +12,14 @@ class Application extends Model
         'status',
         'remarks',
         'submitted_at',
+        'enrollment_verified',
+        'enrollment_verified_at',
     ];
 
     protected $casts = [
         'submitted_at' => 'datetime',
+        'enrollment_verified' => 'boolean',
+        'enrollment_verified_at' => 'datetime',
     ];
 
     public function student()
