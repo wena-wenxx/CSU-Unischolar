@@ -39,12 +39,19 @@ class PayrollController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function store(Request $request)
+    public function store(Request $request, $scholarRecordId = null)
     {
         if ($request->user()->role !== 'staff') {
             return response()->json([
                 'message' => 'Unauthorized.'
             ], 403);
+        }
+
+        // The route is /scholar-records/{scholarRecordId}/payroll, so the
+        // scholar record ID normally comes from the URL. A body value is
+        // still accepted for older clients.
+        if ($scholarRecordId !== null) {
+            $request->merge(['scholar_record_id' => $scholarRecordId]);
         }
 
         $data = $request->validate([
@@ -55,7 +62,7 @@ class PayrollController extends Controller
             'period' =>
                 'required|string|max:255',
             'bank_atm_status' =>
-                'required|string|max:50',
+                'nullable|string|max:50',
             'status' =>
                 'nullable|in:draft,ready,processed',
             'signature' =>
@@ -85,8 +92,11 @@ class PayrollController extends Controller
                 $data['amount'],
             'period' =>
                 $data['period'],
+            // If staff did not type an ATM status, use the scholar record's
+            // has_atm flag ("Yes" / "No", matching the column default "No").
             'bank_atm_status' =>
-                $data['bank_atm_status'],
+                $data['bank_atm_status']
+                ?? ($scholar->has_atm ? 'Yes' : 'No'),
             'status' =>
                 $data['status'] ?? 'draft',
             'signature' =>

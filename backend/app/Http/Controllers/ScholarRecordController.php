@@ -36,16 +36,47 @@ class ScholarRecordController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | STAFF - CREATE SCHOLAR RECORD
+    | STAFF - VIEW ONE SCHOLAR RECORD
     |--------------------------------------------------------------------------
     */
 
-    public function store(Request $request)
+    public function show(Request $request, $id)
     {
         if ($request->user()->role !== 'staff') {
             return response()->json([
                 'message' => 'Unauthorized.'
             ], 403);
+        }
+
+        $record = ScholarRecord::with([
+            'student',
+            'scholarship',
+            'payrollRecords'
+        ])->findOrFail($id);
+
+        return response()->json($record);
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | STAFF - CREATE SCHOLAR RECORD
+    |--------------------------------------------------------------------------
+    */
+
+    public function store(Request $request, $applicationId = null)
+    {
+        if ($request->user()->role !== 'staff') {
+            return response()->json([
+                'message' => 'Unauthorized.'
+            ], 403);
+        }
+
+        // The route is /applications/{applicationId}/scholar-record, so the
+        // application ID normally comes from the URL. A body value is still
+        // accepted for older clients.
+        if ($applicationId !== null) {
+            $request->merge(['application_id' => $applicationId]);
         }
 
         $data = $request->validate([

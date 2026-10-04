@@ -64,10 +64,8 @@ class AIController extends Controller
                     $document->original_filename
                 )
                 ->post(
-                    env(
-                        'AI_SERVICE_URL',
-                        'http://127.0.0.1:8001'
-                    ) . '/validate-document',
+                    rtrim(config('services.ai.url'), '/')
+                        . '/validate-document',
                     [
                         'expected_name' =>
                             $expectedName,

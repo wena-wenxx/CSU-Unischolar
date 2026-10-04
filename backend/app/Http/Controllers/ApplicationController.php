@@ -224,24 +224,33 @@ class ApplicationController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | STAFF - VIEW ONE APPLICATION
+    | STAFF / STUDENT (OWNER) - VIEW ONE APPLICATION
     |--------------------------------------------------------------------------
+    | Staff can open any application. A student can open only their own.
     */
 
     public function show(Request $request, $id)
     {
-        if ($request->user()->role !== 'staff') {
-            return response()->json([
-                'message' => 'Unauthorized.'
-            ], 403);
-        }
-
         $application = Application::with([
             'student',
             'scholarship.requirements',
             'documents.validationResult',
             'documents.requirement'
         ])->findOrFail($id);
+
+        if ($request->user()->role !== 'staff') {
+
+            $student = Student::where(
+                'user_id',
+                $request->user()->id
+            )->first();
+
+            if (!$student || (int) $application->student_id !== (int) $student->id) {
+                return response()->json([
+                    'message' => 'Unauthorized.'
+                ], 403);
+            }
+        }
 
         return response()->json($application);
     }
