@@ -125,7 +125,7 @@ export default function LoginPage() {
           <div className="login-heading">
             <p className="login-eyebrow">SECURE PORTAL</p>
 
-            <h1>Welcome back!</h1>
+            <h2>Welcome back!</h2>
 
             <p>Sign in to continue to your UniScholar account.</p>
           </div>

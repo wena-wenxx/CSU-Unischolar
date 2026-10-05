@@ -940,7 +940,7 @@ hr {
     position: relative;
 
     display: grid;
-    grid-template-columns: 56% 44%;
+    grid-template-columns: 50% 50%;
 
     background: #f8faf7;
 
@@ -948,11 +948,16 @@ hr {
   }
 
   .login-hero-content {
-    padding: 42px;
+    width: 50%;
+    padding: 42px 28px 32px 36px;
   }
 
   .login-hero-main h1 {
-    font-size: 42px;
+    font-size: clamp(30px, 4vw, 42px);
+  }
+
+  .login-panel {
+    grid-column: 2;
   }
 
   .login-hero-description {
@@ -960,7 +965,7 @@ hr {
   }
 
   .login-panel {
-    padding: 40px;
+    padding: 32px 28px 32px 0;
   }
 }
 
@@ -972,13 +977,14 @@ hr {
   }
 
   .login-hero {
-    min-height: 330px;
-
-    height: 330px;
+    min-height: 0;
+    height: auto;
   }
 
   .login-hero-content {
-    min-height: 330px;
+    width: 100%;
+    min-height: 0;
+    gap: 22px;
 
     padding: 30px;
   }
@@ -1056,15 +1062,9 @@ hr {
 }
 
 @media (max-width: 480px) {
-  .login-hero {
-    min-height: 285px;
-    height: 285px;
-  }
-
   .login-hero-content {
-    min-height: 285px;
-
-    padding: 24px 22px;
+    gap: 18px;
+    padding: 24px 22px 26px;
   }
 
   .login-hero-logo {
@@ -1966,18 +1966,10 @@ tbody tr:hover {
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
-
-  .login-page {
-    grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr);
-  }
-
-  .login-hero-university {
-    font-size: 30px;
-  }
 }
 
-/* Tablets and phones: sidebar becomes a slide-in menu (☰),
-   login photo becomes a short banner above the card. */
+/* Tablets and phones: sidebar becomes a slide-in menu (☰).
+   (Login page responsive rules are in the RESPONSIVE LOGIN section.) */
 @media (max-width: 900px) {
   .sidebar {
     width: 270px;
@@ -2021,33 +2013,6 @@ tbody tr:hover {
   .profile-grid,
   .detail-grid {
     grid-template-columns: 1fr;
-  }
-
-  .login-page {
-    grid-template-columns: 1fr;
-  }
-
-  .login-hero {
-    padding: 28px 20px 34px;
-  }
-
-  .login-hero-logo {
-    display: none;
-  }
-
-  .login-hero-university {
-    margin-top: 0;
-    font-size: 24px;
-  }
-
-  .login-hero-tagline {
-    font-size: 17px;
-    margin-bottom: 12px;
-  }
-
-  .login-panel {
-    padding: 20px 14px 32px;
-    align-items: flex-start;
   }
 }
 
@@ -2111,14 +2076,6 @@ tbody tr:hover {
     left: 16px;
     bottom: 16px;
     width: auto;
-  }
-
-  .login-card {
-    padding: 26px 20px 18px;
-  }
-
-  .login-title {
-    font-size: 30px;
   }
 }
 
