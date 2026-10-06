@@ -2,20 +2,23 @@ import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 
 import api, { errMsg } from "../services/api";
-
 import { homePathFor, useAuth } from "../lib/auth";
-
 import {
   APP_NAME,
   CAMPUS_PHOTO,
+  CARD_FOOTER,
   LOGO,
   MOTTO,
+  OFFICE,
   PHOTO_CREDIT,
-  SYSTEM_FOOTER,
   TAGLINE,
   UNIVERSITY,
 } from "../lib/brand";
 
+/*
+  Login: full-screen CSU Main Campus photo under a dark green layer,
+  with a centred white sign-in card.
+*/
 export default function LoginPage() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
@@ -26,228 +29,135 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Already logged in? Go straight to the dashboard.
   if (user) {
     return <Navigate to={homePathFor(user)} replace />;
   }
 
   async function handleLogin(event) {
     event.preventDefault();
-
     setError("");
     setLoading(true);
 
     try {
-      const response = await api.post("/login", {
-        email,
-        password,
-      });
+      const response = await api.post("/login", { email, password });
 
       login(response.data);
-
-      navigate(homePathFor(response.data.user), {
-        replace: true,
-      });
+      navigate(homePathFor(response.data.user), { replace: true });
     } catch (err) {
-      setError(
-        errMsg(err, "Login failed. Please check your email and password."),
-      );
-
+      setError(errMsg(err, "Login failed. Please check your email and password."));
       setLoading(false);
     }
   }
 
   return (
-    <main className="login-page">
-      {/* LEFT SIDE */}
-      <section
-        className="login-hero"
-        style={{
-          backgroundImage: `url(${CAMPUS_PHOTO})`,
-        }}
-        aria-label={`${UNIVERSITY} main campus`}
-      >
-        <div className="login-hero-overlay"></div>
+    <main className="login-page" style={{ backgroundImage: `url(${CAMPUS_PHOTO})` }}>
+      <div className="login-wrap">
+        <p className="login-tagline">{TAGLINE}</p>
 
-        <div className="login-hero-content">
-          <div className="login-brand">
-            <img
-              src={LOGO}
-              alt={`${UNIVERSITY} logo`}
-              className="login-hero-logo"
-            />
+        <section className="login-card" aria-labelledby="login-title">
+          <img src={LOGO} alt={`${UNIVERSITY} logo`} className="login-logo" />
 
-            <div>
-              <span className="login-brand-small">CARAGA STATE UNIVERSITY</span>
+          <h1 id="login-title" className="login-title">
+            {APP_NAME}
+          </h1>
 
-              <span className="login-brand-line"></span>
+          <p className="login-subtitle">
+            {UNIVERSITY} — {OFFICE}
+          </p>
 
-              <span className="login-brand-system">UniScholar</span>
-            </div>
-          </div>
-
-          <div className="login-hero-main">
-            <p className="login-hero-eyebrow">
-              OFFICE OF ADMISSION AND SCHOLARSHIP
-            </p>
-
-            <h1>Unified Scholarship Management System</h1>
-
-            <p className="login-hero-description">
-              A centralized platform for managing scholarship applications,
-              student records, document validation, and scholarship monitoring
-              at Caraga State University.
-            </p>
-
-            <div className="login-hero-divider"></div>
-
-            <p className="login-hero-tagline">{TAGLINE}</p>
-
-            <p className="login-hero-motto">{MOTTO}</p>
-          </div>
-
-          <small className="login-hero-credit">{PHOTO_CREDIT}</small>
-        </div>
-      </section>
-
-      {/* RIGHT SIDE */}
-      <section className="login-panel">
-        <div className="login-form-container">
-          <div className="login-form-brand">
-            <img src={LOGO} alt={`${UNIVERSITY} logo`} className="login-logo" />
-
-            <div>
-              <span className="login-form-brand-title">{APP_NAME}</span>
-
-              <span className="login-form-brand-subtitle">{UNIVERSITY}</span>
-            </div>
-          </div>
-
-          <div className="login-heading">
-            <p className="login-eyebrow">SECURE PORTAL</p>
-
-            <h2>Welcome back!</h2>
-
-            <p>Sign in to continue to your UniScholar account.</p>
-          </div>
+          <p className="login-motto">{MOTTO}</p>
 
           {error && (
             <div className="login-error" role="alert">
-              <span className="login-error-icon">!</span>
-
+              <span className="login-error-icon" aria-hidden="true">
+                !
+              </span>
               <span>{error}</span>
             </div>
           )}
 
           <form className="login-form" onSubmit={handleLogin}>
-            <div className="login-field">
-              <label htmlFor="email">Email address</label>
+            <label htmlFor="email">Email address</label>
 
-              <div className="login-input-wrapper">
-                <span className="login-input-icon">@</span>
+            <div className="login-input-wrapper">
+              <span className="login-input-icon" aria-hidden="true">
+                @
+              </span>
 
-                <input
-                  id="email"
-                  type="email"
-                  placeholder="Enter your email address"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  autoComplete="username"
-                  required
-                />
-              </div>
+              <input
+                id="email"
+                type="email"
+                placeholder="Enter your email address"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="username"
+                required
+              />
             </div>
 
-            <div className="login-field">
-              <label htmlFor="password">Password</label>
+            <label htmlFor="password">Password</label>
 
-              <div className="login-input-wrapper">
-                <span className="login-input-icon">•</span>
+            <div className="login-input-wrapper">
+              <span className="login-input-icon" aria-hidden="true">
+                •
+              </span>
 
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  autoComplete="current-password"
-                  required
-                />
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter your password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
+                required
+              />
 
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? "Hide" : "Show"}
-                </button>
-              </div>
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
             </div>
 
             <button type="submit" className="login-submit" disabled={loading}>
               {loading ? (
                 <>
-                  <span className="login-spinner"></span>
+                  <span className="login-spinner" aria-hidden="true"></span>
                   Signing in...
                 </>
               ) : (
-                <>
-                  Sign In
-                  <span className="login-submit-arrow">→</span>
-                </>
+                "Sign In"
               )}
             </button>
           </form>
 
-          <div className="login-security-note">
-            <span className="login-security-icon">✓</span>
-
-            <div>
-              <strong>Authorized users only</strong>
-
-              <p>
-                This portal is intended for CSU students and authorized OAS
-                staff.
-              </p>
-            </div>
-          </div>
+          <p className="login-security-note">
+            <span aria-hidden="true">✓</span> For CSU students and authorized OAS staff only.
+          </p>
 
           <details className="login-demo">
             <summary>Demo accounts for testing</summary>
 
-            <div className="login-demo-content">
-              <div className="demo-account">
-                <strong>OAS Staff</strong>
+            <dl>
+              <dt>OAS Staff</dt>
+              <dd>oas.staff@carsu.edu.ph · Staff@12345</dd>
 
-                <span>oas.staff@carsu.edu.ph</span>
+              <dt>Student</dt>
+              <dd>student1@carsu.edu.ph · Student@12345</dd>
+            </dl>
 
-                <small>Password: Staff@12345</small>
-              </div>
-
-              <div className="demo-account">
-                <strong>Student</strong>
-
-                <span>student1@carsu.edu.ph</span>
-
-                <small>Password: Student@12345</small>
-              </div>
-
-              <p className="demo-warning">
-                These are fictional accounts for local testing only and are not
-                connected to CSU SSO.
-              </p>
-            </div>
+            <p>Fictional accounts for testing only; not connected to CSU SSO.</p>
           </details>
 
-          <footer className="login-footer">
-            <span>{SYSTEM_FOOTER}</span>
+          <p className="login-card-footer">{CARD_FOOTER}</p>
+        </section>
 
-            <span className="login-footer-dot">•</span>
-
-            <span>CSU UniScholar</span>
-          </footer>
-        </div>
-      </section>
+        <small className="login-credit">{PHOTO_CREDIT}</small>
+      </div>
     </main>
   );
 }

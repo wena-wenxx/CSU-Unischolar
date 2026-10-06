@@ -2,11 +2,10 @@
   CSU branding text, kept in one place.
   To rename the system, change APP_NAME here only.
 */
-export const APP_NAME = "UniScholar";
+export const APP_NAME = "ScholarGuide";
 export const UNIVERSITY = "Caraga State University";
 export const OFFICE = "Office of Admission and Scholarship";
-export const SYSTEM_FOOTER =
-  "CSU UniScholar — Office of Admission and Scholarship";
+export const CARD_FOOTER = "CSU UniScholar — Capstone Prototype 2026";
 
 // Official CSU core values (shown on the university banner).
 export const MOTTO = "Competence. Service. Uprightness.";

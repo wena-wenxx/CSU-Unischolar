@@ -26,6 +26,7 @@ export default function StaffApplicationsPage() {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(null);
   const [verifying, setVerifying] = useState(null);
 
@@ -59,13 +60,29 @@ export default function StaffApplicationsPage() {
     if (selected?.id === id) await openApplication(id);
   }
 
-  const shown = applications.filter((application) => {
-    if (filter === "all") return true;
-    if (filter === "to_verify") {
+  const inFilter = (application, key) => {
+    if (key === "all") return true;
+    if (key === "to_verify") {
       return application.status === "approved" && !application.enrollment_verified;
     }
-    return application.status === filter;
-  });
+    return application.status === key;
+  };
+
+  // Search by student name, student ID or scholarship (every word must match).
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const matchesSearch = (application) => {
+    const haystack = [
+      fullName(application.student),
+      application.student?.student_id,
+      application.scholarship?.name,
+    ]
+      .join(" ")
+      .toLowerCase();
+    return words.every((word) => haystack.includes(word));
+  };
+
+  const searched = applications.filter(matchesSearch);
+  const shown = searched.filter((application) => inFilter(application, filter));
 
   if (loading) return <Loading />;
 
@@ -77,6 +94,24 @@ export default function StaffApplicationsPage() {
       />
 
       <div className="card">
+        <div className="inline-form table-search">
+          <label htmlFor="application-search" className="sr-only">
+            Search applications
+          </label>
+
+          <input
+            id="application-search"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search by student name, student ID or scholarship"
+          />
+
+          <span className="muted">
+            {shown.length} of {applications.length} applications
+          </span>
+        </div>
+
         <div className="filter-row" role="group" aria-label="Filter applications">
           {FILTERS.map(([key, label]) => (
             <button
@@ -89,7 +124,7 @@ export default function StaffApplicationsPage() {
               aria-pressed={filter === key}
               onClick={() => setFilter(key)}
             >
-              {label}
+              {label} ({searched.filter((application) => inFilter(application, key)).length})
             </button>
           ))}
         </div>
@@ -443,6 +478,13 @@ function AiResult({ result }) {
         </ul>
       ) : (
         <p className="ai-ok">No issues flagged.</p>
+      )}
+
+      {result.extracted_text && (
+        <details className="ai-text">
+          <summary>Text read by the AI</summary>
+          <pre>{result.extracted_text}</pre>
+        </details>
       )}
     </div>
   );
