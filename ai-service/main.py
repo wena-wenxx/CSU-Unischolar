@@ -54,6 +54,7 @@ async def validate_document(
     file: UploadFile = File(...),
     expected_name: str = Form(...),
     expected_student_id: str = Form(""),
+    expected_last_name: str = Form(""),
     document_label: str = Form(""),
     # Older name for document_label, still accepted.
     document_type: str = Form(""),
@@ -109,6 +110,7 @@ async def validate_document(
         expected_name=expected_name,
         expected_student_id=expected_student_id,
         document_label=label,
+        expected_last_name=expected_last_name,
     )
 
     extracted_data = result["extracted_data"]

@@ -62,6 +62,8 @@ class AIController extends Controller
                     [
                         'expected_name' => $expectedName,
                         'expected_student_id' => $student->student_id,
+                        // Parents' documents (e.g. ITR) only show the surname.
+                        'expected_last_name' => $student->last_name,
                         'document_label' => $documentLabel,
                     ]
                 );

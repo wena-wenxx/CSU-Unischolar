@@ -168,3 +168,40 @@ def test_correct_barangay_clearance_has_no_flags():
 def test_indigency_uploaded_as_clearance_is_flagged():
     r = validate_text(INDIGENCY, "Maria Santos", "2026-00100", "Barangay Clearance")
     assert r["has_wrong_document"]
+
+
+# ---------- good moral, parents' ITR, recommendation letter ----------
+GOOD_MORAL = "CERTIFICATE OF GOOD MORAL CHARACTER This certifies that MARIA SANTOS has shown good moral character while enrolled"
+ITR = "BUREAU OF INTERNAL REVENUE Annual Income Tax Return Taxpayer: ROBERTO SANTOS Taxable Income 120,000.00 Tax Due 0.00"
+RECOMMENDATION = "To the Scholarship Committee: I am pleased to recommend MARIA SANTOS for your scholarship program."
+
+
+def test_good_moral_is_recognised():
+    r = validate_text(GOOD_MORAL, "Maria Santos", "2026-00100", "Certificate of Good Moral Character")
+    assert r["flags"] == [] and r["extracted_data"]["document_kind"] == "good_moral"
+
+
+def test_parents_itr_only_needs_the_surname():
+    r = validate_text(ITR, "Maria Santos", "2026-00100", "Parents' Income Tax Return", expected_last_name="Santos")
+    assert r["flags"] == [] and r["extracted_data"]["name_checked"] == "surname"
+
+
+def test_parents_itr_of_another_family_is_flagged():
+    r = validate_text(ITR.replace("SANTOS", "REYES"), "Maria Santos", "2026-00100", "Parents' Income Tax Return", expected_last_name="Santos")
+    assert r["has_name_mismatch"]
+
+
+def test_birth_certificate_uploaded_as_itr_is_flagged():
+    birth = "PSA Office of the Civil Registrar General CERTIFICATE OF LIVE BIRTH Child: MARIA SANTOS"
+    r = validate_text(birth, "Maria Santos", "2026-00100", "Parents' Income Tax Return", expected_last_name="Santos")
+    assert r["has_wrong_document"]
+
+
+def test_recommendation_letter_is_recognised():
+    r = validate_text(RECOMMENDATION, "Maria Santos", "2026-00100", "Recommendation Letter")
+    assert r["flags"] == [] and r["extracted_data"]["document_kind"] == "recommendation_letter"
+
+
+def test_recommendation_uploaded_as_good_moral_is_flagged():
+    r = validate_text(RECOMMENDATION, "Maria Santos", "2026-00100", "Certificate of Good Moral Character")
+    assert r["has_wrong_document"]
