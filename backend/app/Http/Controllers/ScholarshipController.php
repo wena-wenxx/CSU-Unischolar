@@ -81,14 +81,6 @@ class ScholarshipController extends Controller
         return response()->json(['message' => 'Scholarship deleted']);
     }
 
-    // ---------------- Requirements (kept in this controller - see note) ----------------
-    // list requirements for one scholarship
-    public function listRequirements($scholarshipId)
-    {
-        $scholarship = Scholarship::findOrFail($scholarshipId);
-
-        return response()->json($scholarship->requirements);
-    }
 
     public function addRequirement(Request $request, $id)
     {
@@ -121,24 +113,6 @@ class ScholarshipController extends Controller
         ]);
 
         return response()->json($requirement, 201);
-    }
-
-    public function updateRequirement(Request $request, $id)
-    {
-        if ($this->notStaff($request)) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'is_required' => 'boolean',
-        ]);
-
-        $requirement = ScholarshipRequirement::findOrFail($id);
-        $requirement->update($data);
-
-        return response()->json($requirement);
     }
 
     public function destroyRequirement(Request $request, $id)

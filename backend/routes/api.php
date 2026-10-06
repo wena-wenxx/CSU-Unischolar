@@ -10,7 +10,6 @@ use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\ScholarRecordController;
 use App\Http\Controllers\ScholarshipController;
 use App\Http\Controllers\StudentController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -32,9 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    Route::get('/user', function (Request $request) {
-        return $request->user()->load('student');
-    });
+    Route::get('/user', [AuthController::class, 'me']);
 
     /*
     |--------------------------------------------------------------------------

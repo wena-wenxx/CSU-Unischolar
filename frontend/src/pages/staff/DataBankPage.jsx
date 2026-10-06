@@ -20,22 +20,22 @@ export default function DataBankPage() {
   const [loading, setLoading] = useState(false);
   const [student, setStudent] = useState(null);
 
+  // Asks the server for students matching the search box (empty = everyone).
+  function fetchStudents(q) {
+    return api
+      .get("/staff/data-bank", { params: { q } })
+      .then((response) => {
+        setResults(response.data);
+        setSearched(true);
+      })
+      .catch((err) => toast.error(errMsg(err, "Search failed.")));
+  }
+
   async function search(e) {
     e?.preventDefault();
     setLoading(true);
-    
-    try {
-      const response = await api.get("/staff/data-bank", {
-        params: { q: query },
-      });
-
-      setResults(response.data);
-      setSearched(true);
-    } catch (err) {
-      toast.error(errMsg(err, "Search failed."));
-    } finally {
-      setLoading(false);
-    }
+    await fetchStudents(query);
+    setLoading(false);
   }
 
   async function openStudent(id) {
@@ -47,8 +47,9 @@ export default function DataBankPage() {
     }
   }
 
+  // Show the first students as soon as the page opens.
   useEffect(() => {
-    search();
+    fetchStudents("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Application;
 use App\Models\ScholarRecord;
-use App\Models\Student;
 use Illuminate\Http\Request;
 
 class ScholarRecordController extends Controller
@@ -194,33 +193,5 @@ class ScholarRecordController extends Controller
                     'scholarship'
                 ])
         ]);
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | STUDENT - MY SCHOLARSHIP HISTORY
-    |--------------------------------------------------------------------------
-    */
-
-    public function myRecords(Request $request)
-    {
-        $student = Student::where(
-            'user_id',
-            $request->user()->id
-        )->first();
-
-        if (!$student) {
-            return response()->json([
-                'message' => 'Student profile not found.'
-            ], 404);
-        }
-
-        return response()->json(
-            ScholarRecord::with('scholarship')
-                ->where('student_id', $student->id)
-                ->latest()
-                ->get()
-        );
     }
 }

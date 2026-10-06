@@ -153,30 +153,4 @@ class PayrollController extends Controller
                 ])
         ]);
     }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | STAFF - PAYROLL READY RECORDS
-    |--------------------------------------------------------------------------
-    */
-
-    public function ready(Request $request)
-    {
-        if ($request->user()->role !== 'staff') {
-            return response()->json([
-                'message' => 'Unauthorized.'
-            ], 403);
-        }
-
-        return response()->json(
-            PayrollRecord::with([
-                'scholarRecord.student',
-                'scholarRecord.scholarship'
-            ])
-                ->where('status', 'ready')
-                ->latest()
-                ->get()
-        );
-    }
 }

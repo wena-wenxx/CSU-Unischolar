@@ -44,13 +44,12 @@ function printedAt() {
 export default function Layout() {
   const { user, logout } = useAuth();
   const location = useLocation();
-  const [menuOpen, setMenuOpen] = useState(false);
+  // The phone menu remembers which page it was opened on, so it closes
+  // automatically as soon as the user moves to another page.
+  const [menuOpenedOn, setMenuOpenedOn] = useState(null);
+  const menuOpen = menuOpenedOn === location.pathname;
+  const setMenuOpen = (open) => setMenuOpenedOn(open ? location.pathname : null);
   const [printTime, setPrintTime] = useState(printedAt);
-
-  // Close the phone menu after moving to another page.
-  useEffect(() => {
-    setMenuOpen(false);
-  }, [location.pathname]);
 
   // Stamp the current time on the printout just before printing.
   useEffect(() => {
@@ -106,7 +105,7 @@ export default function Layout() {
           <div className="topbar-left">
             <button
               className="menu-button"
-              onClick={() => setMenuOpen((open) => !open)}
+              onClick={() => setMenuOpen(!menuOpen)}
               aria-label={menuOpen ? "Close menu" : "Open menu"}
               aria-expanded={menuOpen}
               aria-controls="main-menu"

@@ -209,11 +209,13 @@ class ApplicationController extends Controller
             ], 403);
         }
 
+        // The list only needs what the tables, filters and CSV reports show.
+        // Full documents and AI results are loaded per application in show().
         $applications = Application::with([
             'student',
-            'scholarship.requirements',
-            'documents.validationResult',
-            'documents.requirement'
+            'scholarship:id,name,provider,amount,status',
+            'scholarship.requirements:id,scholarship_id,name,is_required',
+            'documents:id,application_id,scholarship_requirement_id,status',
         ])
             ->latest('submitted_at')
             ->get();
