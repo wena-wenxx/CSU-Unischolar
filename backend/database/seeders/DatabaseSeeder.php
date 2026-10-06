@@ -7,13 +7,18 @@ use Illuminate\Database\Seeder;
 /**
  * Runs with: php artisan migrate:fresh --seed
  *
- * Demo logins created (all fictional):
- *   Staff        oas.staff@carsu.edu.ph                      / Staff@12345
- *   Students     student1@carsu.edu.ph ... student10@carsu.edu.ph / Student@12345
+ * ALL DATA IS FICTIONAL DEMO DATA (no real CSU students).
  *
- * DemoDataSeeder then adds 6 scholarship programs and one application per
- * student in different stages (see the list inside DemoDataSeeder.php).
- * Run "php artisan storage:link" once so staff can open the demo files.
+ * Demo logins:
+ *   Staff        oas.staff@carsu.edu.ph                         / Staff@12345
+ *   Named demo   student1@carsu.edu.ph ... student10@carsu.edu.ph / Student@12345
+ *   Bulk demo    s<student id without dash>@demo.carsu.edu.ph   / Student@12345
+ *                (e.g. the student 2024-10123 logs in as s202410123@demo.carsu.edu.ph)
+ *
+ * DemoDataSeeder: 20 scholarship programs + the 10 named demo scenarios.
+ * BulkDemoSeeder: 120 more students with a full cycle of applications,
+ *                 documents, AI results, grantees and payroll.
+ * Run "php artisan storage:link" once so staff can open the sample files.
  */
 class DatabaseSeeder extends Seeder
 {
@@ -23,6 +28,7 @@ class DatabaseSeeder extends Seeder
             StaffSeeder::class,
             StudentSeeder::class,
             DemoDataSeeder::class,
+            BulkDemoSeeder::class,
         ]);
     }
 }
