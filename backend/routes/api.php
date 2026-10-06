@@ -1,12 +1,15 @@
 <?php
 
 use App\Http\Controllers\AIController;
+use App\Http\Controllers\AgencyListController;
+use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DataBankController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\PayrollController;
+use App\Http\Controllers\ProfileChangeRequestController;
 use App\Http\Controllers\ScholarRecordController;
 use App\Http\Controllers\ScholarshipController;
 use App\Http\Controllers\StudentController;
@@ -31,9 +34,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    Route::get('/user', function (Request $request) {
-        return $request->user()->load('student');
-    });
+    Route::get('/user', [AuthController::class, 'me']);
 
     /*
     |--------------------------------------------------------------------------
@@ -43,6 +44,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/profile', [StudentController::class, 'profile']);
     Route::get('/student/history', [StudentController::class, 'history']);
+    Route::patch('/profile', [StudentController::class, 'updateProfile']);
+    Route::get('/student/notifications', [StudentController::class, 'notifications']);
+    Route::post('/student/notifications/read', [StudentController::class, 'markNotificationsRead']);
+    Route::get('/student/change-requests', [StudentController::class, 'changeRequests']);
+    Route::post('/student/change-requests', [StudentController::class, 'storeChangeRequest']);
 
     /*
     |--------------------------------------------------------------------------
@@ -88,6 +94,21 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/staff/data-bank', [DataBankController::class, 'search']);
     Route::get('/staff/data-bank/{studentId}', [DataBankController::class, 'show']);
+    Route::get('/staff/profile-requests', [ProfileChangeRequestController::class, 'index']);
+    Route::patch('/staff/profile-requests/{id}', [ProfileChangeRequestController::class, 'resolve']);
+    Route::get('/staff/agency-lists', [AgencyListController::class, 'index']);
+    Route::post('/staff/agency-lists', [AgencyListController::class, 'store']);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Announcements (students read; staff manage)
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/announcements', [AnnouncementController::class, 'index']);
+    Route::post('/announcements', [AnnouncementController::class, 'store']);
+    Route::put('/announcements/{id}', [AnnouncementController::class, 'update']);
+    Route::delete('/announcements/{id}', [AnnouncementController::class, 'destroy']);
 
     /*
     |--------------------------------------------------------------------------

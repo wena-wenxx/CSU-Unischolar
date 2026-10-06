@@ -18,6 +18,8 @@ use Illuminate\Database\Seeder;
  * DemoDataSeeder: 20 scholarship programs + the 10 named demo scenarios.
  * BulkDemoSeeder: 120 more students with a full cycle of applications,
  *                 documents, AI results, grantees and payroll.
+ * StatusLogSeeder: timeline / notifications / "last updated" for every application.
+ * PortalDemoSeeder: OAS announcements and one pending correction request.
  * Run "php artisan storage:link" once so staff can open the sample files.
  */
 class DatabaseSeeder extends Seeder
@@ -29,6 +31,8 @@ class DatabaseSeeder extends Seeder
             StudentSeeder::class,
             DemoDataSeeder::class,
             BulkDemoSeeder::class,
+            StatusLogSeeder::class,   // step-by-step history of every application
+            PortalDemoSeeder::class,  // announcements + one profile correction request
         ]);
     }
 }

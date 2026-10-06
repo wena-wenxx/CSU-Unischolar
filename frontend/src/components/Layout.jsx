@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { APP_NAME, LOGO, MOTTO, OFFICE, UNIVERSITY, WORDMARK } from "../lib/brand";
+import NotificationBell from "./NotificationBell";
+import WelcomeModal from "./WelcomeModal";
 
 const NAVIGATION = {
   student: [
@@ -10,6 +12,7 @@ const NAVIGATION = {
     ["/student/applications", "My Applications"],
     ["/student/history", "Scholarship History"],
     ["/student/profile", "My Profile"],
+    ["/student/help", "Help"],
   ],
   staff: [
     ["/staff/dashboard", "Dashboard"],
@@ -18,7 +21,10 @@ const NAVIGATION = {
     ["/staff/payroll", "Payroll"],
     ["/staff/data-bank", "Data Bank"],
     ["/staff/scholarships", "Scholarships"],
+    ["/staff/agency-lists", "Agency Lists"],
+    ["/staff/announcements", "Announcements"],
     ["/staff/reports", "Reports"],
+    ["/staff/help", "Help"],
   ],
 };
 
@@ -117,6 +123,8 @@ export default function Layout() {
           </div>
 
           <div className="user-menu">
+            {user.role === "student" && <NotificationBell />}
+
             <span className="user-name">{user.name}</span>
 
             <span className="role-label">{user.role}</span>
@@ -146,6 +154,8 @@ export default function Layout() {
           {APP_NAME} · {UNIVERSITY} · {MOTTO}
         </p>
       </main>
+
+      <WelcomeModal />
     </div>
   );
 }

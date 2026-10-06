@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
-import { enrollmentText, formatDate } from "../../lib/format";
+import { STATUS_HELP, enrollmentText, formatDate, timeAgo } from "../../lib/format";
 import PageHeader from "../../components/PageHeader";
 import StatusBadge from "../../components/StatusBadge";
 import EmptyState from "../../components/EmptyState";
@@ -43,6 +43,7 @@ export default function MyApplicationsPage() {
                   <th>Scholarship</th>
                   <th>Submitted</th>
                   <th>Status</th>
+                  <th>Last update</th>
                   <th>Enrollment</th>
                   <th>Action</th>
                 </tr>
@@ -61,7 +62,10 @@ export default function MyApplicationsPage() {
 
                     <td>
                       <StatusBadge status={application.status} />
+                      <div className="muted small status-meaning">{STATUS_HELP[application.status]?.text}</div>
                     </td>
+
+                    <td>{timeAgo(application.updated_at)}</td>
 
                     <td>{enrollmentText(application)}</td>
 

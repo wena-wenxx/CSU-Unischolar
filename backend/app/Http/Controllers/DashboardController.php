@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Application;
 use App\Models\Document;
 use App\Models\PayrollRecord;
+use App\Models\ProfileChangeRequest;
 use App\Models\ScholarRecord;
 use App\Models\Scholarship;
 use Illuminate\Http\Request;
@@ -48,7 +49,12 @@ class DashboardController extends Controller
             'currently_enrolled_grantees' => ScholarRecord::where('status', 'active')->where('currently_enrolled', true)->count(),
             'students_with_active_scholarship' => ScholarRecord::where('status', 'active')->distinct()->count('student_id'),
             'active_scholarship_programs' => Scholarship::where('status', 'active')->count(),
-            'recent_applications' => Application::with(['student', 'scholarship'])->orderBy('id', 'desc')->limit(5)->get(),
+            // Most recent activity first (any step: submitted, reviewed, verified...).
+            'recent_applications' => Application::with(['student', 'scholarship:id,name', 'latestLog'])
+                ->where('status', '!=', 'draft')
+                ->orderByDesc('updated_at')->orderByDesc('id')
+                ->limit(6)->get(),
+            'pending_profile_requests' => ProfileChangeRequest::where('status', 'pending')->count(),
 
             // Older names for the same numbers (backward compatibility).
             'approved_applications' => $approved,

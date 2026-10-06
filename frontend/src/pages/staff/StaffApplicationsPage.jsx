@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import api, { errMsg } from "../../services/api";
-import { enrollmentText, fileUrl, fullName, missingRequirements } from "../../lib/format";
+import { enrollmentText, fileUrl, formatDate, fullName, missingRequirements, stepLabel, timeAgo } from "../../lib/format";
 import { useToast } from "../../components/Toast";
 import Modal from "../../components/Modal";
 import PageHeader from "../../components/PageHeader";
@@ -20,6 +20,15 @@ const FILTERS = [
   ["draft", "Drafts"],
 ];
 
+const SORTS = {
+  recent: "Latest activity first",
+  submitted_new: "Newest submitted first",
+  submitted_old: "Oldest submitted first (queue order)",
+  name: "Student name (A–Z)",
+};
+
+const time = (value) => (value ? new Date(value).getTime() : 0);
+
 export default function StaffApplicationsPage() {
   const toast = useToast();
 
@@ -27,6 +36,8 @@ export default function StaffApplicationsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
+  const [program, setProgram] = useState("all");
+  const [sort, setSort] = useState("recent");
   const [selected, setSelected] = useState(null);
   const [verifying, setVerifying] = useState(null);
 
@@ -81,8 +92,22 @@ export default function StaffApplicationsPage() {
     return words.every((word) => haystack.includes(word));
   };
 
-  const searched = applications.filter(matchesSearch);
-  const shown = searched.filter((application) => inFilter(application, filter));
+  const programs = [...new Map(applications.map((a) => [a.scholarship_id, a.scholarship?.name])).entries()].sort((a, b) =>
+    String(a[1]).localeCompare(String(b[1]))
+  );
+
+  const searched = applications
+    .filter(matchesSearch)
+    .filter((application) => program === "all" || String(application.scholarship_id) === program);
+
+  const shown = searched
+    .filter((application) => inFilter(application, filter))
+    .sort((a, b) => {
+      if (sort === "submitted_new") return time(b.submitted_at) - time(a.submitted_at);
+      if (sort === "submitted_old") return (time(a.submitted_at) || Infinity) - (time(b.submitted_at) || Infinity);
+      if (sort === "name") return fullName(a.student).localeCompare(fullName(b.student));
+      return time(b.updated_at) - time(a.updated_at); // the backend's default order
+    });
 
   if (loading) return <Loading />;
 
@@ -106,6 +131,29 @@ export default function StaffApplicationsPage() {
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search by student name, student ID or scholarship"
           />
+
+          <label htmlFor="program-filter" className="sr-only">
+            Scholarship program
+          </label>
+          <select id="program-filter" value={program} onChange={(event) => setProgram(event.target.value)}>
+            <option value="all">All programs</option>
+            {programs.map(([id, name]) => (
+              <option key={id} value={String(id)}>
+                {name}
+              </option>
+            ))}
+          </select>
+
+          <label htmlFor="sort-applications" className="sr-only">
+            Sort
+          </label>
+          <select id="sort-applications" value={sort} onChange={(event) => setSort(event.target.value)}>
+            {Object.entries(SORTS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
 
           <span className="muted">
             {shown.length} of {applications.length} applications
@@ -139,7 +187,9 @@ export default function StaffApplicationsPage() {
                   <th>Student</th>
                   <th>Student ID</th>
                   <th>Scholarship</th>
+                  <th>Submitted</th>
                   <th>Status</th>
+                  <th>Last activity</th>
                   <th>Enrollment</th>
                   <th>Actions</th>
                 </tr>
@@ -151,8 +201,24 @@ export default function StaffApplicationsPage() {
                     <td>{fullName(application.student)}</td>
                     <td>{application.student?.student_id}</td>
                     <td>{application.scholarship?.name}</td>
+                    <td>{application.submitted_at ? formatDate(application.submitted_at) : "Not submitted"}</td>
                     <td>
                       <StatusBadge status={application.status} />
+                    </td>
+                    <td className="activity-cell">
+                      {application.latest_log ? (
+                        <>
+                          {application.latest_log.from_status && (
+                            <span className="muted">
+                              {application.latest_log.from_status.replaceAll("_", " ")} →{" "}
+                            </span>
+                          )}
+                          {stepLabel(application.latest_log.to_status)}
+                        </>
+                      ) : (
+                        "Updated"
+                      )}
+                      <small className="muted">{timeAgo(application.updated_at)}</small>
                     </td>
                     <td>{enrollmentText(application)}</td>
                     <td>

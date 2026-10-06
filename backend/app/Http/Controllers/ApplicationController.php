@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Application;
+use App\Models\ApplicationStatusLog;
 use App\Models\Document;
 use App\Models\ScholarRecord;
 use App\Models\Scholarship;
 use App\Models\Student;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class ApplicationController extends Controller
 {
@@ -45,22 +47,22 @@ class ApplicationController extends Controller
             $request->scholarship_id
         );
 
-        if ($scholarship->status !== 'active') {
+        // Closed, inactive, not yet open, or past its deadline.
+        if (!$scholarship->is_open) {
             return response()->json([
-                'message' => 'This scholarship is not open for applications.'
+                'message' => $scholarship->closedReason()
             ], 422);
         }
 
-        $hasActiveScholarship = ScholarRecord::where(
-            'student_id',
-            $student->id
-        )
+        $activeRecord = ScholarRecord::with('scholarship:id,name')
+            ->where('student_id', $student->id)
             ->where('status', 'active')
-            ->exists();
+            ->first();
 
-        if ($hasActiveScholarship) {
+        if ($activeRecord) {
             return response()->json([
-                'message' => 'You already have an active scholarship. Only one active scholarship is allowed.'
+                'message' => 'You are currently a grantee of '.$activeRecord->scholarship->name
+                    .'. Only one active scholarship is allowed, so you cannot apply for a new one at this time.'
             ], 422);
         }
 
@@ -82,6 +84,8 @@ class ApplicationController extends Controller
             'scholarship_id' => $scholarship->id,
             'status' => 'draft',
         ]);
+
+        ApplicationStatusLog::record($application, 'draft', null, $request->user()->id);
 
         return response()->json(
             $application->load('scholarship'),
@@ -126,6 +130,14 @@ class ApplicationController extends Controller
             ], 422);
         }
 
+        // A first submission must be made before the deadline. A resubmission
+        // that OAS asked for (needs_action) is still accepted afterwards.
+        if ($application->status === 'draft' && !$application->scholarship->is_open) {
+            return response()->json([
+                'message' => $application->scholarship->closedReason()
+            ], 422);
+        }
+
         $requiredRequirements = $application
             ->scholarship
             ->requirements
@@ -149,10 +161,14 @@ class ApplicationController extends Controller
             }
         }
 
+        $previousStatus = $application->status;
+
         $application->update([
             'status' => 'submitted',
             'submitted_at' => now(),
         ]);
+
+        ApplicationStatusLog::record($application, 'submitted', null, $request->user()->id, $previousStatus);
 
         return response()->json([
             'message' => 'Application submitted successfully.',
@@ -188,7 +204,8 @@ class ApplicationController extends Controller
             'documents.validationResult'
         ])
             ->where('student_id', $student->id)
-            ->latest()
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
             ->get();
 
         return response()->json($applications);
@@ -211,13 +228,16 @@ class ApplicationController extends Controller
 
         // The list only needs what the tables, filters and CSV reports show.
         // Full documents and AI results are loaded per application in show().
+        // Newest activity first: whatever changed most recently is on top.
         $applications = Application::with([
             'student',
-            'scholarship:id,name,provider,amount,status',
+            'scholarship:id,name,provider,category,amount,status,application_start,application_end',
             'scholarship.requirements:id,scholarship_id,name,is_required',
             'documents:id,application_id,scholarship_requirement_id,status',
+            'latestLog',
         ])
-            ->latest('submitted_at')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
             ->get();
 
         return response()->json($applications);
@@ -237,7 +257,8 @@ class ApplicationController extends Controller
             'student',
             'scholarship.requirements',
             'documents.validationResult',
-            'documents.requirement'
+            'documents.requirement',
+            'statusLogs',
         ])->findOrFail($id);
 
         if ($request->user()->role !== 'staff') {
@@ -304,6 +325,19 @@ class ApplicationController extends Controller
 
         $file = $request->file('file');
 
+        // Uploading again for the same requirement replaces the old file,
+        // so each requirement has one current document.
+        if ($request->scholarship_requirement_id) {
+            $previous = Document::where('application_id', $application->id)
+                ->where('scholarship_requirement_id', $request->scholarship_requirement_id)
+                ->get();
+
+            foreach ($previous as $old) {
+                Storage::disk('public')->delete($old->file_path);
+                $old->delete(); // its AI result is removed with it
+            }
+        }
+
         $path = $file->store(
             'documents',
             'public'
@@ -351,6 +385,7 @@ class ApplicationController extends Controller
         ]);
 
         $application = Application::findOrFail($id);
+        $previousStatus = $application->status;
 
         $changes = [
             'status' => $data['status'],
@@ -365,6 +400,16 @@ class ApplicationController extends Controller
         }
 
         $application->update($changes);
+
+        if ($previousStatus !== $data['status'] || !empty($data['remarks'])) {
+            ApplicationStatusLog::record(
+                $application,
+                $data['status'],
+                $data['remarks'] ?? null,
+                $request->user()->id,
+                $previousStatus
+            );
+        }
 
         return response()->json([
             'message' => 'Application review updated successfully.',

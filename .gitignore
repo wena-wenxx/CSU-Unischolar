@@ -12,3 +12,5 @@ backend/database/migrations_backup_*/
 .idea/
 .DS_Store
 Thumbs.db
+# Frontend build output (made by "npm run build"; Vercel builds it itself)
+frontend/dist/

@@ -116,11 +116,12 @@ class DemoDataSeeder extends Seeder
 
     private function seedPrograms(): void
     {
-        foreach (self::PROGRAMS as [$name, $provider, , $amount, $start, $end, $status, $description, $requirements]) {
+        foreach (self::PROGRAMS as [$name, $provider, $category, $amount, $start, $end, $status, $description, $requirements]) {
             $scholarship = Scholarship::firstOrCreate(
                 ['name' => $name],
                 [
                     'provider' => $provider,
+                    'category' => $category,
                     'description' => $description,
                     'amount' => $amount, // demo amount per semester
                     'application_start' => $start,

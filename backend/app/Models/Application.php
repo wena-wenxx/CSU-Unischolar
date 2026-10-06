@@ -37,6 +37,18 @@ class Application extends Model
         return $this->hasMany(Document::class);
     }
 
+    // Every step this application went through, oldest first.
+    public function statusLogs()
+    {
+        return $this->hasMany(ApplicationStatusLog::class)->orderBy('created_at')->orderBy('id');
+    }
+
+    // The most recent step (used for "last activity" on the staff list).
+    public function latestLog()
+    {
+        return $this->hasOne(ApplicationStatusLog::class)->latestOfMany();
+    }
+
     /** Names of REQUIRED requirements that have no uploaded document yet. */
     public function missingRequirementNames(): array
     {

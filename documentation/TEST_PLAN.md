@@ -97,22 +97,26 @@ Every request needs the header **Accept: application/json**. After logging in, p
 ### Student: apply (Liza, student5)
 
 - [ ] **B1. Login** — Open http://localhost:5173. Sign in as `student5@carsu.edu.ph` / `Student@12345`.
-  Expect: address bar shows **/student/dashboard**, "Welcome, Liza".
+  Expect: a **Welcome to ScholarGuide** window with 5 steps (press **Next** … **Got it**; it does not appear again in
+  this browser), then **/student/dashboard**, "Welcome, Liza", and 3 announcements.
 - [ ] **B2. Details** — Click **Scholarships**, then **Details** on *CSU Cultural Grant (Choir)*.
   Expect: a page at **/student/scholarships/5** listing 6 required documents. Click **← All scholarships**.
 - [ ] **B3. Apply** — Click **Apply** on CSU Cultural Grant (Choir).
   Expect: a page at **/student/applications/<number>** with the green note "Your application was saved as a draft…".
-  **Submit application** is greyed out and "Still needed…" lists the 6 documents.
-- [ ] **B4. Upload** — Choose a requirement, click **Choose File**, pick the matching PDF from
-  `csu-unischolar-demo-files/students/2026-00005-liza-mendoza/`, click **Upload document**. Repeat for all 6
+  A checklist shows the 6 required documents ("0 of 6 uploaded"); **Submit application** is **grey** and disabled.
+- [ ] **B4. Upload** — On each checklist row, click **Choose File**, pick the matching PDF from
+  `csu-unischolar-demo-files/students/2026-00005-liza-mendoza/`, then click that row's **Upload**. Do all 6
   (COR, Grades, Valid ID, Birth Certificate, Good Moral, Recommendation Letter).
-  Expect: a green message "Document uploaded." in the bottom-right corner each time.
+  Expect: "<document> uploaded." each time, a green ✓ on the row and the progress bar filling. After the 6th,
+  **Submit application** turns **green** and the hint says "All required documents are uploaded."
 - [ ] **B5. Submit** — Click **Submit application**. A window asks "Submit application?" → click **Submit application**.
-  Expect: corner message "Application submitted to OAS.", status **Submitted**, upload form gone.
+  Expect: "Application submitted to OAS.", status **Submitted**, the upload buttons are gone, a **What happens next?**
+  box appears, and the timeline shows "Application started → Submitted to OAS" with the next steps faded.
 - [ ] **B6. Back and refresh** — Click **My Applications**, then the browser **Back** button.
   Expect: you return to the application page. Press **F5** (refresh): you stay on the same page.
-- [ ] **B7. Duplicate prevention** — Go to **Scholarships**, click **Apply** on the Choir grant again.
-  Expect: a red corner message "You already applied to this scholarship."
+- [ ] **B7. Duplicate prevention** — Go to **Scholarships** and find the Choir grant.
+  Expect: its button now says **View my application** instead of Apply. (The server also refuses a second
+  application with "You already applied to this scholarship.")
 - [ ] **B8. Staff pages are protected** — Type http://localhost:5173/staff/dashboard in the address bar.
   Expect: you are sent back to **/student/dashboard**. Click **Sign out**.
 
@@ -163,7 +167,8 @@ Every request needs the header **Accept: application/json**. After logging in, p
 
 ### Reports and settings
 
-- [ ] **B23. CSV export** — **Reports** → **Export CSV** on each card. Expect 4 downloads and a corner message for each.
+- [ ] **B23. CSV export** — **Reports** → **Export CSV** on each card. Expect a download and a corner message for each
+  (the **List for the Agency** card first needs one program chosen at the top).
   Open them in Excel: names, IDs, scholarships and amounts appear in columns; "ñ" displays correctly.
 - [ ] **B24. Edit a program** — **Scholarships** → **Manage**. Set **Amount** → **Save changes** ("Scholarship saved.").
   Click **Remove** on a requirement: a window asks "Remove requirement?" — click **Cancel**.
@@ -177,7 +182,54 @@ Every request needs the header **Accept: application/json**. After logging in, p
 
 ---
 
+## Part C — New features (round 5)
+
+Run `php artisan migrate:fresh --seed` first. Numbers below are what Claude saw on 6 Oct 2026; dates and "days left"
+change with the real date.
+
+**Deadlines and programs**
+- [ ] **C1.** As Liza: **Scholarships** shows filter buttons *All (16) · Government (1) · CSU-funded (5) · LGU (1) ·
+  Private / Foundation (9)*, a deadline on every card, and a coloured label (Open / Open · N days left / Opens …).
+- [ ] **C2.** As staff: **Scholarships → Manage** on *CSU Cultural Grant (Kayam Ethno Band)* → set **Deadline** to
+  yesterday → **Save changes**. The table shows **Closed · deadline passed**. Log in as Carlo (student6): Kayam is no longer
+  in Scholarships, and his Kayam draft says the deadline has passed with **Submit** disabled. Set the deadline back after.
+- [ ] **C3.** As staff: create a program with **Type**, **Applications open** and **Deadline** → it appears in the table.
+  In its **Manage** window press **Delete** → "Scholarship deleted." Open **Manage** on TES: **Delete** is disabled
+  ("This program has 71 application(s)…").
+
+**Student features**
+- [ ] **C4.** As Jose (student9): a green **Current scholarship** banner (TES, latest payroll *Ready*). In Scholarships the
+  message "You are currently a grantee of Tertiary Education Subsidy (TES). You cannot apply…" and every button says
+  **Already a grantee**.
+- [ ] **C5.** The 🔔 bell shows a number for the named demo students. Click it: a list of updates; the number disappears.
+- [ ] **C6.** **My Profile**: the Registrar fields have no input boxes (🔒 read-only). Contact number `0917123` →
+  error; `09171234567` → "Contact number updated." **Request a correction** (Course) → "Request sent to OAS" and a row
+  under *My correction requests*.
+- [ ] **C7.** **Help** shows six student topics; **Show the welcome guide again** reopens the 5-step guide.
+- [ ] **C8.** Every page except the dashboards has **← Back** above the title. On a page opened by typing its address,
+  it goes to the dashboard.
+
+**Staff features**
+- [ ] **C9.** **Dashboard → Recent activity** lists the latest changes ("Submitted to OAS just now"); **Profile correction
+  requests** shows the pending ones. **Mark resolved** with "apply this change" ticked → "Change applied to the student
+  record and request resolved."
+- [ ] **C10.** **Applications** has **Submitted** and **Last activity** columns (e.g. "draft → Submitted to OAS · just now"),
+  a program dropdown (CMSP → 44 of 561) and a sort dropdown (Latest activity first is the default).
+- [ ] **C11.** **Announcements → New announcement** → title, message, *Show until* → **Post**. Log in as a student: it is
+  the first of the 3 announcements on the dashboard. The expired demo notice shows only to staff.
+- [ ] **C12.** **Agency Lists**: choose *CSU Cultural Grant (Choir)*, upload a CSV with a Student ID column (use
+  **Download sample template** to see the layout), check the guessed columns, **Process**. Expect a summary such as
+  "Matched 2 student(s), 1 unmatched, 1 error(s)" and one line per row (a grantee of another program is an error, an unknown
+  ID is unmatched). The upload appears under **Upload history**.
+- [ ] **C13.** **Reports**: choose *CHED Merit Scholarship Program (CMSP)* → file names change to
+  `applications-CMSP-<date>.csv` etc.; **List for the Agency** downloads a numbered list of complete/approved applicants.
+
+---
+
 ## What has and has not been tested
+
+Part C (round 5) was tested by Claude on **6 Oct 2026** in the same way: C1–C13 in the browser, plus the earlier
+staff workflow again (AI check, decision, verify, tag, batch payroll, Data Bank, CSV) with unchanged results.
 
 Tested by Claude on **6 Oct 2026** — Laravel 12 on **SQLite**, the React app in headless Chromium at 1366×900 and
 390×844, after `migrate:fresh --seed` with the full volume data:

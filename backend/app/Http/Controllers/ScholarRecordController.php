@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Application;
+use App\Models\ApplicationStatusLog;
 use App\Models\ScholarRecord;
 use Illuminate\Http\Request;
 
@@ -145,6 +146,8 @@ class ScholarRecordController extends Controller
                     $data['remarks'] ?? null,
             ]
         );
+
+        ApplicationStatusLog::record($application, 'grantee_tagged', null, $request->user()->id, 'approved');
 
         return response()->json([
             'message' => 'Student tagged as grantee.',

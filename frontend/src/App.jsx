@@ -22,6 +22,9 @@ import StaffPayrollPage from "./pages/staff/StaffPayrollPage";
 import DataBankPage from "./pages/staff/DataBankPage";
 import StaffScholarshipsPage from "./pages/staff/StaffScholarshipsPage";
 import StaffReportsPage from "./pages/staff/StaffReportsPage";
+import StaffAnnouncementsPage from "./pages/staff/StaffAnnouncementsPage";
+import AgencyListsPage from "./pages/staff/AgencyListsPage";
+import HelpPage from "./pages/HelpPage";
 
 /*
   Every page has its own address, so the browser Back button and
@@ -35,6 +38,9 @@ import StaffReportsPage from "./pages/staff/StaffReportsPage";
     /student/applications/:id /staff/data-bank
     /student/profile          /staff/scholarships
     /student/history          /staff/reports
+    /student/help             /staff/agency-lists
+                              /staff/announcements
+                              /staff/help
 */
 
 function HomeRedirect() {
@@ -59,6 +65,7 @@ export default function App() {
                 <Route path="/student/applications/:id" element={<ApplicationDetailPage />} />
                 <Route path="/student/profile" element={<StudentProfilePage />} />
                 <Route path="/student/history" element={<StudentHistoryPage />} />
+                <Route path="/student/help" element={<HelpPage />} />
               </Route>
             </Route>
 
@@ -71,6 +78,9 @@ export default function App() {
                 <Route path="/staff/data-bank" element={<DataBankPage />} />
                 <Route path="/staff/scholarships" element={<StaffScholarshipsPage />} />
                 <Route path="/staff/reports" element={<StaffReportsPage />} />
+                <Route path="/staff/agency-lists" element={<AgencyListsPage />} />
+                <Route path="/staff/announcements" element={<StaffAnnouncementsPage />} />
+                <Route path="/staff/help" element={<HelpPage />} />
               </Route>
             </Route>
 

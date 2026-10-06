@@ -120,3 +120,148 @@ export function downloadCSV(filename, rows) {
 
   return true;
 }
+
+/* ---------- Time ---------- */
+
+// "just now", "5 minutes ago", "2 hours ago", "3 days ago", or a date.
+export function timeAgo(date) {
+  if (!date) return "—";
+
+  const seconds = Math.round((Date.now() - new Date(date).getTime()) / 1000);
+
+  if (seconds < 60) return "just now";
+
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
+
+  return formatDate(date);
+}
+
+export function formatDateTime(date) {
+  if (!date) return "—";
+
+  return new Date(date).toLocaleString("en-PH", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+/* ---------- Scholarship programs ---------- */
+
+export const CATEGORY_LABELS = {
+  government: "Government",
+  csu: "CSU-funded",
+  lgu: "LGU",
+  private: "Private / Foundation",
+};
+
+export function categoryLabel(category) {
+  return CATEGORY_LABELS[category] || "Other";
+}
+
+// Whole days from today (Manila) until a YYYY-MM-DD date. Negative = past.
+function daysUntil(day) {
+  if (!day) return null;
+
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+  const ms = new Date(`${String(day).slice(0, 10)}T00:00:00Z`) - new Date(`${today}T00:00:00Z`);
+
+  return Math.round(ms / 86400000);
+}
+
+// Label + colour for a program's availability (computed by the backend).
+export function availabilityInfo(scholarship) {
+  const left = daysUntil(scholarship.application_end);
+
+  switch (scholarship.availability) {
+    case "open":
+      if (left === null) return { label: "Open", tone: "success" };
+      if (left === 0) return { label: "Open · closes today", tone: "warning" };
+      if (left <= 7) return { label: `Open · ${left} day${left === 1 ? "" : "s"} left`, tone: "warning" };
+      return { label: "Open", tone: "success" };
+    case "upcoming":
+      return { label: `Opens ${formatDate(scholarship.application_start)}`, tone: "neutral" };
+    case "deadline_passed":
+      return { label: "Closed · deadline passed", tone: "danger" };
+    case "closed":
+      return { label: "Closed", tone: "danger" };
+    default:
+      return { label: "Not open", tone: "danger" };
+  }
+}
+
+export function deadlineText(scholarship) {
+  if (!scholarship.application_end) return "No deadline set";
+
+  return `Deadline: ${formatDate(scholarship.application_end)}`;
+}
+
+/* ---------- What students see ---------- */
+
+// Plain-language meaning of each application status (shown to students).
+export const STATUS_HELP = {
+  draft: {
+    title: "Draft",
+    text: "Not sent yet. Upload every required document, then press Submit application.",
+  },
+  submitted: {
+    title: "Submitted",
+    text: "OAS has received your application. Nothing to do now; staff will check your documents.",
+  },
+  under_review: {
+    title: "Under review",
+    text: "OAS staff are checking your documents. Nothing to do now.",
+  },
+  needs_action: {
+    title: "Needs action",
+    text: "OAS needs something from you. Read their remarks, upload the corrected document, and submit again.",
+  },
+  complete: {
+    title: "Complete",
+    text: "Your documents are complete. OAS has forwarded your application to the scholarship provider, who makes the final decision.",
+  },
+  approved: {
+    title: "Approved",
+    text: "The provider approved you. OAS will verify that you are currently enrolled, then tag you as a grantee.",
+  },
+  rejected: {
+    title: "Not approved",
+    text: "The provider did not approve this application. See the remarks. You may apply to other open scholarships.",
+  },
+};
+
+// Students see a simple document state, not the raw AI flags:
+// the AI only helps OAS staff, and staff decide what to ask the student.
+export function studentDocumentState(document) {
+  if (!document) return { label: "Not uploaded", tone: "neutral" };
+  if (document.status === "validated") return { label: "Checked", tone: "success" };
+  if (document.status === "uploaded") return { label: "Uploaded", tone: "success" };
+  return { label: "Being checked by OAS", tone: "warning" };
+}
+
+// Wording for one step of an application's history.
+export function stepLabel(toStatus) {
+  const labels = {
+    draft: "Application started",
+    submitted: "Submitted to OAS",
+    under_review: "Under review by OAS",
+    needs_action: "OAS asked for action",
+    complete: "Forwarded to the scholarship provider",
+    approved: "Approved by the provider",
+    rejected: "Not approved",
+    enrollment_verified: "Enrollment verified by OAS",
+    enrollment_not_verified: "Enrollment could not be verified",
+    grantee_tagged: "Tagged as grantee",
+  };
+
+  return labels[toStatus] || statusLabel(toStatus);
+}

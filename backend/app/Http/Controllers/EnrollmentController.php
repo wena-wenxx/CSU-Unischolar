@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Application;
+use App\Models\ApplicationStatusLog;
 use App\Models\ScholarRecord;
 use Illuminate\Http\Request;
 
@@ -51,6 +52,14 @@ class EnrollmentController extends Controller
             'enrollment_verified_at' => $enrolled ? now() : null,
             'remarks' => $data['remarks'] ?? $application->remarks,
         ]);
+
+        ApplicationStatusLog::record(
+            $application,
+            $enrolled ? 'enrollment_verified' : 'enrollment_not_verified',
+            $data['remarks'] ?? null,
+            $request->user()->id,
+            'approved'
+        );
 
         // If this student was already tagged as a grantee for this
         // scholarship, keep the scholar record's enrollment flag in step,
