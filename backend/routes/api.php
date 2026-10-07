@@ -10,9 +10,12 @@ use App\Http\Controllers\DataBankController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\ProfileChangeRequestController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ScholarRecordController;
 use App\Http\Controllers\ScholarshipController;
+use App\Http\Controllers\SearchController;
 use App\Http\Controllers\StudentController;
+use App\Http\Controllers\StudentDocumentController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -35,6 +38,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::get('/user', [AuthController::class, 'me']);
+    Route::get('/search', [SearchController::class, 'search']);   // top-bar search box
 
     /*
     |--------------------------------------------------------------------------
@@ -49,6 +53,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/student/notifications/read', [StudentController::class, 'markNotificationsRead']);
     Route::get('/student/change-requests', [StudentController::class, 'changeRequests']);
     Route::post('/student/change-requests', [StudentController::class, 'storeChangeRequest']);
+
+    // My Documents: every file the student uploaded, reusable across applications
+    Route::get('/student/documents', [StudentDocumentController::class, 'index']);
+    Route::post('/student/documents', [StudentDocumentController::class, 'store']);
+    Route::post('/student/documents/{id}/replace', [StudentDocumentController::class, 'replace']);
+    Route::post('/applications/{id}/documents/reuse', [ApplicationController::class, 'reuseDocument']);
 
     /*
     |--------------------------------------------------------------------------
@@ -98,6 +108,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/staff/profile-requests/{id}', [ProfileChangeRequestController::class, 'resolve']);
     Route::get('/staff/agency-lists', [AgencyListController::class, 'index']);
     Route::post('/staff/agency-lists', [AgencyListController::class, 'store']);
+    Route::get('/staff/email-logs', [ReportController::class, 'emailLogs']);
 
     /*
     |--------------------------------------------------------------------------

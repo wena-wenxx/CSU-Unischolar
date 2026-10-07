@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { ConfirmContext } from "../lib/confirm";
 
 /*
   Modal window. Closes with the × button, the Escape key, or a click
@@ -59,8 +60,6 @@ export default function Modal({ title, subtitle, onClose, size = "normal", foote
     if (!(await confirm({ title: "Submit?", message: "...", confirmLabel: "Submit" }))) return;
 */
 
-const ConfirmContext = createContext(null);
-
 export function ConfirmProvider({ children }) {
   const [request, setRequest] = useState(null);
 
@@ -108,8 +107,4 @@ export function ConfirmProvider({ children }) {
       )}
     </ConfirmContext.Provider>
   );
-}
-
-export function useConfirm() {
-  return useContext(ConfirmContext);
 }

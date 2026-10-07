@@ -3,8 +3,9 @@ import { Link } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { parseCSV } from "../../lib/csv";
 import { downloadCSV, formatDateTime } from "../../lib/format";
-import { useToast } from "../../components/Toast";
-import Modal, { useConfirm } from "../../components/Modal";
+import { useToast } from "../../lib/toast";
+import Modal from "../../components/Modal";
+import { useConfirm } from "../../lib/confirm";
 import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
@@ -46,16 +47,21 @@ export default function AgencyListsPage() {
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState(null);
 
-  const load = useCallback(async () => {
-    try {
-      const [programs, uploads] = await Promise.all([api.get("/scholarships"), api.get("/staff/agency-lists")]);
-      setScholarships(programs.data);
-      setHistory(uploads.data);
-    } catch (err) {
-      toast.error(errMsg(err, "Unable to load this page."));
-      setScholarships([]);
-    }
-  }, [toast]);
+  // Written with .then() (not await) so React's lint rule can see that the
+  // state is set later, when the server answers, not during the effect.
+  const load = useCallback(
+    () =>
+      Promise.all([api.get("/scholarships"), api.get("/staff/agency-lists")])
+        .then(([programs, uploads]) => {
+          setScholarships(programs.data);
+          setHistory(uploads.data);
+        })
+        .catch((err) => {
+          toast.error(errMsg(err, "Unable to load this page."));
+          setScholarships([]);
+        }),
+    [toast]
+  );
 
   useEffect(() => {
     load();

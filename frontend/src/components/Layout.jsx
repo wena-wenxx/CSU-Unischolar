@@ -3,6 +3,8 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { APP_NAME, LOGO, MOTTO, OFFICE, UNIVERSITY, WORDMARK } from "../lib/brand";
 import NotificationBell from "./NotificationBell";
+import SearchBox from "./SearchBox";
+import SidebarProfile from "./SidebarProfile";
 import WelcomeModal from "./WelcomeModal";
 
 const NAVIGATION = {
@@ -10,6 +12,7 @@ const NAVIGATION = {
     ["/student/dashboard", "Dashboard"],
     ["/student/scholarships", "Scholarships"],
     ["/student/applications", "My Applications"],
+    ["/student/documents", "My Documents"],
     ["/student/history", "Scholarship History"],
     ["/student/profile", "My Profile"],
     ["/student/help", "Help"],
@@ -32,6 +35,7 @@ const NAVIGATION = {
 function pageTitle(pathname, role) {
   if (/^\/student\/scholarships\/[^/]+$/.test(pathname)) return "Scholarship Details";
   if (/^\/student\/applications\/[^/]+$/.test(pathname)) return "Application";
+  if (pathname.endsWith("/profile")) return "My Profile";
 
   const match = (NAVIGATION[role] || []).find(([path]) => path === pathname);
   return match ? match[1] : APP_NAME;
@@ -82,6 +86,8 @@ export default function Layout() {
           </div>
         </div>
 
+        <SidebarProfile />
+
         <nav aria-label="Main menu">
           {navigation.map(([path, label]) => (
             <NavLink
@@ -123,6 +129,8 @@ export default function Layout() {
           </div>
 
           <div className="user-menu">
+            <SearchBox />
+
             {user.role === "student" && <NotificationBell />}
 
             <span className="user-name">{user.name}</span>
@@ -146,7 +154,9 @@ export default function Layout() {
           </div>
         </div>
 
-        <div className="content">
+        {/* Keyed on the address: following a link with a different ?filter=
+            (e.g. from the search box) opens the page fresh with that filter. */}
+        <div className="content" key={location.pathname + location.search}>
           <Outlet />
         </div>
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../lib/auth";
-import { WELCOME_STEPS } from "../lib/help";
+import { WELCOME_EVENT, WELCOME_STEPS } from "../lib/help";
 import Modal from "./Modal";
 
 /*
@@ -10,10 +10,6 @@ import Modal from "./Modal";
   The Help page has a button that shows it again.
 */
 const key = (user) => `scholarguide-welcome-seen-${user.id}`;
-
-export function showWelcomeAgain() {
-  window.dispatchEvent(new Event("scholarguide:welcome"));
-}
 
 function alreadySeen(user) {
   try {
@@ -34,8 +30,8 @@ export default function WelcomeModal() {
       setOpen(true);
     }
 
-    window.addEventListener("scholarguide:welcome", show);
-    return () => window.removeEventListener("scholarguide:welcome", show);
+    window.addEventListener(WELCOME_EVENT, show);
+    return () => window.removeEventListener(WELCOME_EVENT, show);
   }, []);
 
   if (!open) return null;

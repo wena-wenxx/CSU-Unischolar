@@ -26,7 +26,7 @@ class DashboardController extends Controller
         $approved = $apps->where('status', 'approved')->count();
         $activeScholars = ScholarRecord::where('status', 'active')->count();
         $payrollReady = PayrollRecord::where('status', 'ready')->count();
-        $aiFlags = Document::where('status', 'flagged')->count();
+        $aiFlags = Document::whereNotNull('application_id')->where('status', 'flagged')->count(); // only documents in applications
         $scholarships = Scholarship::count();
 
         return response()->json([
@@ -39,12 +39,14 @@ class DashboardController extends Controller
             'active_scholars' => $activeScholars,
             'payroll_ready' => $payrollReady,
             'ai_flags' => $aiFlags,
+            // Applications with at least one flagged document (the "Has AI flags" list).
+            'applications_with_flags' => $apps->filter(fn ($a) => $a->documents->contains('status', 'flagged'))->count(),
             'scholarships' => $scholarships,
 
             // Extra detail, kept for reports and future screens.
             'applications_by_status' => $apps->groupBy('status')->map->count(),
             'applications_with_missing_docs' => $apps->filter(fn ($a) => count($a->missingRequirementNames()) > 0)->count(),
-            'documents_needing_review' => Document::whereIn('status', ['flagged', 'needs_review'])->count(),
+            'documents_needing_review' => Document::whereNotNull('application_id')->whereIn('status', ['flagged', 'needs_review'])->count(),
             'students_needing_review' => $apps->whereIn('status', ['submitted', 'under_review', 'needs_action'])->pluck('student_id')->unique()->count(),
             'currently_enrolled_grantees' => ScholarRecord::where('status', 'active')->where('currently_enrolled', true)->count(),
             'students_with_active_scholarship' => ScholarRecord::where('status', 'active')->distinct()->count('student_id'),

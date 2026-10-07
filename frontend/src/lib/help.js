@@ -3,6 +3,13 @@
   Kept in one place so both stay the same.
 */
 
+// The Help page's "Show the welcome guide again" button sends this event.
+export const WELCOME_EVENT = "scholarguide:welcome";
+
+export function showWelcomeAgain() {
+  window.dispatchEvent(new Event(WELCOME_EVENT));
+}
+
 export const WELCOME_STEPS = {
   student: [
     {
@@ -11,7 +18,7 @@ export const WELCOME_STEPS = {
     },
     {
       title: "Apply and upload",
-      text: "Press Apply. Your application is saved as a draft. Upload one file for each required document (PDF, JPG or PNG, up to 10 MB).",
+      text: "Press Apply. Your application is saved as a draft. Upload one file for each required document, or press Use my saved documents if they are already in My Documents.",
     },
     {
       title: "Submit",
@@ -60,6 +67,16 @@ export const HELP = {
         "Press Apply. A draft application opens with a checklist of the required documents.",
         "For each document, press Choose file, pick the file, then press Upload. The row turns green when it is uploaded.",
         "When every required document is uploaded, the progress bar is full and Submit application turns green. Press it and confirm.",
+      ],
+    },
+    {
+      title: "My Documents: upload once, reuse",
+      steps: [
+        "My Documents lists every file you have uploaded, by type (COR, grades, valid ID, and so on).",
+        "Each file shows if it is still valid. COR, grades, indigency, barangay clearance, good moral and recommendation letters count for 6 months; the income tax return for 1 year; the birth certificate and valid ID do not expire.",
+        "Press Check with AI to have the system read a file. If it finds something (for example your name is not on it), the reason is shown so you can fix it before applying.",
+        "To update a file, choose the new file and press Replace. Your draft applications get the new copy too.",
+        "When you apply for another scholarship, press Use my saved documents (or Use saved file on one row) instead of uploading again.",
       ],
     },
     {
@@ -138,6 +155,14 @@ export const HELP = {
         "Scholarships → Create a program with its type, deadline and amount, then add its requirements in Manage.",
         "To stop new applications, set the status to Closed or set the deadline. Programs with applications cannot be deleted, so their records are kept.",
         "Announcements → post deadline reminders and payout schedules. Students see the latest three on their dashboard until the expiry date.",
+      ],
+    },
+    {
+      title: "Finding things quickly",
+      steps: [
+        "Use the search box at the top of every page: type part of a student's name or Student ID, a program name, or a page name such as \"payroll\".",
+        "Click a number on the Dashboard to open the matching list (for example Needs Action or Payroll Ready).",
+        "Click your name at the top of the menu for View Profile, Help and Sign Out.",
       ],
     },
     {

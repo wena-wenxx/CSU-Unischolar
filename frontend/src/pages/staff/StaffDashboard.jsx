@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { formatDate, fullName, stepLabel, timeAgo } from "../../lib/format";
-import { useToast } from "../../components/Toast";
+import { useToast } from "../../lib/toast";
 import Modal from "../../components/Modal";
-import PageHeader from "../../components/PageHeader";
+import DashboardHero from "../../components/DashboardHero";
+import QuickActions from "../../components/QuickActions";
 import StatCard from "../../components/StatCard";
 import StatusBadge from "../../components/StatusBadge";
 import EmptyState from "../../components/EmptyState";
@@ -47,36 +48,32 @@ export default function StaffDashboard() {
 
   return (
     <div>
-      <PageHeader back={false} title="OAS Staff Dashboard" subtitle="Scholarship management overview" />
+      <DashboardHero title="OAS Staff Dashboard" subtitle="Scholarship management overview. Click any number to open the matching list." />
 
       <div className="stats-grid">
-        <StatCard title="Total Applicants" value={stats.total_applicants ?? 0} />
-        <StatCard title="Applications" value={stats.total_applications ?? 0} />
-        <StatCard title="Needs Action" value={stats.needs_action ?? 0} />
-        <StatCard title="Approved" value={stats.approved ?? 0} />
-        <StatCard title="Active Scholars" value={stats.active_scholars ?? 0} />
-        <StatCard title="Payroll Ready" value={stats.payroll_ready ?? 0} />
-        <StatCard title="AI Flags" value={stats.ai_flags ?? 0} />
-        <StatCard title="Scholarship Programs" value={stats.scholarships ?? 0} />
+        <StatCard title="Total Applicants" value={stats.total_applicants ?? 0} to="/staff/applications" />
+        <StatCard title="Applications" value={stats.total_applications ?? 0} to="/staff/applications" />
+        <StatCard title="Needs Action" value={stats.needs_action ?? 0} to="/staff/applications?filter=needs_action" />
+        <StatCard title="Approved" value={stats.approved ?? 0} to="/staff/applications?filter=approved" />
+        <StatCard title="Active Scholars" value={stats.active_scholars ?? 0} to="/staff/scholars" />
+        <StatCard title="Payroll Ready" value={stats.payroll_ready ?? 0} to="/staff/payroll?status=ready" />
+        <StatCard
+          title="AI Flags (documents)"
+          value={stats.ai_flags ?? 0}
+          to="/staff/applications?filter=flagged"
+          hint={`In ${stats.applications_with_flags ?? 0} applications`}
+        />
+        <StatCard title="Scholarship Programs" value={stats.scholarships ?? 0} to="/staff/scholarships" />
       </div>
 
-      <div className="quick-actions">
-        <Link className="button button-primary" to="/staff/applications">
-          Review Applications
-        </Link>
-        <Link className="button button-secondary" to="/staff/scholars">
-          Scholar Records
-        </Link>
-        <Link className="button button-secondary" to="/staff/payroll">
-          Payroll
-        </Link>
-        <Link className="button button-secondary" to="/staff/agency-lists">
-          Upload Agency List
-        </Link>
-        <Link className="button button-secondary" to="/staff/reports">
-          Reports
-        </Link>
-      </div>
+      <QuickActions
+        actions={[
+          { to: "/staff/applications?filter=submitted", icon: "📋", label: "Review Applications", text: "Newly submitted, waiting for OAS" },
+          { to: "/staff/scholars", icon: "🏅", label: "Tag Grantees", text: "Verified students ready to tag" },
+          { to: "/staff/payroll", icon: "💳", label: "Prepare Payroll", text: "Entries for enrolled grantees" },
+          { to: "/staff/scholarships?new=1", icon: "➕", label: "Create Scholarship", text: "Add a new program" },
+        ]}
+      />
 
       <div className="dashboard-grid">
         <section className="card dashboard-recent">

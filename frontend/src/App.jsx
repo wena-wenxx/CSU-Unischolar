@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { AuthProvider, homePathFor, useAuth } from "./lib/auth";
+import AuthProvider from "./components/AuthProvider";
+import { homePathFor, useAuth } from "./lib/auth";
 import { ToastProvider } from "./components/Toast";
 import { ConfirmProvider } from "./components/Modal";
 import Layout from "./components/Layout";
@@ -14,6 +15,7 @@ import MyApplicationsPage from "./pages/student/MyApplicationsPage";
 import ApplicationDetailPage from "./pages/student/ApplicationDetailPage";
 import StudentProfilePage from "./pages/student/StudentProfilePage";
 import StudentHistoryPage from "./pages/student/StudentHistoryPage";
+import MyDocumentsPage from "./pages/student/MyDocumentsPage";
 
 import StaffDashboard from "./pages/staff/StaffDashboard";
 import StaffApplicationsPage from "./pages/staff/StaffApplicationsPage";
@@ -25,6 +27,7 @@ import StaffReportsPage from "./pages/staff/StaffReportsPage";
 import StaffAnnouncementsPage from "./pages/staff/StaffAnnouncementsPage";
 import AgencyListsPage from "./pages/staff/AgencyListsPage";
 import HelpPage from "./pages/HelpPage";
+import StaffProfilePage from "./pages/staff/StaffProfilePage";
 
 /*
   Every page has its own address, so the browser Back button and
@@ -39,6 +42,7 @@ import HelpPage from "./pages/HelpPage";
     /student/profile          /staff/scholarships
     /student/history          /staff/reports
     /student/help             /staff/agency-lists
+    /student/documents        /staff/profile
                               /staff/announcements
                               /staff/help
 */
@@ -66,6 +70,7 @@ export default function App() {
                 <Route path="/student/profile" element={<StudentProfilePage />} />
                 <Route path="/student/history" element={<StudentHistoryPage />} />
                 <Route path="/student/help" element={<HelpPage />} />
+                <Route path="/student/documents" element={<MyDocumentsPage />} />
               </Route>
             </Route>
 
@@ -81,6 +86,7 @@ export default function App() {
                 <Route path="/staff/agency-lists" element={<AgencyListsPage />} />
                 <Route path="/staff/announcements" element={<StaffAnnouncementsPage />} />
                 <Route path="/staff/help" element={<HelpPage />} />
+                <Route path="/staff/profile" element={<StaffProfilePage />} />
               </Route>
             </Route>
 

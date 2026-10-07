@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { enrollmentText, formatDate, formatMoney, fullName, statusClass, statusLabel } from "../../lib/format";
-import { useToast } from "../../components/Toast";
+import { useToast } from "../../lib/toast";
 import PageHeader from "../../components/PageHeader";
 import ProfileItem from "../../components/ProfileItem";
 import EmptyState from "../../components/EmptyState";
@@ -38,18 +39,22 @@ export default function DataBankPage() {
     setLoading(false);
   }
 
-  async function openStudent(id) {
-    try {
-      const response = await api.get(`/staff/data-bank/${id}`);
-      setStudent(response.data);
-    } catch (err) {
-      toast.error(errMsg(err, "Unable to load student history."));
-    }
+  // .then() (not await): this also runs from the page-load effect below.
+  function openStudent(id) {
+    return api
+      .get(`/staff/data-bank/${id}`)
+      .then((response) => setStudent(response.data))
+      .catch((err) => toast.error(errMsg(err, "Unable to load student history.")));
   }
 
-  // Show the first students as soon as the page opens.
+  const location = useLocation();
+
+  // Show the first students as soon as the page opens. A link with
+  // ?student=<id> (from the search box) also opens that student's history.
   useEffect(() => {
     fetchStudents("");
+    const wanted = new URLSearchParams(location.search).get("student");
+    if (wanted) openStudent(wanted);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

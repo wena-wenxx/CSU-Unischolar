@@ -1,16 +1,10 @@
-import { createContext, useCallback, useContext, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { ToastContext } from "../lib/toast";
 
 /*
   Small notification messages in the corner (replaces alert()).
-
-  Usage in any page:
-    const toast = useToast();
-    toast.success("Saved.");
-    toast.error("Something went wrong.");
-    toast.info("Heads up.");
+  Pages use them with useToast() from lib/toast.js.
 */
-
-const ToastContext = createContext(null);
 
 const DURATION_MS = 4500;
 
@@ -60,8 +54,4 @@ export function ToastProvider({ children }) {
       </div>
     </ToastContext.Provider>
   );
-}
-
-export function useToast() {
-  return useContext(ToastContext);
 }

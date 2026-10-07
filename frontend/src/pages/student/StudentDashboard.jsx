@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
 import { availabilityInfo, deadlineText, formatDate, formatMoney, timeAgo } from "../../lib/format";
-import PageHeader from "../../components/PageHeader";
+import DashboardHero from "../../components/DashboardHero";
+import QuickActions from "../../components/QuickActions";
 import StatCard from "../../components/StatCard";
 import StatusBadge from "../../components/StatusBadge";
 import EmptyState from "../../components/EmptyState";
@@ -41,14 +42,9 @@ export default function StudentDashboard() {
 
   return (
     <div>
-      <PageHeader
-        back={false}
-        title="Student Dashboard"
-        subtitle={
-          profile?.student
-            ? `Welcome, ${profile.student.first_name}`
-            : "Manage your scholarship applications"
-        }
+      <DashboardHero
+        title={profile?.student ? `Welcome, ${profile.student.first_name}!` : "Student Dashboard"}
+        subtitle="Apply for scholarships, keep your documents in one place, and follow every step online."
       />
 
       {grant && (
@@ -84,11 +80,24 @@ export default function StudentDashboard() {
       ))}
 
       <div className="stats-grid">
-        <StatCard title="Open Scholarships" value={openCount} />
-        <StatCard title="My Applications" value={applications.length} />
-        <StatCard title="Being Processed" value={count("submitted", "under_review", "complete")} />
-        <StatCard title="Approved" value={count("approved")} />
+        <StatCard title="Open Scholarships" value={openCount} to="/student/scholarships" hint="Browse" />
+        <StatCard title="My Applications" value={applications.length} to="/student/applications" />
+        <StatCard
+          title="Being Processed"
+          value={count("submitted", "under_review", "complete")}
+          to="/student/applications?status=processing"
+        />
+        <StatCard title="Approved" value={count("approved")} to="/student/applications?status=approved" />
       </div>
+
+      <QuickActions
+        actions={[
+          { to: "/student/scholarships", icon: "🎓", label: "Browse Scholarships", text: "See open programs and deadlines" },
+          { to: "/student/applications", icon: "📋", label: "My Applications", text: "Follow each step" },
+          { to: "/student/documents", icon: "📁", label: "My Documents", text: "Upload once, reuse later" },
+          { to: "/student/help", icon: "❓", label: "Help", text: "How to apply" },
+        ]}
+      />
 
       {applications.length === 0 && !grant && (
         <section className="card how-to-apply">

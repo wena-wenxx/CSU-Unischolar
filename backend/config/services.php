@@ -33,6 +33,11 @@ return [
         'url' => env('AI_SERVICE_URL', 'http://127.0.0.1:8001'),
     ],
 
+    // Address of the React site, used for links inside e-mails.
+    'frontend' => [
+        'url' => env('APP_FRONTEND_URL', 'http://localhost:5173'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

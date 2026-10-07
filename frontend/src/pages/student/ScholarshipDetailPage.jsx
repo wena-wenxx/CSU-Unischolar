@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { availabilityInfo, categoryLabel, formatDate, formatMoney } from "../../lib/format";
-import { useToast } from "../../components/Toast";
+import { useToast } from "../../lib/toast";
 import { startApplication } from "../../lib/applications";
 import PageHeader from "../../components/PageHeader";
 import ProfileItem from "../../components/ProfileItem";

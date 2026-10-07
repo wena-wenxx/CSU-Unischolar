@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { enrollmentText, formatDate, fullName } from "../../lib/format";
-import { useToast } from "../../components/Toast";
-import Modal, { useConfirm } from "../../components/Modal";
+import { useToast } from "../../lib/toast";
+import Modal from "../../components/Modal";
+import { useConfirm } from "../../lib/confirm";
 import PageHeader from "../../components/PageHeader";
 import StatusBadge from "../../components/StatusBadge";
 import EmptyState from "../../components/EmptyState";
@@ -18,21 +19,19 @@ export default function StaffScholarRecordsPage() {
   const [loading, setLoading] = useState(true);
   const [tagging, setTagging] = useState(null);
 
-  const load = useCallback(async () => {
-    try {
-      const [recordsResponse, applicationsResponse] = await Promise.all([
-        api.get("/scholar-records"),
-        api.get("/applications"),
-      ]);
-
-      setRecords(recordsResponse.data);
-      setApplications(applicationsResponse.data.filter((a) => a.status === "approved"));
-    } catch (err) {
-      toast.error(errMsg(err, "Unable to load scholar records."));
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  // Written with .then() (not await) so React's lint rule can see that the
+  // state is set later, when the server answers, not during the effect.
+  const load = useCallback(
+    () =>
+      Promise.all([api.get("/scholar-records"), api.get("/applications")])
+        .then(([recordsResponse, applicationsResponse]) => {
+          setRecords(recordsResponse.data);
+          setApplications(applicationsResponse.data.filter((a) => a.status === "approved"));
+        })
+        .catch((err) => toast.error(errMsg(err, "Unable to load scholar records.")))
+        .finally(() => setLoading(false)),
+    [toast]
+  );
 
   useEffect(() => {
     load();

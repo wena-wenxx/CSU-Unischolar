@@ -6,7 +6,7 @@
   Returns an array of rows; each row is an array of strings.
 */
 export function parseCSV(text) {
-  const clean = text.replace(/^﻿/, "");
+  const clean = text.replace(/^\uFEFF/, "");
   const firstLine = clean.split(/\r?\n/, 1)[0] || "";
   const delimiter = [",", ";", "\t"]
     .map((d) => [d, firstLine.split(d).length])

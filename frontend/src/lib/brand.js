@@ -18,3 +18,5 @@ export const LOGO = "/csu-logo.png"; // shield only
 export const WORDMARK = "/csu-wordmark.png"; // "Caraga State University" lettering
 export const CAMPUS_PHOTO = "/csu-header.jpg"; // main campus photo (login hero)
 export const PHOTO_CREDIT = "Photo: CSU MIS/ICT Photography";
+// University banner with the CSU vision, mission and core values (Help page).
+export const BANNER = "/csu-letterhead.jpg";
