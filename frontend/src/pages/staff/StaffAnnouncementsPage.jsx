@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import api, { errMsg } from "../../services/api";
 import { formatDate } from "../../lib/format";
-import { useToast } from "../../components/Toast";
-import Modal, { useConfirm } from "../../components/Modal";
+import { useToast } from "../../lib/toast";
+import Modal from "../../components/Modal";
+import { useConfirm } from "../../lib/confirm";
 import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
@@ -22,15 +23,19 @@ export default function StaffAnnouncementsPage() {
   const [items, setItems] = useState(null);
   const [editing, setEditing] = useState(null); // null = closed, {} = new, {id,...} = edit
 
-  const load = useCallback(async () => {
-    try {
-      const response = await api.get("/announcements");
-      setItems(response.data);
-    } catch (err) {
-      toast.error(errMsg(err, "Unable to load announcements."));
-      setItems([]);
-    }
-  }, [toast]);
+  // Written with .then() (not await) so React's lint rule can see that the
+  // state is set later, when the server answers, not during the effect.
+  const load = useCallback(
+    () =>
+      api
+        .get("/announcements")
+        .then((response) => setItems(response.data))
+        .catch((err) => {
+          toast.error(errMsg(err, "Unable to load announcements."));
+          setItems([]);
+        }),
+    [toast]
+  );
 
   useEffect(() => {
     load();

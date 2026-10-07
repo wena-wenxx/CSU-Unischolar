@@ -2,7 +2,7 @@ import { useAuth } from "../lib/auth";
 import { HELP } from "../lib/help";
 import { STATUS_HELP } from "../lib/format";
 import { BANNER, MOTTO, UNIVERSITY } from "../lib/brand";
-import { showWelcomeAgain } from "../components/WelcomeModal";
+import { showWelcomeAgain } from "../lib/help";
 import PageHeader from "../components/PageHeader";
 import StatusBadge from "../components/StatusBadge";
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { initials } from "../lib/format";
 
 /*
   Who is logged in, at the top of the sidebar: an initials avatar, the name,
@@ -8,14 +9,6 @@ import { useAuth } from "../lib/auth";
   Click it for View Profile / Help / Sign Out.
   (No photo upload: the system does not store profile pictures.)
 */
-export function initials(name) {
-  return String(name || "?")
-    .split(/\s+/)
-    .filter(Boolean)
-    .filter((part, index, parts) => index === 0 || index === parts.length - 1)
-    .map((part) => part[0].toUpperCase())
-    .join("");
-}
 
 export default function SidebarProfile() {
   const { user, logout } = useAuth();

@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { CATEGORY_LABELS, availabilityInfo, categoryLabel, deadlineText, formatMoney } from "../../lib/format";
 import { startApplication } from "../../lib/applications";
-import { useToast } from "../../components/Toast";
+import { useToast } from "../../lib/toast";
 import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";

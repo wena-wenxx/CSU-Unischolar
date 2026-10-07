@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { fileUrl, formatDate, statusLabel } from "../../lib/format";
 import { checkableRow, groupDocuments, loadMyDocuments } from "../../lib/documents";
-import { useToast } from "../../components/Toast";
+import { useToast } from "../../lib/toast";
 import PageHeader from "../../components/PageHeader";
 import Loading from "../../components/Loading";
 
@@ -23,14 +23,18 @@ export default function MyDocumentsPage() {
   const [busy, setBusy] = useState(null); // type or "check-<id>"
   const [history, setHistory] = useState({}); // type -> open?
 
-  const load = useCallback(async () => {
-    try {
-      setData(await loadMyDocuments());
-    } catch (err) {
-      toast.error(errMsg(err, "Unable to load your documents."));
-      setData({ types: [], documents: [] });
-    }
-  }, [toast]);
+  // Written with .then() (not await) so React's lint rule can see that the
+  // state is set later, when the server answers, not during the effect.
+  const load = useCallback(
+    () =>
+      loadMyDocuments()
+        .then(setData)
+        .catch((err) => {
+          toast.error(errMsg(err, "Unable to load your documents."));
+          setData({ types: [], documents: [] });
+        }),
+    [toast]
+  );
 
   useEffect(() => {
     load();

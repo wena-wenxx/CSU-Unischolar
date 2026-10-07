@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { formatDate, fullName, stepLabel, timeAgo } from "../../lib/format";
-import { useToast } from "../../components/Toast";
+import { useToast } from "../../lib/toast";
 import Modal from "../../components/Modal";
 import DashboardHero from "../../components/DashboardHero";
 import QuickActions from "../../components/QuickActions";

@@ -1,5 +1,5 @@
 import { useAuth } from "../../lib/auth";
-import { initials } from "../../components/SidebarProfile";
+import { initials } from "../../lib/format";
 import PageHeader from "../../components/PageHeader";
 import ProfileItem from "../../components/ProfileItem";
 

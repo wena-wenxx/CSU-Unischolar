@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { enrollmentText, fileUrl, formatDate, fullName, missingRequirements, stepLabel, timeAgo } from "../../lib/format";
-import { useToast } from "../../components/Toast";
+import { useToast } from "../../lib/toast";
 import Modal from "../../components/Modal";
 import PageHeader from "../../components/PageHeader";
 import ProfileItem from "../../components/ProfileItem";
@@ -48,16 +48,17 @@ export default function StaffApplicationsPage() {
   const [selected, setSelected] = useState(null);
   const [verifying, setVerifying] = useState(null);
 
-  const load = useCallback(async () => {
-    try {
-      const response = await api.get("/applications");
-      setApplications(response.data);
-    } catch (err) {
-      toast.error(errMsg(err, "Unable to load applications."));
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  // Written with .then() (not await) so React's lint rule can see that the
+  // state is set later, when the server answers, not during the effect.
+  const load = useCallback(
+    () =>
+      api
+        .get("/applications")
+        .then((response) => setApplications(response.data))
+        .catch((err) => toast.error(errMsg(err, "Unable to load applications.")))
+        .finally(() => setLoading(false)),
+    [toast]
+  );
 
   useEffect(() => {
     load();

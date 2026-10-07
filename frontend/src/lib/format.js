@@ -89,7 +89,7 @@ export function enrollmentText(application) {
 }
 
 // Builds a CSV file in the browser and downloads it.
-// "﻿" at the start makes Excel read it as UTF-8 (keeps ñ and Ñ intact).
+// A "\uFEFF" mark at the start makes Excel read it as UTF-8 (keeps ñ and Ñ intact).
 // Returns false when there is nothing to export.
 export function downloadCSV(filename, rows) {
   if (!rows.length) return false;
@@ -105,7 +105,7 @@ export function downloadCSV(filename, rows) {
     ),
   ].join("\n");
 
-  const blob = new Blob(["﻿" + csv], {
+  const blob = new Blob(["\uFEFF" + csv], {
     type: "text/csv;charset=utf-8;",
   });
 
@@ -264,4 +264,14 @@ export function stepLabel(toStatus) {
   };
 
   return labels[toStatus] || statusLabel(toStatus);
+}
+
+// "Liza Demo Mendoza" -> "LM" (sidebar avatar)
+export function initials(name) {
+  return String(name || "?")
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((part, index, parts) => index === 0 || index === parts.length - 1)
+    .map((part) => part[0].toUpperCase())
+    .join("");
 }

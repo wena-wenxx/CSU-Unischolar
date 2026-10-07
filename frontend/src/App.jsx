@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { AuthProvider, homePathFor, useAuth } from "./lib/auth";
+import AuthProvider from "./components/AuthProvider";
+import { homePathFor, useAuth } from "./lib/auth";
 import { ToastProvider } from "./components/Toast";
 import { ConfirmProvider } from "./components/Modal";
 import Layout from "./components/Layout";

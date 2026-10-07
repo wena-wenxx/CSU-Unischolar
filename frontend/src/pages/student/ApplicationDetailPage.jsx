@@ -10,8 +10,8 @@ import {
   studentDocumentState,
 } from "../../lib/format";
 import { groupDocuments, latestUsable, loadMyDocuments } from "../../lib/documents";
-import { useToast } from "../../components/Toast";
-import { useConfirm } from "../../components/Modal";
+import { useToast } from "../../lib/toast";
+import { useConfirm } from "../../lib/confirm";
 import PageHeader from "../../components/PageHeader";
 import StatusBadge from "../../components/StatusBadge";
 import StatusTimeline from "../../components/StatusTimeline";
@@ -39,18 +39,18 @@ export default function ApplicationDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState([]); // My Documents, grouped by type
 
-  const load = useCallback(async () => {
-    try {
-      const [response, mine] = await Promise.all([
-        api.get(`/applications/${id}`),
-        loadMyDocuments().catch(() => null),
-      ]);
-      setApplication(response.data);
-      setSaved(mine ? groupDocuments(mine) : []);
-    } catch (err) {
-      setError(errMsg(err, "Unable to load application."));
-    }
-  }, [id]);
+  // Written with .then() (not await) so React's lint rule can see that the
+  // state is set later, when the server answers, not during the effect.
+  const load = useCallback(
+    () =>
+      Promise.all([api.get(`/applications/${id}`), loadMyDocuments().catch(() => null)])
+        .then(([response, mine]) => {
+          setApplication(response.data);
+          setSaved(mine ? groupDocuments(mine) : []);
+        })
+        .catch((err) => setError(errMsg(err, "Unable to load application."))),
+    [id]
+  );
 
   useEffect(() => {
     load();

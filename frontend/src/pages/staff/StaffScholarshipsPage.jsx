@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { CATEGORY_LABELS, availabilityInfo, categoryLabel, formatDate, formatMoney } from "../../lib/format";
-import { useToast } from "../../components/Toast";
-import Modal, { useConfirm } from "../../components/Modal";
+import { useToast } from "../../lib/toast";
+import Modal from "../../components/Modal";
+import { useConfirm } from "../../lib/confirm";
 import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
@@ -46,16 +47,17 @@ export default function StaffScholarshipsPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      const response = await api.get("/scholarships");
-      setScholarships(response.data);
-    } catch (err) {
-      toast.error(errMsg(err, "Unable to load scholarships."));
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  // Written with .then() (not await) so React's lint rule can see that the
+  // state is set later, when the server answers, not during the effect.
+  const load = useCallback(
+    () =>
+      api
+        .get("/scholarships")
+        .then((response) => setScholarships(response.data))
+        .catch((err) => toast.error(errMsg(err, "Unable to load scholarships.")))
+        .finally(() => setLoading(false)),
+    [toast]
+  );
 
   useEffect(() => {
     load();
@@ -234,26 +236,28 @@ function ManageScholarshipModal({ scholarshipId, onClose, onDeleted }) {
   const [saving, setSaving] = useState(false);
   const [applicationCount, setApplicationCount] = useState(0);
 
-  const load = useCallback(async () => {
-    try {
-      const { data } = await api.get(`/scholarships/${scholarshipId}`);
-      setApplicationCount(data.applications_count || 0);
+  const load = useCallback(
+    () =>
+      api
+        .get(`/scholarships/${scholarshipId}`)
+        .then(({ data }) => {
+          setApplicationCount(data.applications_count || 0);
 
-      setForm({
-        name: data.name || "",
-        provider: data.provider || "",
-        category: data.category || "",
-        description: data.description || "",
-        amount: data.amount ?? "",
-        application_start: data.application_start ? String(data.application_start).slice(0, 10) : "",
-        application_end: data.application_end ? String(data.application_end).slice(0, 10) : "",
-        status: data.status || "active",
-      });
-      setRequirements(data.requirements || []);
-    } catch (err) {
-      toast.error(errMsg(err, "Unable to load scholarship."));
-    }
-  }, [scholarshipId, toast]);
+          setForm({
+            name: data.name || "",
+            provider: data.provider || "",
+            category: data.category || "",
+            description: data.description || "",
+            amount: data.amount ?? "",
+            application_start: data.application_start ? String(data.application_start).slice(0, 10) : "",
+            application_end: data.application_end ? String(data.application_end).slice(0, 10) : "",
+            status: data.status || "active",
+          });
+          setRequirements(data.requirements || []);
+        })
+        .catch((err) => toast.error(errMsg(err, "Unable to load scholarship."))),
+    [scholarshipId, toast]
+  );
 
   useEffect(() => {
     load();

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { formatMoney, fullName } from "../../lib/format";
-import { useToast } from "../../components/Toast";
+import { useToast } from "../../lib/toast";
 import Modal from "../../components/Modal";
 import PageHeader from "../../components/PageHeader";
 import StatusBadge from "../../components/StatusBadge";
@@ -37,21 +37,19 @@ export default function StaffPayrollPage() {
   const [single, setSingle] = useState(null); // scholar record for the one-person form
   const [batchOpen, setBatchOpen] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      const [scholarsResponse, payrollResponse] = await Promise.all([
-        api.get("/scholar-records"),
-        api.get("/payroll"),
-      ]);
-
-      setRecords(scholarsResponse.data);
-      setPayroll(payrollResponse.data);
-    } catch (err) {
-      toast.error(errMsg(err, "Unable to load payroll."));
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  // Written with .then() (not await) so React's lint rule can see that the
+  // state is set later, when the server answers, not during the effect.
+  const load = useCallback(
+    () =>
+      Promise.all([api.get("/scholar-records"), api.get("/payroll")])
+        .then(([scholarsResponse, payrollResponse]) => {
+          setRecords(scholarsResponse.data);
+          setPayroll(payrollResponse.data);
+        })
+        .catch((err) => toast.error(errMsg(err, "Unable to load payroll.")))
+        .finally(() => setLoading(false)),
+    [toast]
+  );
 
   useEffect(() => {
     load();

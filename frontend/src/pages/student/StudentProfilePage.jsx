@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { formatDate } from "../../lib/format";
 import { groupDocuments, loadMyDocuments } from "../../lib/documents";
-import { useToast } from "../../components/Toast";
+import { useToast } from "../../lib/toast";
 import PageHeader from "../../components/PageHeader";
 import ProfileItem from "../../components/ProfileItem";
 import StatusBadge from "../../components/StatusBadge";
@@ -39,23 +39,20 @@ export default function StudentProfilePage() {
   const [documents, setDocuments] = useState([]);
   const correctionRef = useRef(null);
 
-  const load = useCallback(async () => {
-    try {
-      const [profileResponse, requestsResponse, mine] = await Promise.all([
-        api.get("/profile"),
-        api.get("/student/change-requests"),
-        loadMyDocuments().catch(() => null),
-      ]);
-
-      setDocuments(mine ? groupDocuments(mine) : []);
-
-      setProfile(profileResponse.data);
-      setContact(profileResponse.data.student?.contact_number || "");
-      setRequests(requestsResponse.data);
-    } catch (err) {
-      toast.error(errMsg(err, "Unable to load your profile."));
-    }
-  }, [toast]);
+  // Written with .then() (not await) so React's lint rule can see that the
+  // state is set later, when the server answers, not during the effect.
+  const load = useCallback(
+    () =>
+      Promise.all([api.get("/profile"), api.get("/student/change-requests"), loadMyDocuments().catch(() => null)])
+        .then(([profileResponse, requestsResponse, mine]) => {
+          setDocuments(mine ? groupDocuments(mine) : []);
+          setProfile(profileResponse.data);
+          setContact(profileResponse.data.student?.contact_number || "");
+          setRequests(requestsResponse.data);
+        })
+        .catch((err) => toast.error(errMsg(err, "Unable to load your profile."))),
+    [toast]
+  );
 
   useEffect(() => {
     load();
