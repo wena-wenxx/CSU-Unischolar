@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { formatDate } from "../../lib/format";
+import { groupDocuments, loadMyDocuments } from "../../lib/documents";
 import { useToast } from "../../components/Toast";
 import PageHeader from "../../components/PageHeader";
 import ProfileItem from "../../components/ProfileItem";
@@ -34,13 +36,18 @@ export default function StudentProfilePage() {
   const [savingContact, setSavingContact] = useState(false);
   const [correction, setCorrection] = useState({ field: "", requested_value: "", reason: "" });
   const [sending, setSending] = useState(false);
+  const [documents, setDocuments] = useState([]);
+  const correctionRef = useRef(null);
 
   const load = useCallback(async () => {
     try {
-      const [profileResponse, requestsResponse] = await Promise.all([
+      const [profileResponse, requestsResponse, mine] = await Promise.all([
         api.get("/profile"),
         api.get("/student/change-requests"),
+        loadMyDocuments().catch(() => null),
       ]);
+
+      setDocuments(mine ? groupDocuments(mine) : []);
 
       setProfile(profileResponse.data);
       setContact(profileResponse.data.student?.contact_number || "");
@@ -100,6 +107,17 @@ export default function StudentProfilePage() {
 
   const current = (field) => student[field] || "—";
 
+  // "Request a change" next to a locked field: pick it in the form below.
+  function requestChange(field) {
+    setCorrection({ field, requested_value: "", reason: "" });
+    correctionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setTimeout(() => document.getElementById("correction-value")?.focus(), 300);
+  }
+
+  const pending = (field) => requests.some((r) => r.field === field && r.status === "pending");
+  const validTypes = documents.filter((g) => g.files.some((f) => !f.is_expired)).length;
+  const expiredTypes = documents.filter((g) => g.files.length && g.files.every((f) => f.is_expired)).length;
+
   return (
     <div>
       <PageHeader title="My Profile" subtitle="Your student information" />
@@ -110,15 +128,24 @@ export default function StudentProfilePage() {
           <span className="lock-note">🔒 From the Registrar · read-only</span>
         </div>
 
-        <div className="profile-grid">
-          <ProfileItem label="Student ID" value={student.student_id} />
-          <ProfileItem label="First Name" value={student.first_name} />
-          <ProfileItem label="Middle Name" value={student.middle_name} />
-          <ProfileItem label="Last Name" value={student.last_name} />
-          <ProfileItem label="Course" value={student.course} />
-          <ProfileItem label="Year Level" value={student.year_level} />
-          <ProfileItem label="College" value={student.college} />
-          <ProfileItem label="Email (login account)" value={profile.email} />
+        <div className="locked-fields">
+          {Object.entries(CORRECTABLE).map(([field, label]) => (
+            <div className="locked-field" key={field}>
+              <ProfileItem label={label} value={student[field]} />
+              {pending(field) ? (
+                <span className="muted small">Change requested</span>
+              ) : (
+                <button type="button" className="link-button small" onClick={() => requestChange(field)}>
+                  Request a change
+                </button>
+              )}
+            </div>
+          ))}
+
+          <div className="locked-field">
+            <ProfileItem label="Email (login account)" value={profile.email} />
+            <span className="muted small">Managed by the university</span>
+          </div>
         </div>
 
         <p className="muted small">
@@ -151,7 +178,7 @@ export default function StudentProfilePage() {
           </form>
         </section>
 
-        <section className="card">
+        <section className="card" ref={correctionRef} id="request-correction">
           <h2>Request a correction</h2>
 
           <form className="form-grid" onSubmit={sendCorrection}>
@@ -202,6 +229,38 @@ export default function StudentProfilePage() {
           </form>
         </section>
       </div>
+
+      <section className="card">
+        <div className="card-header">
+          <h2>My documents</h2>
+          <Link className="button button-small button-secondary" to="/student/documents">
+            Open My Documents
+          </Link>
+        </div>
+
+        <p>
+          <strong>{validTypes}</strong> of {documents.length} document types saved and valid
+          {expiredTypes > 0 && (
+            <>
+              {" "}
+              · <span className="text-danger">{expiredTypes} expired</span>
+            </>
+          )}
+          .
+        </p>
+
+        <ul className="doc-chips">
+          {documents.map((group) => {
+            const latest = group.files[0];
+            const state = !latest ? "missing" : latest.is_expired ? "expired" : latest.status === "flagged" ? "flagged" : "ok";
+            return (
+              <li key={group.type} className={`doc-chip ${state}`}>
+                {state === "ok" ? "✓" : state === "missing" ? "○" : "!"} {group.type}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
 
       {requests.length > 0 && (
         <section className="card">

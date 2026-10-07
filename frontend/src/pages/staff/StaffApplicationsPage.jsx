@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { enrollmentText, fileUrl, formatDate, fullName, missingRequirements, stepLabel, timeAgo } from "../../lib/format";
 import { useToast } from "../../components/Toast";
@@ -17,6 +18,7 @@ const FILTERS = [
   ["complete", "Complete"],
   ["approved", "Approved"],
   ["to_verify", "Approved, enrollment not verified"],
+  ["flagged", "Has AI flags"],
   ["draft", "Drafts"],
 ];
 
@@ -34,7 +36,12 @@ export default function StaffApplicationsPage() {
 
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
+  // The address can preselect a list, e.g. /staff/applications?filter=needs_action
+  const location = useLocation();
+  const [filter, setFilter] = useState(() => {
+    const wanted = new URLSearchParams(location.search).get("filter");
+    return FILTERS.some(([key]) => key === wanted) ? wanted : "all";
+  });
   const [query, setQuery] = useState("");
   const [program, setProgram] = useState("all");
   const [sort, setSort] = useState("recent");
@@ -75,6 +82,9 @@ export default function StaffApplicationsPage() {
     if (key === "all") return true;
     if (key === "to_verify") {
       return application.status === "approved" && !application.enrollment_verified;
+    }
+    if (key === "flagged") {
+      return (application.documents || []).some((document) => document.status === "flagged");
     }
     return application.status === key;
   };
@@ -290,12 +300,17 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
     setBusy(true);
 
     try {
-      await api.patch(`/applications/${application.id}/review`, {
+      const { data } = await api.patch(`/applications/${application.id}/review`, {
         status,
         remarks: remarks.trim() || null,
       });
 
       toast.success(`Status changed to "${status.replaceAll("_", " ")}".`);
+
+      // Approval e-mail to the student (see Reports → E-mails sent).
+      if (data.email?.status === "sent") toast.info(`Approval e-mail sent to ${data.email.to}.`);
+      else if (data.email?.status === "queued") toast.info(`Approval e-mail queued for ${data.email.to}.`);
+      else if (data.email?.status === "failed") toast.error("The approval e-mail could not be sent. See Reports → E-mails sent.");
       await onChanged();
     } catch (err) {
       toast.error(errMsg(err, "Unable to update application."));

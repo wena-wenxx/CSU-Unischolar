@@ -9,6 +9,7 @@ import {
   missingRequirements,
   studentDocumentState,
 } from "../../lib/format";
+import { groupDocuments, latestUsable, loadMyDocuments } from "../../lib/documents";
 import { useToast } from "../../components/Toast";
 import { useConfirm } from "../../components/Modal";
 import PageHeader from "../../components/PageHeader";
@@ -36,11 +37,16 @@ export default function ApplicationDetailPage() {
   const [inputKeys, setInputKeys] = useState({}); // to clear a file input after upload
   const [uploadingId, setUploadingId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [saved, setSaved] = useState([]); // My Documents, grouped by type
 
   const load = useCallback(async () => {
     try {
-      const response = await api.get(`/applications/${id}`);
+      const [response, mine] = await Promise.all([
+        api.get(`/applications/${id}`),
+        loadMyDocuments().catch(() => null),
+      ]);
       setApplication(response.data);
+      setSaved(mine ? groupDocuments(mine) : []);
     } catch (err) {
       setError(errMsg(err, "Unable to load application."));
     }
@@ -79,6 +85,37 @@ export default function ApplicationDetailPage() {
     } finally {
       setUploadingId(null);
     }
+  }
+
+  // Attach a file from My Documents instead of uploading it again.
+  async function attachSaved(requirement, file, quiet = false) {
+    setUploadingId(requirement.id);
+
+    try {
+      await api.post(`/applications/${id}/documents/reuse`, {
+        document_id: file.id,
+        scholarship_requirement_id: requirement.id,
+      });
+      if (!quiet) {
+        await load();
+        toast.success(`Saved file used for ${requirement.name}.`);
+      }
+      return true;
+    } catch (err) {
+      toast.error(errMsg(err, "Unable to use the saved file."));
+      return false;
+    } finally {
+      setUploadingId(null);
+    }
+  }
+
+  async function attachAllSaved(pairs) {
+    let used = 0;
+    for (const [requirement, file] of pairs) {
+      if (await attachSaved(requirement, file, true)) used++;
+    }
+    await load();
+    toast.success(`${used} saved document${used === 1 ? "" : "s"} added from My Documents.`);
   }
 
   async function submitApplication() {
@@ -133,6 +170,20 @@ export default function ApplicationDetailPage() {
   const documentFor = (requirement) =>
     (application.documents || []).find((d) => d.scholarship_requirement_id === requirement.id);
   const otherFiles = (application.documents || []).filter((d) => !d.scholarship_requirement_id);
+
+  // Saved files (My Documents) that could fill a requirement, if different from what is attached now.
+  const savedFor = (requirement) => {
+    const file = latestUsable(saved, requirement.name);
+    const attached = documentFor(requirement);
+    return file && file.file_path !== attached?.file_path ? file : null;
+  };
+  // "Use my saved documents" fills empty rows, but skips files the AI flagged:
+  // those stay as a separate "Use saved file" choice with a warning.
+  const fillable = editable
+    ? requirements
+        .filter((r) => !documentFor(r) && savedFor(r) && savedFor(r).status !== "flagged")
+        .map((r) => [r, savedFor(r)])
+    : [];
   const help = STATUS_HELP[application.status];
 
   return (
@@ -180,6 +231,23 @@ export default function ApplicationDetailPage() {
             {uploadedCount} of {required.length} uploaded
           </span>
         </div>
+
+        {fillable.length > 0 && (
+          <div className="saved-banner">
+            <span>
+              You already have {fillable.length} of these document{fillable.length === 1 ? "" : "s"} in{" "}
+              <Link to="/student/documents">My Documents</Link>.
+            </span>
+            <button
+              type="button"
+              className="button button-small button-primary"
+              onClick={() => attachAllSaved(fillable)}
+              disabled={uploadingId !== null}
+            >
+              Use my saved documents
+            </button>
+          </div>
+        )}
 
         <div
           className="progress"
@@ -238,8 +306,24 @@ export default function ApplicationDetailPage() {
                       onClick={() => upload(requirement)}
                       disabled={uploadingId !== null || !files[requirement.id]}
                     >
-                      {uploadingId === requirement.id ? "Uploading..." : document ? "Replace" : "Upload"}
+                      {uploadingId === requirement.id ? "Please wait..." : document ? "Replace" : "Upload"}
                     </button>
+
+                    {savedFor(requirement) && (
+                      <button
+                        type="button"
+                        className="button button-small button-secondary"
+                        onClick={() => attachSaved(requirement, savedFor(requirement))}
+                        disabled={uploadingId !== null}
+                        title={`${savedFor(requirement).original_filename}, uploaded ${formatDate(savedFor(requirement).uploaded_at)}`}
+                      >
+                        Use saved file
+                      </button>
+                    )}
+
+                    {savedFor(requirement)?.status === "flagged" && (
+                      <span className="small ai-warning">⚠ The AI flagged this saved file. Check it in My Documents first.</span>
+                    )}
                   </div>
                 )}
               </li>

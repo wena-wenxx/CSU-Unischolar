@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { enrollmentText, formatDate, formatMoney, fullName, statusClass, statusLabel } from "../../lib/format";
 import { useToast } from "../../components/Toast";
@@ -47,9 +48,14 @@ export default function DataBankPage() {
     }
   }
 
-  // Show the first students as soon as the page opens.
+  const location = useLocation();
+
+  // Show the first students as soon as the page opens. A link with
+  // ?student=<id> (from the search box) also opens that student's history.
   useEffect(() => {
     fetchStudents("");
+    const wanted = new URLSearchParams(location.search).get("student");
+    if (wanted) openStudent(wanted);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

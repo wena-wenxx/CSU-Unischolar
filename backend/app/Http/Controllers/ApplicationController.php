@@ -6,11 +6,12 @@ use App\Models\Application;
 use App\Models\ApplicationStatusLog;
 use App\Models\Document;
 use App\Models\ScholarRecord;
+use App\Models\ScholarshipRequirement;
 use App\Models\Scholarship;
 use App\Models\Student;
+use App\Support\ApplicationNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 
 class ApplicationController extends Controller
 {
@@ -333,8 +334,8 @@ class ApplicationController extends Controller
                 ->get();
 
             foreach ($previous as $old) {
-                Storage::disk('public')->delete($old->file_path);
                 $old->delete(); // its AI result is removed with it
+                Document::deleteFileIfUnused($old->file_path);
             }
         }
 
@@ -343,21 +344,101 @@ class ApplicationController extends Controller
             'public'
         );
 
+        $requirementName = $request->scholarship_requirement_id
+            ? ScholarshipRequirement::whereKey($request->scholarship_requirement_id)->value('name')
+            : null;
+
         $document = Document::create([
+            'student_id' => $application->student_id,
             'application_id' => $application->id,
             'scholarship_requirement_id' =>
                 $request->scholarship_requirement_id,
             'original_filename' =>
                 $file->getClientOriginalName(),
             'file_path' => $path,
+            // The type name lets the student reuse this file in My Documents.
             'document_type' =>
-                $request->document_type,
+                $request->document_type ?: $requirementName,
             'status' => 'uploaded',
         ]);
 
         return response()->json([
             'message' => 'Document uploaded successfully.',
             'document' => $document
+        ], 201);
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | STUDENT - REUSE A SAVED DOCUMENT (My Documents)
+    |--------------------------------------------------------------------------
+    | Attaches a file the student already uploaded (for another application
+    | or in My Documents) to this application, instead of uploading it again.
+    | A new document row is made that points to the same stored file, so each
+    | application keeps its own status and AI check.
+    */
+
+    public function reuseDocument(Request $request, $id)
+    {
+        $data = $request->validate([
+            'document_id' => 'required|exists:documents,id',
+            'scholarship_requirement_id' => 'required|exists:scholarship_requirements,id',
+        ]);
+
+        $student = Student::where('user_id', $request->user()->id)->first();
+        $application = Application::with('scholarship.requirements')->findOrFail($id);
+
+        if (!$student || $application->student_id !== $student->id) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
+        if (!in_array($application->status, ['draft', 'needs_action'])) {
+            return response()->json(['message' => 'Documents cannot be changed at this stage.'], 422);
+        }
+
+        $requirement = $application->scholarship->requirements->firstWhere('id', (int) $data['scholarship_requirement_id']);
+
+        if (!$requirement) {
+            return response()->json(['message' => 'That requirement is not part of this scholarship.'], 422);
+        }
+
+        $source = Document::findOrFail($data['document_id']);
+
+        if ($source->student_id !== $student->id) {
+            return response()->json(['message' => 'You can only reuse your own documents.'], 403);
+        }
+
+        if ($source->isExpired()) {
+            return response()->json([
+                'message' => 'This saved document expired on '.$source->expiresAt()->format('F j, Y').'. Please upload a new copy.'
+            ], 422);
+        }
+
+        $previous = Document::where('application_id', $application->id)
+            ->where('scholarship_requirement_id', $requirement->id)
+            ->get();
+
+        foreach ($previous as $old) {
+            $old->delete();
+            if ($old->file_path !== $source->file_path) {
+                Document::deleteFileIfUnused($old->file_path);
+            }
+        }
+
+        $document = Document::create([
+            'student_id' => $student->id,
+            'application_id' => $application->id,
+            'scholarship_requirement_id' => $requirement->id,
+            'original_filename' => $source->original_filename,
+            'file_path' => $source->file_path,
+            'document_type' => $requirement->name,
+            'status' => 'uploaded', // OAS checks it again for this application
+        ]);
+
+        return response()->json([
+            'message' => "Saved document used for {$requirement->name}.",
+            'document' => $document,
         ], 201);
     }
 
@@ -401,6 +482,12 @@ class ApplicationController extends Controller
 
         $application->update($changes);
 
+        // E-mail the student when the agency's approval is recorded.
+        $emailLog = null;
+        if ($data['status'] === 'approved' && $previousStatus !== 'approved') {
+            $emailLog = ApplicationNotifier::approved($application, 'review');
+        }
+
         if ($previousStatus !== $data['status'] || !empty($data['remarks'])) {
             ApplicationStatusLog::record(
                 $application,
@@ -413,6 +500,7 @@ class ApplicationController extends Controller
 
         return response()->json([
             'message' => 'Application review updated successfully.',
+            'email' => $emailLog ? ['status' => $emailLog->status, 'to' => $emailLog->to_email] : null,
             'application' => $application->fresh()->load([
                 'student',
                 'scholarship',

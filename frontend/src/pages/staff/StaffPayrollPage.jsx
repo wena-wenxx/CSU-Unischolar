@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { formatMoney, fullName } from "../../lib/format";
 import { useToast } from "../../components/Toast";
@@ -11,11 +11,25 @@ import Loading from "../../components/Loading";
 
 const DEFAULT_PERIOD = "1st Semester AY 2026-2027";
 
+const PAYROLL_FILTERS = [
+  ["all", "All"],
+  ["draft", "Draft"],
+  ["ready", "Ready"],
+  ["processed", "Processed"],
+];
+
 const samePeriod = (a, b) =>
   String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 
 export default function StaffPayrollPage() {
   const toast = useToast();
+
+  // /staff/payroll?status=ready opens the list already filtered.
+  const location = useLocation();
+  const [statusFilter, setStatusFilter] = useState(() => {
+    const wanted = new URLSearchParams(location.search).get("status");
+    return PAYROLL_FILTERS.some(([key]) => key === wanted) ? wanted : "all";
+  });
 
   const [records, setRecords] = useState([]);
   const [payroll, setPayroll] = useState([]);
@@ -56,6 +70,7 @@ export default function StaffPayrollPage() {
   const activeRecords = records.filter((record) => record.status === "active");
   const eligible = activeRecords.filter((record) => record.currently_enrolled);
   const readyCount = payroll.filter((item) => item.status === "ready").length;
+  const shownPayroll = statusFilter === "all" ? payroll : payroll.filter((item) => item.status === statusFilter);
 
   if (loading) return <Loading />;
 
@@ -136,8 +151,21 @@ export default function StaffPayrollPage() {
 
         <p className="muted">Draft → Ready (checked and ready to send) → Processed (released).</p>
 
-        {payroll.length === 0 ? (
-          <EmptyState message="No payroll records yet." />
+        <div className="filter-row" role="group" aria-label="Filter payroll by status">
+          {PAYROLL_FILTERS.map(([key, label]) => (
+            <button
+              key={key}
+              className={statusFilter === key ? "button button-small button-primary" : "button button-small button-secondary"}
+              aria-pressed={statusFilter === key}
+              onClick={() => setStatusFilter(key)}
+            >
+              {label} ({key === "all" ? payroll.length : payroll.filter((item) => item.status === key).length})
+            </button>
+          ))}
+        </div>
+
+        {shownPayroll.length === 0 ? (
+          <EmptyState message="No payroll records in this list." />
         ) : (
           <div className="table-wrapper">
             <table>
@@ -154,7 +182,7 @@ export default function StaffPayrollPage() {
               </thead>
 
               <tbody>
-                {payroll.map((item) => (
+                {shownPayroll.map((item) => (
                   <tr key={item.id}>
                     <td>{fullName(item.scholar_record?.student)}</td>
                     <td>{item.scholar_record?.scholarship?.name}</td>

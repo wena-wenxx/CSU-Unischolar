@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api, { errMsg } from "../../services/api";
-import { downloadCSV, formatDate, fullName, missingRequirements, statusLabel } from "../../lib/format";
+import { downloadCSV, formatDate, formatDateTime, fullName, missingRequirements, statusLabel } from "../../lib/format";
 import { useToast } from "../../components/Toast";
 import PageHeader from "../../components/PageHeader";
 import Loading from "../../components/Loading";
@@ -37,18 +37,20 @@ export default function StaffReportsPage() {
       api.get("/scholar-records"),
       api.get("/payroll"),
       api.get("/scholarships"),
+      api.get("/staff/email-logs").catch(() => ({ data: [] })),
     ])
-      .then(([applications, scholars, payroll, scholarships]) =>
+      .then(([applications, scholars, payroll, scholarships, emails]) =>
         setData({
           applications: applications.data,
           scholars: scholars.data,
           payroll: payroll.data,
           scholarships: scholarships.data,
+          emails: emails.data,
         })
       )
       .catch((err) => {
         toast.error(errMsg(err, "Unable to load report data."));
-        setData({ applications: [], scholars: [], payroll: [], scholarships: [] });
+        setData({ applications: [], scholars: [], payroll: [], scholarships: [], emails: [] });
       });
   }, [toast]);
 
@@ -244,6 +246,58 @@ export default function StaffReportsPage() {
           );
         })}
       </div>
+
+      <section className="card" id="emails">
+        <div className="card-header">
+          <h2>E-mails sent</h2>
+          <span className="muted">{data.emails.length} most recent</span>
+        </div>
+
+        <p className="muted small">
+          Students get an e-mail when their application is approved (by review or by an agency list). Demo setting:
+          e-mails are written to the server log or caught by a Mailtrap test inbox, never delivered to real addresses.
+        </p>
+
+        {data.emails.length === 0 ? (
+          <p className="muted">No e-mails yet.</p>
+        ) : (
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Student</th>
+                  <th>To</th>
+                  <th>Subject</th>
+                  <th>From</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.emails.map((item) => (
+                  <tr key={item.id}>
+                    <td>{formatDateTime(item.created_at)}</td>
+                    <td>
+                      {fullName(item.student)} ({item.student?.student_id})
+                    </td>
+                    <td>{item.to_email}</td>
+                    <td>{item.subject}</td>
+                    <td>{item.trigger === "agency_list" ? "Agency list" : "Review"}</td>
+                    <td>
+                      <span
+                        className={`status status-${item.status === "sent" ? "success" : item.status === "failed" ? "danger" : "warning"}`}
+                        title={item.error || ""}
+                      >
+                        {item.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

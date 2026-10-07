@@ -34,5 +34,9 @@ class DatabaseSeeder extends Seeder
             StatusLogSeeder::class,   // step-by-step history of every application
             PortalDemoSeeder::class,  // announcements + one profile correction request
         ]);
+
+        // Bulk documents were inserted directly; record which student owns each.
+        \App\Models\Document::backfillOwners();
+        \App\Models\Document::alignSeededDates();
     }
 }

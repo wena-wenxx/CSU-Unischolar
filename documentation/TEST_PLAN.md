@@ -226,7 +226,56 @@ change with the real date.
 
 ---
 
+## Part D — Round 6 features
+
+Run `php artisan migrate:fresh --seed` first. In `backend/.env` set `QUEUE_CONNECTION=sync` and `MAIL_MAILER=log`.
+
+**My Documents (student5 Liza)**
+- [ ] **D1.** Menu → **My Documents**: 9 cards (COR, Grades, Valid ID, Indigency, Birth Certificate, Barangay Clearance,
+  Good Moral, ITR, Recommendation). Liza has 8 valid; Birth Certificate says "Not uploaded yet".
+- [ ] **D2.** On Birth Certificate choose `2026-00004-pedro-garcia/birth-certificate.pdf` (someone else's) → **Upload** →
+  **Check with AI**. Expect the orange box "Applicant name not found on the document (best match 52.63%)" and the badge
+  **Needs attention**.
+- [ ] **D3.** On COR choose Liza's COR → **Replace** → "Certificate of Registration (COR) saved." **Show 1 older copy**
+  lists the previous file.
+- [ ] **D4.** Scholarships → **Apply** on the Choir grant. A gold box says "You already have 5 of these documents in My
+  Documents" → **Use my saved documents** → "5 saved documents added", 5 of 6 uploaded, **Submit** still grey. The
+  Birth Certificate row shows **Use saved file** with "⚠ The AI flagged this saved file". Upload Liza's own birth
+  certificate on that row → Submit turns green → submit.
+- [ ] **D5.** Log in as Ana (student3) → My Documents: the Certificate of Indigency card is red, "Expired on Mar 3, 2026".
+
+**Search, cards, sidebar, profile**
+- [ ] **D6.** Search box (top bar): student types `my doc` → "Go to My Documents"; staff types `juan` → three students →
+  click *Juan Student (2026-00001)* → Data Bank opens his history. `CHED` → two programs → click → Manage window.
+  `payroll` + Enter → Payroll page.
+- [ ] **D7.** Staff dashboard: every number is a link. Needs Action → Applications with *Needs action (49)* selected;
+  AI Flags (documents) 225 "In 179 applications" → *Has AI flags (179)*; Payroll Ready → Payroll with *Ready (18)*.
+  Student dashboard: Being Processed → My Applications with *Being processed* selected.
+- [ ] **D8.** Quick actions: staff *Create Scholarship* → the create form with the Name box focused; student
+  *My Documents* → My Documents.
+- [ ] **D9.** Top of the menu: initials avatar, name, Student ID (staff: e-mail) and role → click → View Profile / Help /
+  Sign Out all work.
+- [ ] **D10.** My Profile (student): no input boxes for Registrar fields; each has **Request a change** → the form below
+  is pre-filled with that field and the cursor is in "Correct value". A "My documents" box shows 8 of 9 valid.
+
+**E-mail**
+- [ ] **D11.** Staff → review Rosa (2026-00007) → **Approved by agency**. Toasts: "Status changed…" and "Approval e-mail
+  sent to student7@carsu.edu.ph." Reports → **E-mails sent** shows the row with **SENT**. Open
+  `backend/storage/logs/laravel.log`: the e-mail with "Hello Rosa Villanueva (2026-00007)", "APPROVED" and a link
+  `http://localhost:5173/student/applications/…`.
+- [ ] **D12.** Uploading an agency list that approves students adds "N approval e-mail(s) sent." to the summary.
+
+**Colours**
+- [ ] **D13.** The sidebar is deep forest green (#004d26) with gold (#d4af37) highlights; the page background is soft gray.
+  On a wide screen the sidebar is 280px and stays in place while the page scrolls; on a phone the ☰ menu still works.
+
+---
+
 ## What has and has not been tested
+
+Part D (round 6) was tested by Claude on **7 Oct 2026** the same way (D1–D13 in the browser at 1366×900 and
+390×844, e-mails with MAIL_MAILER=log; a failing SMTP server was also tried: the approval still works and the
+e-mail is logged as FAILED). Parts B and C were re-run afterwards with the same results.
 
 Part C (round 5) was tested by Claude on **6 Oct 2026** in the same way: C1–C13 in the browser, plus the earlier
 staff workflow again (AI check, decision, verify, tag, batch payroll, Data Bank, CSV) with unchanged results.

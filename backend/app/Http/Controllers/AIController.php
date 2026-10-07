@@ -17,16 +17,29 @@ class AIController extends Controller
 {
     public function validateDocument(Request $request, $documentId)
     {
-        if ($request->user()->role !== 'staff') {
-            return response()->json([
-                'message' => 'Only staff can run document validation.'
-            ], 403);
-        }
-
         $document = Document::with([
             'application.student',
+            'student',
             'requirement'
         ])->findOrFail($documentId);
+
+        // Staff can check any document. A student can check their OWN file
+        // while it is still theirs to change: saved in My Documents, or in a
+        // draft / needs-action application. (The AI only flags; nothing is
+        // approved or rejected automatically.)
+        if ($request->user()->role !== 'staff') {
+            $mine = $document->student_id
+                && $request->user()->student
+                && $document->student_id === $request->user()->student->id;
+            $editable = !$document->application_id
+                || in_array($document->application?->status, ['draft', 'needs_action'], true);
+
+            if (!$mine || !$editable) {
+                return response()->json([
+                    'message' => 'You can only check your own documents before they are submitted.'
+                ], 403);
+            }
+        }
 
         $fullPath = Storage::disk('public')->path($document->file_path);
 
@@ -38,7 +51,7 @@ class AIController extends Controller
 
         $document->update(['status' => 'processing']);
 
-        $student = $document->application->student;
+        $student = $document->student ?? $document->application->student;
 
         // First + last name only: validation.py already accepts a middle
         // name printed on the document.

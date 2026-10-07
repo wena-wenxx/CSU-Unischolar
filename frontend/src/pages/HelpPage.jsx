@@ -1,6 +1,7 @@
 import { useAuth } from "../lib/auth";
 import { HELP } from "../lib/help";
 import { STATUS_HELP } from "../lib/format";
+import { BANNER, MOTTO, UNIVERSITY } from "../lib/brand";
 import { showWelcomeAgain } from "../components/WelcomeModal";
 import PageHeader from "../components/PageHeader";
 import StatusBadge from "../components/StatusBadge";
@@ -21,6 +22,13 @@ export default function HelpPage() {
           </button>
         }
       />
+
+      <figure className="help-banner">
+        <img
+          src={BANNER}
+          alt={`${UNIVERSITY}: Creating futures, empowering communities. Vision, mission and core values: ${MOTTO}`}
+        />
+      </figure>
 
       <nav className="card help-contents" aria-label="Help topics">
         <strong>On this page</strong>

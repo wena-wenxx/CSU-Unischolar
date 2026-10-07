@@ -8,6 +8,7 @@ use App\Models\ApplicationStatusLog;
 use App\Models\ScholarRecord;
 use App\Models\Scholarship;
 use App\Models\Student;
+use App\Support\ApplicationNotifier;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -33,6 +34,9 @@ use Illuminate\Support\Facades\DB;
 */
 class AgencyListController extends Controller
 {
+    /** Applications approved by this upload (they get an e-mail afterwards). */
+    private array $approvedApplications = [];
+
     private function staffOnly(Request $request): void
     {
         if ($request->user()->role !== 'staff') {
@@ -95,10 +99,18 @@ class AgencyListController extends Controller
             'details' => $details,
         ]);
 
+        // E-mails go out after the database work is saved.
+        $emailed = 0;
+        foreach ($this->approvedApplications as $application) {
+            if (ApplicationNotifier::approved($application, 'agency_list')?->status !== 'failed') {
+                $emailed++;
+            }
+        }
+
         $matched = $counts['approved'] + $counts['created'] + $counts['already'];
 
         return response()->json([
-            'message' => "Matched {$matched} student(s), {$counts['unmatched']} unmatched, {$counts['error']} error(s).",
+            'message' => "Matched {$matched} student(s), {$counts['unmatched']} unmatched, {$counts['error']} error(s). {$emailed} approval e-mail(s) sent.",
             'upload' => $upload->load(['scholarship:id,name', 'uploader:id,name']),
         ], 201);
     }
@@ -150,6 +162,7 @@ class AgencyListController extends Controller
             ]);
 
             ApplicationStatusLog::record($application, 'approved', 'Added from the agency\'s approved list. '.$approvalNote, $staffId, null);
+            $this->approvedApplications[] = $application;
 
             return $line + ['result' => 'created', 'note' => 'No application in the system; an approved application was created. Verify enrollment next.'];
         }
@@ -176,6 +189,7 @@ class AgencyListController extends Controller
         ]);
 
         ApplicationStatusLog::record($application, 'approved', $approvalNote, $staffId, $previous);
+        $this->approvedApplications[] = $application;
 
         return $line + ['result' => 'approved', 'note' => "Changed from {$previous} to approved. Verify enrollment next."];
     }

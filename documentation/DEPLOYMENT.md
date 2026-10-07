@@ -118,6 +118,10 @@ QUEUE_CONNECTION=sync
 LOG_CHANNEL=stderr
 AI_SERVICE_URL=<https://your-hf-username-csu-unischolar-ai.hf.space>
 FRONTEND_URL=<fill in after step 3, e.g. https://csu-unischolar.vercel.app>
+APP_FRONTEND_URL=<the same Vercel address; used for links inside e-mails>
+MAIL_MAILER=log
+MAIL_FROM_ADDRESS=scholarguide@example.com
+MAIL_FROM_NAME="ScholarGuide (CSU OAS demo)"
 SEED_DEMO_DATA=true
 ```
 
@@ -125,6 +129,10 @@ SEED_DEMO_DATA=true
   the database's real address. (If your database service has another name,
   use that name instead of `MySQL`.)
 - Until you have the Vercel address, you may put `FRONTEND_URL=*`.
+- E-mails: `MAIL_MAILER=log` writes them to the Railway logs. To see them as real e-mails, create a free
+  Mailtrap **Email Testing** inbox and add `MAIL_MAILER=smtp`, `MAIL_HOST=sandbox.smtp.mailtrap.io`,
+  `MAIL_PORT=2525`, `MAIL_USERNAME` and `MAIL_PASSWORD` (from Mailtrap). Mailtrap catches every message, so the
+  fictional demo addresses never receive anything. Do **not** use a personal Gmail with the demo accounts.
 
 Click **Update Variables**, then **Deploy**.
 

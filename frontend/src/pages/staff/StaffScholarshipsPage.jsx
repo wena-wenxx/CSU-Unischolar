@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { CATEGORY_LABELS, availabilityInfo, categoryLabel, formatDate, formatMoney } from "../../lib/format";
 import { useToast } from "../../components/Toast";
@@ -35,7 +36,12 @@ export default function StaffScholarshipsPage() {
   const toast = useToast();
 
   const [scholarships, setScholarships] = useState([]);
-  const [managingId, setManagingId] = useState(null);
+  // ?manage=<id> opens that program (search box); ?new=1 jumps to the create form.
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const createRef = useRef(null);
+  const wantsNew = params.get("new") === "1";
+  const [managingId, setManagingId] = useState(() => Number(params.get("manage")) || null);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -54,6 +60,13 @@ export default function StaffScholarshipsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (wantsNew && !loading && createRef.current) {
+      createRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      createRef.current.querySelector("input")?.focus();
+    }
+  }, [wantsNew, loading]);
 
   async function createScholarship(event) {
     event.preventDefault();
@@ -87,7 +100,7 @@ export default function StaffScholarshipsPage() {
     <div>
       <PageHeader title="Scholarship Programs" subtitle="Manage scholarship programs and their requirements" />
 
-      <section className="card">
+      <section className="card" id="create-scholarship" ref={createRef}>
         <h2>Create Scholarship</h2>
 
         <form className="form-grid" onSubmit={createScholarship}>
