@@ -10,7 +10,9 @@ use Illuminate\Database\Seeder;
  * ALL DATA IS FICTIONAL DEMO DATA (no real CSU students).
  *
  * Demo logins:
+ *   Admin        admin@carsu.edu.ph                             / Admin@12345
  *   Staff        oas.staff@carsu.edu.ph                         / Staff@12345
+ *   Test student wenarose.contiga@carsu.edu.ph (real, with permission) / Student@12345
  *   Named demo   student1@carsu.edu.ph ... student10@carsu.edu.ph / Student@12345
  *   Bulk demo    s<student id without dash>@demo.carsu.edu.ph   / Student@12345
  *                (e.g. the student 2024-10123 logs in as s202410123@demo.carsu.edu.ph)
@@ -27,6 +29,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
+            AdminSeeder::class,
             StaffSeeder::class,
             StudentSeeder::class,
             DemoDataSeeder::class,
@@ -41,5 +44,14 @@ class DatabaseSeeder extends Seeder
 
         // Starting ATM status for every grantee (funded / pending / for ATM application).
         \App\Models\ScholarRecord::backfillAtmStatus();
+
+        // When each demo application was forwarded to its agency.
+        \App\Models\Application::backfillForwardedAt();
+
+        // A demo Registrar enrollment list for "Verify All Enrollments".
+        $this->call(EnrollmentListSeeder::class);
+
+        // Activity log entries for the staff steps already in the demo history.
+        \App\Models\ActivityLog::backfillFromStatusLogs();
     }
 }

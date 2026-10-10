@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { useAuth } from "../lib/auth";
+import api from "../services/api";
+import { ROLE_LABELS, useAuth } from "../lib/auth";
 import { APP_NAME, LOGO, MOTTO, OFFICE, UNIVERSITY, WORDMARK } from "../lib/brand";
 import NotificationBell from "./NotificationBell";
 import SearchBox from "./SearchBox";
@@ -15,6 +16,7 @@ const NAVIGATION = {
     ["/student/documents", "My Documents"],
     ["/student/history", "My Scholarship History"],
     ["/student/profile", "My Profile"],
+    ["/student/contact", "Contact OAS"],
     ["/student/help", "Help"],
   ],
   // Same order as the OAS workflow: review -> agency's list -> grantees -> payroll.
@@ -22,13 +24,27 @@ const NAVIGATION = {
     ["/staff/dashboard", "Dashboard"],
     ["/staff/applications", "Applications"],
     ["/staff/agency-lists", "Approved Lists"],
+    ["/staff/forwarded", "Forwarded to Agency"],
     ["/staff/scholars", "Scholar Records"],
+    ["/staff/enrollment", "Enrollment"],
     ["/staff/payroll", "Payroll"],
     ["/staff/scholarships", "Scholarships"],
     ["/staff/announcements", "Announcements"],
+    ["/staff/messages", "Student Messages"],
     ["/staff/data-bank", "Data Bank"],
     ["/staff/reports", "Reports"],
     ["/staff/help", "Help"],
+  ],
+  // The administrator manages accounts and settings; OAS staff process applications.
+  admin: [
+    ["/admin/dashboard", "Dashboard"],
+    ["/admin/staff", "Manage Staff"],
+    ["/admin/students", "Manage Students"],
+    ["/admin/activity", "Activity Logs"],
+    ["/admin/settings", "System Settings"],
+    ["/admin/scholarships", "All Scholarships"],
+    ["/admin/reports", "Reports"],
+    ["/admin/help", "Help"],
   ],
 };
 
@@ -37,6 +53,7 @@ function pageTitle(pathname, role) {
   if (/^\/student\/scholarships\/[^/]+$/.test(pathname)) return "Scholarship Details";
   if (/^\/student\/applications\/[^/]+$/.test(pathname)) return "Application";
   if (pathname.endsWith("/profile")) return "My Profile";
+  if (pathname === "/staff/auto-review") return "Auto-Review";
 
   const match = (NAVIGATION[role] || []).find(([path]) => path === pathname);
   return match ? match[1] : APP_NAME;
@@ -61,6 +78,15 @@ export default function Layout() {
   const menuOpen = menuOpenedOn === location.pathname;
   const setMenuOpen = (open) => setMenuOpenedOn(open ? location.pathname : null);
   const [printTime, setPrintTime] = useState(printedAt);
+  const [office, setOffice] = useState(null);
+
+  // OAS contact details for the footer (set by the admin in System Settings).
+  useEffect(() => {
+    api
+      .get("/settings/public")
+      .then((response) => setOffice(response.data))
+      .catch(() => setOffice(null));
+  }, []);
 
   // Stamp the current time on the printout just before printing.
   useEffect(() => {
@@ -83,7 +109,7 @@ export default function Layout() {
 
             <span className="sidebar-app">{APP_NAME}</span>
 
-            <small>{user.role === "staff" ? "OAS Staff" : "Student Portal"}</small>
+            <small>{user.role === "student" ? "Student Portal" : ROLE_LABELS[user.role]}</small>
           </div>
         </div>
 
@@ -161,6 +187,8 @@ export default function Layout() {
           <Outlet />
         </div>
 
+        {office && <OfficeFooter office={office} isStudent={user.role === "student"} />}
+
         <p className="print-footer" aria-hidden="true">
           {APP_NAME} · {UNIVERSITY} · {MOTTO}
         </p>
@@ -168,5 +196,29 @@ export default function Layout() {
 
       <WelcomeModal />
     </div>
+  );
+}
+
+// Contact details of the OAS on every page (only the fields the admin filled in).
+function OfficeFooter({ office, isStudent }) {
+  const parts = [office.oas_location, office.oas_office_hours, office.oas_email, office.oas_phone].filter(Boolean);
+
+  return (
+    <footer className="office-footer">
+      <span>
+        <strong>{OFFICE}</strong>
+        {parts.length > 0 && " · "}
+        {parts.join(" · ")}
+      </span>
+      <span>
+        {office.current_period}
+        {isStudent && (
+          <>
+            {" · "}
+            <NavLink to="/student/contact">Contact OAS</NavLink>
+          </>
+        )}
+      </span>
+    </footer>
   );
 }

@@ -15,7 +15,12 @@ export default function HelpPage() {
     <div>
       <PageHeader
         title="Help"
-        subtitle={user.role === "staff" ? "How to use ScholarGuide at the OAS" : "How to apply and follow your scholarship"}
+        subtitle={
+          {
+            staff: "How to use ScholarGuide at the OAS",
+            admin: "Managing accounts, logs and settings",
+          }[user.role] || "How to apply and follow your scholarship"
+        }
         actions={
           <button className="button button-secondary" onClick={showWelcomeAgain}>
             Show the welcome guide again
@@ -67,8 +72,8 @@ export default function HelpPage() {
       ))}
 
       <p className="muted help-footer">
-        Still stuck? Visit or message the Office of Admission and Scholarship. All accounts and records in this
-        prototype are fictional.
+        Still stuck? Visit or message the Office of Admission and Scholarship. Apart from the test student account,
+        all accounts and records in this prototype are fictional.
       </p>
     </div>
   );

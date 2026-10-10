@@ -12,12 +12,14 @@ class Application extends Model
         'status',
         'remarks',
         'submitted_at',
+        'forwarded_at',
         'enrollment_verified',
         'enrollment_verified_at',
     ];
 
     protected $casts = [
         'submitted_at' => 'datetime',
+        'forwarded_at' => 'datetime',
         'enrollment_verified' => 'boolean',
         'enrollment_verified_at' => 'datetime',
     ];
@@ -145,5 +147,33 @@ class Application extends Model
             ->where('is_required', true)
             ->reject(fn ($req) => in_array($req->id, $covered))
             ->pluck('name')->values()->all();
+    }
+
+    /*
+    | forwarded_at for applications that were forwarded before this column
+    | existed: the date of their "complete" step, else the submission date.
+    */
+    public static function backfillForwardedAt(): int
+    {
+        $count = 0;
+
+        $apps = self::query()
+            ->whereNull('forwarded_at')
+            ->whereIn('status', ['complete', 'approved', 'rejected'])
+            ->get(['id', 'submitted_at']);
+
+        foreach ($apps as $app) {
+            $at = ApplicationStatusLog::where('application_id', $app->id)
+                ->where('to_status', 'complete')
+                ->latest('created_at')
+                ->value('created_at') ?? $app->submitted_at;
+
+            if ($at) {
+                self::whereKey($app->id)->update(['forwarded_at' => $at]);
+                $count++;
+            }
+        }
+
+        return $count;
     }
 }

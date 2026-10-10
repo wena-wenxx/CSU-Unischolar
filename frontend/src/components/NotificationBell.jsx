@@ -5,12 +5,13 @@ import { stepLabel, timeAgo } from "../lib/format";
 
 /*
   Students only: a bell in the top bar with the number of new status
-  changes on their applications. Opening it marks them as read.
+  changes on their applications (opening it marks them as read) and of
+  unread replies from OAS to Contact OAS messages (read on that page).
   It checks again whenever the student moves to another page.
 */
 export default function NotificationBell() {
   const location = useLocation();
-  const [data, setData] = useState({ unread: 0, items: [] });
+  const [data, setData] = useState({ unread: 0, items: [], unread_replies: 0 });
   const [open, setOpen] = useState(false);
   const boxRef = useRef(null);
 
@@ -56,14 +57,26 @@ export default function NotificationBell() {
         className="bell-button"
         onClick={toggle}
         aria-expanded={open}
-        aria-label={data.unread ? `Notifications, ${data.unread} new` : "Notifications"}
+        aria-label={
+          data.unread + (data.unread_replies || 0)
+            ? `Notifications, ${data.unread + (data.unread_replies || 0)} new`
+            : "Notifications"
+        }
       >
         <span aria-hidden="true">🔔</span>
-        {data.unread > 0 && <span className="bell-count">{data.unread}</span>}
+        {data.unread + (data.unread_replies || 0) > 0 && (
+          <span className="bell-count">{data.unread + (data.unread_replies || 0)}</span>
+        )}
       </button>
 
       {open && (
         <div className="bell-panel" role="dialog" aria-label="Notifications">
+          {data.unread_replies > 0 && (
+            <Link className="bell-reply" to="/student/contact" onClick={() => setOpen(false)}>
+              ✉️ OAS replied to {data.unread_replies === 1 ? "your message" : `${data.unread_replies} of your messages`}. Open Contact OAS →
+            </Link>
+          )}
+
           <strong className="bell-title">Updates on your applications</strong>
 
           {data.items.length === 0 ? (

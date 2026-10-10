@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Application;
 use App\Models\ApplicationStatusLog;
 use App\Models\Document;
@@ -87,6 +88,7 @@ class ApplicationController extends Controller
         ]);
 
         ApplicationStatusLog::record($application, 'draft', null, $request->user()->id);
+        ActivityLog::record($request->user(), 'application.started', "Started an application for {$scholarship->name}.", $application);
 
         return response()->json(
             $application->load('scholarship'),
@@ -170,6 +172,7 @@ class ApplicationController extends Controller
         ]);
 
         ApplicationStatusLog::record($application, 'submitted', null, $request->user()->id, $previousStatus);
+        ActivityLog::record($request->user(), 'application.submitted', ($previousStatus === 'needs_action' ? 'Resubmitted' : 'Submitted').' the application for '.$application->scholarship->name.'.', $application);
 
         return response()->json([
             'message' => 'Application submitted successfully.',
@@ -221,7 +224,7 @@ class ApplicationController extends Controller
 
     public function index(Request $request)
     {
-        if ($request->user()->role !== 'staff') {
+        if ($request->user()->role !== 'staff' && !$request->user()->isAdmin()) {
             return response()->json([
                 'message' => 'Unauthorized.'
             ], 403);
@@ -232,6 +235,7 @@ class ApplicationController extends Controller
         // Newest activity first: whatever changed most recently is on top.
         $applications = Application::with([
             'student',
+            'student.user:id,email',
             'scholarship:id,name,provider,category,amount,status,application_start,application_end',
             'scholarship.requirements:id,scholarship_id,name,is_required',
             'documents:id,application_id,scholarship_requirement_id,status',
@@ -518,6 +522,11 @@ class ApplicationController extends Controller
             'remarks' => $data['remarks'] ?? null,
         ];
 
+        // Forwarded to the agency now (or again): remember when.
+        if ($data['status'] === 'complete' && !in_array($previousStatus, ['complete', 'approved', 'rejected'], true)) {
+            $changes['forwarded_at'] = now();
+        }
+
         // Enrollment verification only makes sense for approved
         // applications. If staff move it away from "approved", clear it.
         if ($data['status'] !== 'approved') {
@@ -531,6 +540,13 @@ class ApplicationController extends Controller
         $emailLog = null;
         if ($data['status'] === 'approved' && $previousStatus !== 'approved') {
             $emailLog = ApplicationNotifier::approved($application, 'review');
+        }
+
+        if ($previousStatus !== $data['status']) {
+            $application->loadMissing('student:id,first_name,last_name', 'scholarship:id,name');
+            ActivityLog::record($request->user(), 'application.'.($data['status'] === 'complete' ? 'forwarded' : $data['status']),
+                'Application of '.trim(($application->student?->first_name ?? '').' '.($application->student?->last_name ?? '')).' ('.$application->scholarship?->name.'): '
+                .str_replace('_', ' ', $previousStatus).' → '.str_replace('_', ' ', $data['status']).'.', $application);
         }
 
         if ($previousStatus !== $data['status'] || !empty($data['remarks'])) {

@@ -262,6 +262,16 @@ export default function StudentProfilePage() {
         </ul>
       </section>
 
+      <section className="card">
+        <div className="card-header">
+          <h2>Password</h2>
+          <Link className="button button-small button-secondary" to="/account/password">
+            Change password
+          </Link>
+        </div>
+        <p className="muted small">Use at least 8 characters with letters and numbers. Do not share it with anyone.</p>
+      </section>
+
       {requests.length > 0 && (
         <section className="card">
           <h2>My correction requests</h2>

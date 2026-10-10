@@ -15,11 +15,16 @@ export function getStoredUser() {
   }
 }
 
+// Where each role starts. Admin = system administrator.
 export function homePathFor(user) {
   if (!user) return "/login";
+  if (user.must_change_password) return "/account/password";
 
-  return user.role === "staff" ? "/staff/dashboard" : "/student/dashboard";
+  return { admin: "/admin/dashboard", staff: "/staff/dashboard" }[user.role] || "/student/dashboard";
 }
+
+// Shown in the sidebar and on profile pages.
+export const ROLE_LABELS = { student: "Student", staff: "OAS Staff", admin: "System Admin" };
 
 export function useAuth() {
   return useContext(AuthContext);

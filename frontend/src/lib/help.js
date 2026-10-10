@@ -55,6 +55,28 @@ export const WELCOME_STEPS = {
       text: "Payroll: choose the program and period, preview, then confirm. Each scholar gets their own program's amount. Reports exports CSV files for Excel.",
     },
   ],
+  admin: [
+    {
+      title: "You manage accounts and settings",
+      text: "As System Admin you create and look after accounts, read the activity log and set the school year and OAS contact details. OAS staff process the applications.",
+    },
+    {
+      title: "Create accounts",
+      text: "Manage Staff and Manage Students → New account. The system gives a temporary password; the user must change it when they first log in.",
+    },
+    {
+      title: "Reset or deactivate",
+      text: "Forgot a password? Reset password gives a new temporary one. Someone left the office? Deactivate: they cannot log in, but their records stay.",
+    },
+    {
+      title: "Activity Logs",
+      text: "Who did what and when: logins, account changes, application steps, payroll and settings. Filter it and export it to CSV.",
+    },
+    {
+      title: "System Settings",
+      text: "Set the current school year and semester (used as the payroll period) and the OAS office hours, e-mail and phone shown to students.",
+    },
+  ],
 };
 
 export const HELP = {
@@ -112,6 +134,15 @@ export const HELP = {
         "Your name, Student ID, course, year level and college come from the Registrar, so you cannot edit them here.",
         "If something is wrong, use Request a correction on My Profile. OAS will check it with the Registrar.",
         "You can update your contact number yourself.",
+        "To change your password, open My Profile → Change password.",
+      ],
+    },
+    {
+      title: "Contact OAS",
+      steps: [
+        "Contact OAS shows the office hours, location, e-mail and phone of the Office of Admission and Scholarship.",
+        "To ask a question, choose a topic, write a short subject and your message, then press Send.",
+        "OAS replies on the same page. The bell at the top tells you when there is a reply.",
       ],
     },
   ],
@@ -169,11 +200,78 @@ export const HELP = {
       ],
     },
     {
+      title: "Auto-Review and forwarding",
+      steps: [
+        "Applications → Auto-Review sorts every submitted application into three lists: Ready to forward, Needs manual review, and Probably incomplete. It changes nothing by itself.",
+        "Ready to forward: every required document is uploaded and checked by the AI with no flag. Tick them and press Forward selected to the agency.",
+        "Needs manual review: open each one (an AI flag, a file the AI could not read, a file not checked yet, or an expired document).",
+        "Probably incomplete: a required document is missing, or the student already holds another scholarship. Edit the remark if needed and press Send back (Needs action).",
+        "Forwarded to Agency lists everything sent to agencies, by program, with the days waiting. Export a CSV for each agency. When the agency answers, record it in Approved Lists.",
+      ],
+    },
+    {
+      title: "Enrollment: Registrar list",
+      steps: [
+        "Enrollment → upload the Registrar's list of enrolled students as a CSV file and choose the Student ID column (names are optional but recommended).",
+        "Press Verify All Enrollments. Everyone is sorted into Enrolled, Not on the list, and Needs manual check (the Student ID is on the list but the name is different).",
+        "Nothing is saved until you press Record. Record the Enrolled group in one click; check the others one by one.",
+        "Use “Active grantees” at the start of each semester, so payroll only includes students who are still enrolled.",
+      ],
+    },
+    {
+      title: "Student messages",
+      steps: [
+        "Students send questions from Contact OAS. Open messages appear on the Dashboard and in Student Messages, oldest first.",
+        "Type a reply and press Send reply. The student sees it on their Contact OAS page and their bell shows it.",
+      ],
+    },
+    {
       title: "Reports and the Data Bank",
       steps: [
         "Reports → choose a program (or all) and a status, then Export CSV. The file name includes the program and the date.",
         "Data Bank → search a student to see every application and grant they ever had.",
         "Profile correction requests from students appear on the Dashboard. Check them with the Registrar, then mark them resolved.",
+      ],
+    },
+  ],
+  admin: [
+    {
+      title: "What the System Admin does",
+      steps: [
+        "Creates, updates and deactivates staff, admin and student accounts, and resets passwords.",
+        "Reads the Activity Logs (who did what and when) and exports them.",
+        "Sets the current school year and semester and the OAS contact details in System Settings.",
+        "Can manage scholarship programs and export reports, but does not review applications, tag grantees or prepare payroll; those stay with OAS staff.",
+      ],
+    },
+    {
+      title: "Creating an account",
+      steps: [
+        "Manage Staff (or Manage Students) → New account. Fill in the form; for students, the Student ID must be unique.",
+        "Leave the password empty to get a temporary one, or type your own. Give it to the user privately.",
+        "The user must change the temporary password the first time they log in.",
+      ],
+    },
+    {
+      title: "Passwords and deactivation",
+      steps: [
+        "Reset password gives a new temporary password and signs the user out everywhere.",
+        "Deactivate stops someone from logging in. Their applications, decisions and logs stay. Reactivate to undo.",
+        "You cannot deactivate yourself, and the last active admin cannot be deactivated or changed to staff.",
+      ],
+    },
+    {
+      title: "Activity Logs",
+      steps: [
+        "Filter by type (accounts, applications, payroll, settings, logins), by role or by date, or type a name.",
+        "Export CSV saves everything that matches the filters.",
+      ],
+    },
+    {
+      title: "System Settings",
+      steps: [
+        "School year and semester: the current term. Payroll uses it as the default period. Leave both empty to let the system work it out from today's date.",
+        "OAS office hours, location, e-mail and phone: shown to students on Contact OAS and at the bottom of every page. Only enter details confirmed by the OAS.",
       ],
     },
   ],

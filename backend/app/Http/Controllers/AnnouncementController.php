@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Announcement;
 use Illuminate\Http\Request;
 
@@ -52,6 +53,8 @@ class AnnouncementController extends Controller
             'posted_at' => now(),
         ]);
 
+        ActivityLog::record($request->user(), 'announcement.created', "Posted announcement \"{$announcement->title}\".", $announcement);
+
         return response()->json($announcement->load('author:id,name'), 201);
     }
 
@@ -61,6 +64,7 @@ class AnnouncementController extends Controller
 
         $announcement = Announcement::findOrFail($id);
         $announcement->update($request->validate($this->rules()));
+        ActivityLog::record($request->user(), 'announcement.updated', "Edited announcement \"{$announcement->title}\".", $announcement);
 
         return response()->json($announcement->load('author:id,name'));
     }
@@ -69,7 +73,9 @@ class AnnouncementController extends Controller
     {
         $this->staffOnly($request);
 
-        Announcement::findOrFail($id)->delete();
+        $announcement = Announcement::findOrFail($id);
+        $announcement->delete();
+        ActivityLog::record($request->user(), 'announcement.deleted', "Deleted announcement \"{$announcement->title}\".");
 
         return response()->json(['message' => 'Announcement deleted.']);
     }

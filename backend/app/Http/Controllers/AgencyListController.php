@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\AgencyListUpload;
 use App\Models\Application;
 use App\Models\ApplicationStatusLog;
@@ -108,6 +109,9 @@ class AgencyListController extends Controller
         }
 
         $matched = $counts['approved'] + $counts['created'] + $counts['already'];
+
+        ActivityLog::record($request->user(), 'agency_list.uploaded',
+            "Uploaded approved list {$data['file_name']} for {$scholarship->name}: {$counts['approved']} approved, {$counts['created']} added, {$counts['unmatched']} unmatched.", $upload);
 
         return response()->json([
             'message' => "Matched {$matched} student(s), {$counts['unmatched']} unmatched, {$counts['error']} error(s). {$emailed} approval e-mail(s) sent.",

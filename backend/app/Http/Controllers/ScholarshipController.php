@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Document;
 use App\Models\Scholarship;
 use App\Models\ScholarshipRequirement;
@@ -10,9 +11,10 @@ use Illuminate\Support\Facades\DB;
 
 class ScholarshipController extends Controller
 {
+    // Staff and the admin may manage scholarship programs.
     private function notStaff(Request $request): bool
     {
-        return $request->user()->role !== 'staff';
+        return !$request->user()->isOffice();
     }
 
     // List scholarships. Staff see all. Students see active programs that
@@ -106,6 +108,8 @@ class ScholarshipController extends Controller
             return $scholarship;
         });
 
+        ActivityLog::record($request->user(), 'scholarship.created', "Created scholarship {$scholarship->name} with ".count($requirements).' requirement(s).', $scholarship);
+
         return response()->json($scholarship->load('requirements'), 201);
     }
 
@@ -118,7 +122,13 @@ class ScholarshipController extends Controller
         $data = $request->validate($this->rules(false));
 
         $scholarship = Scholarship::findOrFail($id);
-        $scholarship->update($data);
+        $scholarship->fill($data);
+        $changed = array_keys($scholarship->getDirty());
+        $scholarship->save();
+
+        if ($changed) {
+            ActivityLog::record($request->user(), 'scholarship.updated', "Edited scholarship {$scholarship->name}: ".implode(', ', $changed).'.', $scholarship);
+        }
 
         return response()->json($scholarship);
     }
@@ -140,6 +150,7 @@ class ScholarshipController extends Controller
         }
 
         $scholarship->delete();
+        ActivityLog::record($request->user(), 'scholarship.deleted', "Deleted scholarship {$scholarship->name}.");
 
         return response()->json(['message' => 'Scholarship deleted.']);
     }
@@ -175,6 +186,8 @@ class ScholarshipController extends Controller
             'is_required' => $data['is_required'] ?? true,
         ]);
 
+        ActivityLog::record($request->user(), 'scholarship.requirement_added', "Added requirement \"{$requirement->name}\" to {$scholarship->name}.", $scholarship);
+
         return response()->json($requirement, 201);
     }
 
@@ -190,8 +203,10 @@ class ScholarshipController extends Controller
             'description' => 'nullable|string|max:1000',
         ]);
 
-        $requirement = ScholarshipRequirement::findOrFail($id);
+        $requirement = ScholarshipRequirement::with('scholarship:id,name')->findOrFail($id);
         $requirement->update($data);
+        ActivityLog::record($request->user(), 'scholarship.requirement_changed',
+            "Changed requirement \"{$requirement->name}\" of {$requirement->scholarship?->name}".(array_key_exists('is_required', $data) ? ' to '.($data['is_required'] ? 'required' : 'optional') : '').'.');
 
         return response()->json($requirement);
     }
@@ -202,7 +217,9 @@ class ScholarshipController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        ScholarshipRequirement::findOrFail($id)->delete();
+        $requirement = ScholarshipRequirement::with('scholarship:id,name')->findOrFail($id);
+        $requirement->delete();
+        ActivityLog::record($request->user(), 'scholarship.requirement_removed', "Removed requirement \"{$requirement->name}\" from {$requirement->scholarship?->name}.");
 
         return response()->json(['message' => 'Requirement deleted successfully.']);
     }

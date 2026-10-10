@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Application;
 use App\Models\ApplicationStatusLog;
 use App\Models\ScholarRecord;
@@ -17,7 +18,7 @@ class ScholarRecordController extends Controller
 
     public function index(Request $request)
     {
-        if ($request->user()->role !== 'staff') {
+        if ($request->user()->role !== 'staff' && !$request->user()->isAdmin()) {
             return response()->json([
                 'message' => 'Unauthorized.'
             ], 403);
@@ -152,6 +153,7 @@ class ScholarRecordController extends Controller
         );
 
         ApplicationStatusLog::record($application, 'grantee_tagged', null, $request->user()->id, 'approved');
+        ActivityLog::record($request->user(), 'grantee.tagged', 'Tagged '.trim(($application->student?->first_name ?? '').' '.($application->student?->last_name ?? '')).' as grantee of '.$application->scholarship?->name.'.', $record);
 
         return response()->json([
             'message' => 'Student tagged as grantee.',
@@ -205,7 +207,16 @@ class ScholarRecordController extends Controller
             }
         }
 
-        $record->update($data);
+        $record->fill($data);
+        $changed = array_keys($record->getDirty());
+        $record->save();
+
+        if ($changed) {
+            $record->loadMissing('student:id,first_name,last_name', 'scholarship:id,name');
+            ActivityLog::record($request->user(), 'grantee.updated',
+                'Updated scholar record of '.trim($record->student?->first_name.' '.$record->student?->last_name)
+                .' ('.$record->scholarship?->name.'): '.implode(', ', $changed).'.', $record);
+        }
 
         return response()->json([
             'message' => 'Scholar record updated successfully.',

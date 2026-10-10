@@ -13,6 +13,10 @@ const PAGES = {
   staff: [
     ["Dashboard", "/staff/dashboard", "home overview numbers"],
     ["Applications", "/staff/applications", "review ai check flags needs action"],
+    ["Auto-Review", "/staff/auto-review", "bulk forward ready incomplete sort"],
+    ["Forwarded to Agency", "/staff/forwarded", "ched dost agency transmittal sent waiting"],
+    ["Enrollment", "/staff/enrollment", "registrar list verify all enrolled"],
+    ["Student Messages", "/staff/messages", "contact inbox reply questions"],
     ["Scholar Records", "/staff/scholars", "grantee tag enrolled"],
     ["Payroll", "/staff/payroll", "pay payout ready"],
     ["Data Bank", "/staff/data-bank", "student history records"],
@@ -29,8 +33,20 @@ const PAGES = {
     ["My Applications", "/student/applications", "status submitted"],
     ["My Documents", "/student/documents", "files upload cor grades id indigency birth certificate clearance"],
     ["My Scholarship History", "/student/history", "grant payroll completed"],
-    ["My Profile", "/student/profile", "contact correction"],
+    ["My Profile", "/student/profile", "contact correction password"],
+    ["Contact OAS", "/student/contact", "message ask question office hours phone email"],
     ["Help", "/student/help", "guide how to apply"],
+  ],
+  admin: [
+    ["Dashboard", "/admin/dashboard", "home overview"],
+    ["Manage Staff", "/admin/staff", "accounts users oas staff admin create"],
+    ["Manage Students", "/admin/students", "accounts users student create"],
+    ["Activity Logs", "/admin/activity", "audit who did what history"],
+    ["System Settings", "/admin/settings", "school year semester office hours contact"],
+    ["All Scholarships", "/admin/scholarships", "programs"],
+    ["Reports", "/admin/reports", "export csv excel"],
+    ["My Profile", "/admin/profile", "account password"],
+    ["Help", "/admin/help", "guide how manual"],
   ],
 };
 
@@ -111,7 +127,7 @@ export default function SearchBox() {
   }
 
   const placeholder =
-    user.role === "staff" ? "Search students, programs, pages…" : "Search scholarships, pages…";
+    { staff: "Search students, programs, pages…", admin: "Search accounts, pages…" }[user.role] || "Search scholarships, pages…";
 
   return (
     <div className="search-box" ref={boxRef}>

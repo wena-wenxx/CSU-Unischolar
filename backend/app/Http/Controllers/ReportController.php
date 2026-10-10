@@ -10,7 +10,7 @@ class ReportController extends Controller
 {
     public function emailLogs(Request $request)
     {
-        if ($request->user()->role !== 'staff') {
+        if ($request->user()->role !== 'staff' && !$request->user()->isAdmin()) {
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 

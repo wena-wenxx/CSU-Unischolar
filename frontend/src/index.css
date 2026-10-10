@@ -3076,3 +3076,305 @@ tbody tr.row-selected:hover {
 .modal .button-row + p + h3 {
   margin-top: 24px;
 }
+
+/* =====================================================================
+   ROUND 8: admin pages, password page, Contact OAS, messages,
+   enrollment, Auto-Review, forwarded list, footer
+   ===================================================================== */
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.account-note {
+  display: block;
+  margin-top: 2px;
+}
+
+.activity-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+/* ---------- Footer with OAS contact details ---------- */
+.office-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 20px;
+  margin: 8px 28px 24px;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.office-footer strong {
+  color: var(--primary-color);
+}
+
+/* ---------- Change password ---------- */
+.password-page {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 24px 16px;
+  background: var(--bg-app);
+}
+
+.password-card {
+  width: 100%;
+  max-width: 440px;
+  text-align: left;
+}
+
+.password-card h1 {
+  margin: 8px 0 6px;
+  font-size: 26px;
+}
+
+.password-logo {
+  width: 56px;
+  height: auto;
+}
+
+.password-rules {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.password-rules li.ok {
+  color: var(--csu-emerald-text);
+  font-weight: 600;
+}
+
+.password-form .button {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.password-links {
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.temp-password {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.temp-password code {
+  padding: 8px 14px;
+  border: 1px dashed var(--accent-color);
+  border-radius: 8px;
+  background: var(--csu-gold-tint);
+  color: var(--text-strong);
+  font-size: 20px;
+  letter-spacing: 0.06em;
+}
+
+/* ---------- Contact OAS and Student Messages ---------- */
+.contact-list {
+  margin: 0 0 12px;
+}
+
+.contact-list div {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.contact-list dt {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.contact-list dd {
+  margin: 0;
+}
+
+.message-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.message-item {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.message-item:last-child {
+  border-bottom: 0;
+}
+
+.message-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.message-body {
+  margin: 8px 0;
+  white-space: pre-wrap;
+}
+
+.message-reply {
+  margin: 8px 0 0;
+  padding: 10px 14px;
+  border-left: 4px solid var(--primary-color);
+  border-radius: 8px;
+  background: var(--csu-green-tint);
+}
+
+.message-reply p {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+}
+
+.message-answer {
+  margin-top: 10px;
+}
+
+.message-answer textarea {
+  min-height: 80px;
+  margin-bottom: 8px;
+}
+
+.bell-reply {
+  display: block;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--csu-gold-tint);
+  color: var(--text-strong);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* ---------- Auto-Review ---------- */
+.auto-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.auto-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-left-width: 6px;
+  border-radius: var(--radius-system);
+  background: var(--surface);
+  color: var(--text-strong);
+  text-align: left;
+  font: inherit;
+}
+
+.auto-group strong {
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.auto-group.tone-success {
+  border-left-color: var(--csu-emerald);
+}
+
+.auto-group.tone-warning {
+  border-left-color: var(--csu-orange);
+}
+
+.auto-group.tone-danger {
+  border-left-color: var(--csu-red);
+}
+
+.auto-group.active {
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.25);
+  background: var(--surface-hover);
+}
+
+.reason-list {
+  margin: 0 0 4px;
+  padding-left: 18px;
+  font-size: 14px;
+}
+
+.text-success-soft {
+  color: var(--csu-emerald-text);
+  display: block;
+}
+
+.remark-box {
+  min-width: 240px;
+  min-height: 70px;
+  margin: 0;
+  font-size: 14px;
+}
+
+/* ---------- Forwarded to Agency ---------- */
+.program-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.chip {
+  padding: 6px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-strong);
+  font: 500 13px var(--font-body);
+}
+
+.chip strong {
+  margin-left: 4px;
+  color: var(--primary-color);
+}
+
+.chip.active {
+  border-color: var(--primary-color);
+  background: var(--primary-color);
+  color: var(--bg-surface);
+}
+
+.chip.active strong {
+  color: var(--accent-color);
+}
+
+.enr-results {
+  margin-top: 16px;
+}
+
+@media (max-width: 640px) {
+  .office-footer {
+    margin: 8px 16px 20px;
+  }
+
+  .contact-list div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
+@media print {
+  .office-footer,
+  .auto-groups {
+    display: none !important;
+  }
+}

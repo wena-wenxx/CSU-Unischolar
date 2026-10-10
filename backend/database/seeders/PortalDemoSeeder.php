@@ -3,14 +3,15 @@
 namespace Database\Seeders;
 
 use App\Models\Announcement;
+use App\Models\ContactMessage;
 use App\Models\ProfileChangeRequest;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
 /**
- * FICTIONAL DEMO DATA: OAS announcements and one pending
- * "request a correction" from a demo student.
+ * FICTIONAL DEMO DATA: OAS announcements, one pending
+ * "request a correction" and three Contact OAS messages from demo students.
  * Safe to run again (skips what already exists).
  */
 class PortalDemoSeeder extends Seeder
@@ -68,6 +69,37 @@ class PortalDemoSeeder extends Seeder
                     'reason' => 'My COR for this semester shows I am already in 3rd year.',
                 ]
             );
+        }
+
+        // Contact OAS: two waiting for an answer, one already answered.
+        $messages = [
+            ['2026-00004', 'documents', 'Barangay clearance is still being processed', "Good day po. My barangay clearance will only be released next week. Can I submit my application first and upload it later?", 2, null],
+            ['2026-00006', 'payroll', 'No ATM card yet', "I was tagged as a grantee but I do not have an ATM card yet. Where should I apply for one?", 1, null],
+            ['2026-00009', 'application', 'Status says Needs action', "What does Needs action mean on my application?", 5,
+                "It means OAS found something to fix. Open the application to read the remarks, upload the corrected file and press Submit again."],
+        ];
+
+        foreach ($messages as [$studentId, $topic, $subject, $body, $daysAgo, $reply]) {
+            $student = Student::where('student_id', $studentId)->first();
+            if (!$student) {
+                continue;
+            }
+
+            // unguarded: the seeder sets the dates too
+            ContactMessage::unguarded(fn () => ContactMessage::firstOrCreate(
+                ['student_id' => $student->id, 'subject' => $subject],
+                [
+                    'topic' => $topic,
+                    'message' => $body,
+                    'status' => $reply ? 'answered' : 'open',
+                    'reply' => $reply,
+                    'replied_by' => $reply ? $staff?->id : null,
+                    'replied_at' => $reply ? now()->subDays($daysAgo - 1) : null,
+                    'reply_read_at' => $reply ? now()->subDays($daysAgo - 1) : null,
+                    'created_at' => now()->subDays($daysAgo),
+                    'updated_at' => now()->subDays($daysAgo),
+                ]
+            ));
         }
     }
 }

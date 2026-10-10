@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\ProfileChangeRequest;
 use App\Models\Student;
 use Illuminate\Http\Request;
@@ -71,6 +72,10 @@ class ProfileChangeRequestController extends Controller
             'resolved_by' => $request->user()->id,
             'resolved_at' => now(),
         ]);
+
+        $name = trim($changeRequest->student->first_name.' '.$changeRequest->student->last_name);
+        ActivityLog::record($request->user(), 'profile_request.resolved',
+            "Resolved {$name}'s correction request ({$changeRequest->field})".(!empty($data['apply_change']) ? ', change applied.' : '.'), $changeRequest);
 
         return response()->json([
             'message' => !empty($data['apply_change'])

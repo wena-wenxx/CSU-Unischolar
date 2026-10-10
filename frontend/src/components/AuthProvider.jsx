@@ -13,6 +13,12 @@ export default function AuthProvider({ children }) {
     setUser(data.user);
   }
 
+  // After a password change: the server sends the updated user.
+  function updateUser(next) {
+    localStorage.setItem("user", JSON.stringify(next));
+    setUser(next);
+  }
+
   async function logout() {
     // Tell the server to revoke the token BEFORE forgetting it locally.
     try {
@@ -26,5 +32,5 @@ export default function AuthProvider({ children }) {
     setUser(null);
   }
 
-  return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, login, logout, updateUser }}>{children}</AuthContext.Provider>;
 }

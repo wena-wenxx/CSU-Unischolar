@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\ApplicationStatusLog;
 use App\Models\ProfileChangeRequest;
 use App\Models\ScholarRecord;
@@ -78,6 +79,7 @@ class StudentController extends Controller
         ]);
 
         $student->update($data);
+        ActivityLog::record($request->user(), 'profile.contact_updated', 'Updated their contact number.', $student);
 
         return response()->json([
             'message' => 'Contact number updated.',
@@ -130,9 +132,16 @@ class StudentController extends Controller
             ->limit(20)
             ->get();
 
+        // Replies from OAS to the student's Contact OAS messages, not yet seen.
+        $replies = \App\Models\ContactMessage::where('student_id', $student->id)
+            ->whereNotNull('replied_at')
+            ->whereNull('reply_read_at')
+            ->count();
+
         return response()->json([
             'unread' => $logs->whereNull('read_at')->count(),
             'items' => $logs->values(),
+            'unread_replies' => $replies,
         ]);
     }
 
@@ -188,6 +197,8 @@ class StudentController extends Controller
             'student_id' => $student->id,
             'status' => 'pending',
         ]);
+
+        ActivityLog::record($request->user(), 'profile_request.sent', 'Asked OAS to correct their '.ProfileChangeRequest::FIELDS[$data['field']].'.', $changeRequest);
 
         return response()->json([
             'message' => 'Request sent to OAS.',

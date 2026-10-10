@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -80,6 +81,16 @@ class AuthController extends Controller
             ]);
         }
 
+        // A deactivated account keeps its history but cannot log in.
+        if (!$user->is_active) {
+            throw ValidationException::withMessages([
+                'email' => ['This account is deactivated. Please contact the OAS.'],
+            ]);
+        }
+
+        $user->forceFill(['last_login_at' => now()])->save();
+        ActivityLog::record($user, 'auth.login', "{$user->name} logged in.");
+
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
@@ -96,8 +107,54 @@ class AuthController extends Controller
         );
     }
 
+    /*
+    | POST /change-password   Body: current_password, password, password_confirmation
+    | Every user can change their own password. Required after an admin
+    | gave the account a temporary password (must_change_password).
+    */
+    public function changePassword(Request $request)
+    {
+        $user = $request->user();
+
+        $data = $request->validate([
+            'current_password' => 'required|string',
+            'password' => ['required', 'string', 'min:8', 'max:100', 'confirmed', 'regex:/[A-Za-z]/', 'regex:/[0-9]/'],
+        ], [
+            'password.regex' => 'The new password needs at least one letter and one number.',
+        ]);
+
+        if (!Hash::check($data['current_password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['Your current password is not correct.'],
+            ]);
+        }
+
+        if (Hash::check($data['password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'password' => ['Choose a password different from the current one.'],
+            ]);
+        }
+
+        $user->forceFill([
+            'password' => Hash::make($data['password']),
+            'must_change_password' => false,
+        ])->save();
+
+        // Sign out every other device; keep this session.
+        $current = $user->currentAccessToken()?->id;
+        $user->tokens()->when($current, fn ($q) => $q->where('id', '!=', $current))->delete();
+
+        ActivityLog::record($user, 'auth.password_changed', "{$user->name} changed their password.");
+
+        return response()->json([
+            'message' => 'Password changed.',
+            'user' => $user->fresh()->load('student'),
+        ]);
+    }
+
     public function logout(Request $request)
     {
+        ActivityLog::record($request->user(), 'auth.logout', "{$request->user()->name} logged out.");
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([

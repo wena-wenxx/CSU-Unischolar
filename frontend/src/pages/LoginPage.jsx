@@ -143,6 +143,9 @@ export default function LoginPage() {
             <summary>Demo accounts for testing</summary>
 
             <dl>
+              <dt>System Admin</dt>
+              <dd>admin@carsu.edu.ph · Admin@12345</dd>
+
               <dt>OAS Staff</dt>
               <dd>oas.staff@carsu.edu.ph · Staff@12345</dd>
 

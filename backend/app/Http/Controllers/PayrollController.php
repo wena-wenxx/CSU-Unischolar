@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\PayrollRecord;
 use App\Models\ScholarRecord;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -20,12 +22,22 @@ class PayrollController extends Controller
     }
 
     /*
-    | The term we are in now (Philippine time). CSU calendar, roughly:
+    | The term we are in now. The admin sets it in System Settings (school
+    | year + semester). If it was never set, it is worked out from today's
+    | date (Philippine time), CSU calendar roughly:
     |   August-December = 1st Semester, January-May = 2nd Semester,
     |   June-July = Summer. Returns [AY start year, term index].
     */
-    private function currentTerm(): array
+    private static function currentTerm(): array
     {
+        $year = Setting::get('current_school_year');
+        $semester = Setting::get('current_semester');
+
+        if ($year && $semester && preg_match('/^(\d{4})-\d{4}$/', $year, $m)
+            && ($index = array_search($semester, self::TERMS, true)) !== false) {
+            return [(int) $m[1], $index];
+        }
+
         $now = Carbon::now('Asia/Manila');
         $month = $now->month;
 
@@ -35,9 +47,17 @@ class PayrollController extends Controller
         return [$now->year - 1, 2];
     }
 
-    private function termLabel(int $year, int $index): string
+    private static function termLabel(int $year, int $index): string
     {
         return self::TERMS[$index].' AY '.$year.'-'.($year + 1);
+    }
+
+    /** "1st Semester AY 2026-2027": the current term, used as the default period. */
+    public static function currentPeriod(): string
+    {
+        [$year, $index] = self::currentTerm();
+
+        return self::termLabel($year, $index);
     }
 
     private function samePeriod(string $a, string $b): bool
@@ -54,8 +74,8 @@ class PayrollController extends Controller
     {
         $this->staffOnly($request);
 
-        [$year, $index] = $this->currentTerm();
-        $current = $this->termLabel($year, $index);
+        [$year, $index] = self::currentTerm();
+        $current = self::termLabel($year, $index);
 
         // Step back three terms, then list five terms in order.
         for ($i = 0; $i < 3; $i++) {
@@ -68,7 +88,7 @@ class PayrollController extends Controller
 
         $list = [];
         for ($i = 0; $i < 5; $i++) {
-            $list[] = $this->termLabel($year, $index);
+            $list[] = self::termLabel($year, $index);
             $index++;
             if ($index > 2) {
                 $index = 0;
@@ -188,6 +208,10 @@ class PayrollController extends Controller
             }
         });
 
+        $program = isset($data['scholarship_id']) ? $records->first()?->scholarship?->name ?? 'one program' : 'all programs';
+        ActivityLog::record($request->user(), 'payroll.prepared',
+            "Prepared payroll for {$period} ({$program}): {$summary['included']} entries, total ".number_format($summary['total_amount'], 2).'.');
+
         return response()->json([
             'message' => "Payroll prepared: {$summary['included']} draft entries for {$period}.",
             'summary' => $summary,
@@ -215,6 +239,10 @@ class PayrollController extends Controller
             ->update(['status' => $data['status'], 'updated_at' => now()]);
 
         $skipped = count(array_unique($data['ids'])) - $changed;
+
+        if ($changed) {
+            ActivityLog::record($request->user(), 'payroll.'.$data['status'], "Marked {$changed} payroll entr".($changed === 1 ? 'y' : 'ies')." as {$data['status']}.");
+        }
 
         return response()->json([
             'message' => "{$changed} entr".($changed === 1 ? 'y' : 'ies')." marked {$data['status']}."
@@ -264,7 +292,7 @@ class PayrollController extends Controller
 
     public function index(Request $request)
     {
-        if ($request->user()->role !== 'staff') {
+        if ($request->user()->role !== 'staff' && !$request->user()->isAdmin()) {
             return response()->json([
                 'message' => 'Unauthorized.'
             ], 403);

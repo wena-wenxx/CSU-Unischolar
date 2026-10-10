@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { useAuth } from "../lib/auth";
+import { ROLE_LABELS, useAuth } from "../lib/auth";
 import { initials } from "../lib/format";
 
 /*
   Who is logged in, at the top of the sidebar: an initials avatar, the name,
-  the Student ID (students) or e-mail (staff) and the role.
+  the Student ID (students) or e-mail (staff, admin) and the role.
   Click it for View Profile / Help / Sign Out.
   (No photo upload: the system does not store profile pictures.)
 */
@@ -29,7 +29,7 @@ export default function SidebarProfile() {
   const student = user.student;
   const name = student ? `${student.first_name} ${student.last_name}` : user.name;
   const detail = student ? student.student_id : user.email;
-  const role = user.role === "staff" ? "OAS Staff" : "Student";
+  const role = ROLE_LABELS[user.role] || user.role;
 
   return (
     <div className="sidebar-profile" ref={boxRef}>

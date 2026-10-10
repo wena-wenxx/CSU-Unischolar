@@ -57,6 +57,9 @@ class DashboardController extends Controller
                 ->orderByDesc('updated_at')->orderByDesc('id')
                 ->limit(6)->get(),
             'pending_profile_requests' => ProfileChangeRequest::where('status', 'pending')->count(),
+            'open_messages' => \App\Models\ContactMessage::where('status', 'open')->count(),
+            'forwarded' => $apps->where('status', 'complete')->count(),
+            'enrollment_to_verify' => $apps->where('status', 'approved')->where('enrollment_verified', false)->count(),
 
             // Older names for the same numbers (backward compatibility).
             'approved_applications' => $approved,

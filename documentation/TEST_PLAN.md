@@ -326,9 +326,61 @@ Test student: **Wena Rose Contiga** `wenarose.contiga@carsu.edu.ph` / `Student@1
   submit. As staff: Complete → Approved by agency. The e-mail arrives in Wena's CSU inbox (check Spam too) and
   Reports → *E-mails sent* shows SENT.
 
+## Part F — Round 8 features
+
+Run `php artisan migrate:fresh --seed` first. Admin: `admin@carsu.edu.ph` / `Admin@12345`.
+
+**System Admin**
+- [ ] **F1.** Log in as admin → the Admin Dashboard opens. Menu: Dashboard, Manage Staff, Manage Students, Activity
+  Logs, System Settings, All Scholarships, Reports, Help. Typing `/staff/applications` in the address bar goes back
+  to the admin dashboard (the admin does not process applications).
+- [ ] **F2.** Manage Staff → *New staff account* → a temporary password is shown once. The row shows *Temporary password*.
+- [ ] **F3.** Edit the new account → change the role to System Admin → saved. Your own row has no Deactivate button
+  and you cannot change your own role.
+- [ ] **F4.** Deactivate the new account → it cannot log in ("This account is deactivated"). Reactivate → it can.
+- [ ] **F5.** Reset password → a new temporary password; the user's open sessions are signed out.
+- [ ] **F6.** Manage Students → search "contiga" → Wena. *New student account* with an existing Student ID → error.
+- [ ] **F7.** Log in with a temporary password → the *Set your own password* page opens and no other page can be
+  opened until the password is changed. The button stays grey until the three rules are ticked.
+- [ ] **F8.** System Settings → set school year 2026-2027, semester, OAS e-mail and phone → Save. The footer of every
+  page and the student's Contact OAS page show them; Payroll uses the term as the default period.
+- [ ] **F9.** Activity Logs → newest first; filter *Account changes*; Export CSV. The demo history already contains the
+  staff steps from the seeded applications.
+
+**Contact OAS**
+- [ ] **F10.** As Wena: Contact OAS → choose a topic, subject and message → Send. It appears under *My messages* as
+  *Waiting for OAS*.
+- [ ] **F11.** As staff: Dashboard → *Student Messages* card → reply. As Wena: the bell shows "OAS replied…";
+  Contact OAS shows the reply.
+
+**Enrollment (Registrar list)**
+- [ ] **F12.** Staff → Enrollment shows the demo Registrar list. *Verify All Enrollments* → Enrolled / Not on the
+  list / Needs manual check. *Record all as enrolled* → those students appear in Scholar Records → Ready to Tag.
+- [ ] **F13.** *Not on the list* → select → *Record selected as NOT enrolled* asks for confirmation first.
+- [ ] **F14.** Choose *Active grantees* → Verify All → grantees not on the list can be recorded as not enrolled
+  (they are then skipped by Payroll).
+- [ ] **F15.** *Upload a newer list* with a CSV whose columns are "Student No, Surname, Given Name, Program" → the
+  columns are recognised → Save list.
+
+**Auto-Review and Forwarded to Agency**
+- [ ] **F16.** Applications → *Auto-Review submitted applications* → three numbers: Ready to forward, Needs manual
+  review, Probably incomplete. Nothing changed yet.
+- [ ] **F17.** Ready → tick two → *Forward selected to the agency* → they leave the list and appear in
+  *Forwarded to Agency* with today's date.
+- [ ] **F18.** Probably incomplete → each row has a pre-written remark (editable) → tick → *Send selected back*.
+  The student sees the remark (Needs action).
+- [ ] **F19.** Needs manual review → *Open review* opens that application's review window.
+- [ ] **F20.** Forwarded to Agency → program buttons with counts, longest waiting first (over 30 days in orange),
+  *Export CSV* for one program.
+
 ---
 
 ## What has and has not been tested
+
+Part F (round 8) was tested by Claude on **10 Oct 2026**: F1–F20 in the browser (1366×900; the new pages also at
+390×844 with no sideways scrolling), every new API rule (staff and students get 403 on admin pages, the admin gets
+403 on review and payroll, deactivated accounts get 401 and cannot log in, last-admin and self-protection rules),
+`php artisan test` (2 passed), and the new migrations rolled back and re-run on SQLite.
 
 Part E (round 7) was tested by Claude on **10 Oct 2026**: E1–E18 in the browser (1366×900 and 390×844, no page
 scrolls sideways on a phone), plus the API rules (draft/submitted cannot be approved, needs-action needs remarks,

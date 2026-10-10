@@ -105,7 +105,7 @@ export default function AgencyListsPage() {
       setRows(parsed);
       setFileName(file.name);
       const head = parsed[0].map((h) => h.trim());
-      setIdColumn(guessColumn(head, [/student.?id/, /id.?no/, /id.?number/, /^id$/]));
+      setIdColumn(guessColumn(head, [/student.?(id|no|num)/, /id.?(no|num)/, /^stud/, /^id$/]));
       setDateColumn(guessColumn(head, [/approv.*date/, /date/]));
     };
     reader.readAsText(file);
@@ -169,7 +169,7 @@ export default function AgencyListsPage() {
   return (
     <div>
       <PageHeader
-        title="Agency Approved Lists"
+        title="Approved Lists"
         subtitle="Upload the list of students an agency approved and update their applications in one step"
         actions={
           <button className="button button-secondary" onClick={downloadTemplate}>

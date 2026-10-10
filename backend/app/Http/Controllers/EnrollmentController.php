@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Application;
 use App\Models\ApplicationStatusLog;
 use App\Models\ScholarRecord;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class EnrollmentController extends Controller
@@ -47,26 +49,7 @@ class EnrollmentController extends Controller
 
         $enrolled = (bool) $data['currently_enrolled'];
 
-        $application->update([
-            'enrollment_verified' => $enrolled,
-            'enrollment_verified_at' => $enrolled ? now() : null,
-            'remarks' => $data['remarks'] ?? $application->remarks,
-        ]);
-
-        ApplicationStatusLog::record(
-            $application,
-            $enrolled ? 'enrollment_verified' : 'enrollment_not_verified',
-            $data['remarks'] ?? null,
-            $request->user()->id,
-            'approved'
-        );
-
-        // If this student was already tagged as a grantee for this
-        // scholarship, keep the scholar record's enrollment flag in step,
-        // because payroll checks it.
-        ScholarRecord::where('student_id', $application->student_id)
-            ->where('scholarship_id', $application->scholarship_id)
-            ->update(['currently_enrolled' => $enrolled]);
+        self::record($application, $enrolled, $data['remarks'] ?? null, $request->user());
 
         return response()->json([
             'message' => $enrolled
@@ -79,5 +62,37 @@ class EnrollmentController extends Controller
                 'scholarship'
             ]),
         ]);
+    }
+
+    /*
+    | Saves one enrollment check (also used by "Verify All Enrollments"):
+    | the application, its step history, the activity log, and the scholar
+    | record's enrollment flag (payroll checks it).
+    */
+    public static function record(Application $application, bool $enrolled, ?string $remarks, User $by): void
+    {
+        $application->update([
+            'enrollment_verified' => $enrolled,
+            'enrollment_verified_at' => $enrolled ? now() : null,
+            'remarks' => $remarks ?? $application->remarks,
+        ]);
+
+        ApplicationStatusLog::record(
+            $application,
+            $enrolled ? 'enrollment_verified' : 'enrollment_not_verified',
+            $remarks,
+            $by->id,
+            'approved'
+        );
+
+        $application->loadMissing('student:id,first_name,last_name', 'scholarship:id,name');
+        ActivityLog::record($by, $enrolled ? 'enrollment.verified' : 'enrollment.not_enrolled',
+            ($enrolled ? 'Verified enrollment of ' : 'Recorded NOT enrolled: ')
+            .trim(($application->student?->first_name ?? '').' '.($application->student?->last_name ?? ''))
+            .' ('.$application->scholarship?->name.').', $application);
+
+        ScholarRecord::where('student_id', $application->student_id)
+            ->where('scholarship_id', $application->scholarship_id)
+            ->update(['currently_enrolled' => $enrolled]);
     }
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { enrollmentText, fileUrl, formatDate, fullName, missingRequirements, stepLabel, timeAgo } from "../../lib/format";
 import { useToast } from "../../lib/toast";
@@ -16,7 +16,7 @@ const FILTERS = [
   ["submitted", "Submitted"],
   ["under_review", "Under review"],
   ["needs_action", "Needs action"],
-  ["complete", "Complete"],
+  ["complete", "Forwarded to agency"],
   ["approved", "Approved"],
   ["to_verify", "Approved, enrollment not verified"],
   ["flagged", "Has AI flags"],
@@ -64,6 +64,18 @@ export default function StaffApplicationsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // /staff/applications?review=<id> opens that application's review window
+  // (used by Auto-Review). .then() so the state is set when the server answers.
+  useEffect(() => {
+    const wanted = new URLSearchParams(location.search).get("review");
+    if (!wanted) return;
+    api
+      .get(`/applications/${wanted}`)
+      .then((response) => setSelected(response.data))
+      .catch((err) => toast.error(errMsg(err, "Unable to load application.")));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function openApplication(id) {
     try {
@@ -127,7 +139,12 @@ export default function StaffApplicationsPage() {
     <div>
       <PageHeader
         title="Application Review"
-        subtitle="Check documents, record the agency's decision, and verify enrollment"
+        subtitle="Check documents, forward complete applications, record the agency's decision, and verify enrollment"
+        actions={
+          <Link className="button button-primary" to="/staff/auto-review">
+            Auto-Review submitted applications
+          </Link>
+        }
       />
 
       <div className="card">
