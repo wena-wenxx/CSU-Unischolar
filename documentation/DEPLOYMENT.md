@@ -132,7 +132,9 @@ SEED_DEMO_DATA=true
 - E-mails: `MAIL_MAILER=log` writes them to the Railway logs. To see them as real e-mails, create a free
   Mailtrap **Email Testing** inbox and add `MAIL_MAILER=smtp`, `MAIL_HOST=sandbox.smtp.mailtrap.io`,
   `MAIL_PORT=2525`, `MAIL_USERNAME` and `MAIL_PASSWORD` (from Mailtrap). Mailtrap catches every message, so the
-  fictional demo addresses never receive anything. Do **not** use a personal Gmail with the demo accounts.
+  fictional demo addresses never receive anything. To use Gmail instead (the setup chosen for the demo), copy the
+  Gmail lines from `backend/.env.example` (App Password, never your normal password) and **always** add
+  `MAIL_ALWAYS_TO=wenarose.contiga@carsu.edu.ph`, so the fictional demo students' e-mails go to the test inbox only.
 
 Click **Update Variables**, then **Deploy**.
 

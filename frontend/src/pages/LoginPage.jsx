@@ -146,11 +146,14 @@ export default function LoginPage() {
               <dt>OAS Staff</dt>
               <dd>oas.staff@carsu.edu.ph · Staff@12345</dd>
 
-              <dt>Student</dt>
+              <dt>Test student</dt>
+              <dd>wenarose.contiga@carsu.edu.ph · Student@12345</dd>
+
+              <dt>Other demo student</dt>
               <dd>student1@carsu.edu.ph · Student@12345</dd>
             </dl>
 
-            <p>Fictional accounts for testing only; not connected to CSU SSO.</p>
+            <p>Testing accounts only; not connected to CSU SSO. Every other student in the demo data is fictional.</p>
           </details>
 
           <p className="login-card-footer">{CARD_FOOTER}</p>

@@ -181,6 +181,7 @@ class BulkDemoSeeder extends Seeder
             'first' => $first,
             'middle' => $middle,
             'last' => $last,
+            'sex' => $female ? 'Female' : 'Male',
             // CSU-style ID: entry year + 5 digits (fictional)
             'student_id' => sprintf('%s-%05d', $year, 10000 + $i * 700 + mt_rand(0, 699)),
             'year' => (int) $year,
@@ -216,6 +217,7 @@ class BulkDemoSeeder extends Seeder
             'first_name' => $p['first'],
             'middle_name' => $p['middle'],
             'last_name' => $p['last'],
+            'sex' => $p['sex'],
             'course' => $p['course'],
             'year_level' => $p['year_level'],
             'college' => $p['college'],

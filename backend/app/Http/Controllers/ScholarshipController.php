@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Document;
 use App\Models\Scholarship;
 use App\Models\ScholarshipRequirement;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ScholarshipController extends Controller
 {
@@ -53,16 +55,58 @@ class ScholarshipController extends Controller
         ];
     }
 
+    /*
+    | GET /requirement-types
+    | The standard document types students keep in My Documents. Requirements
+    | picked from this list can be reused across applications and have an
+    | expiry period; a custom (typed) requirement cannot.
+    */
+    public function requirementTypes()
+    {
+        return response()->json(collect(StudentDocumentController::STANDARD_TYPES)->map(fn ($name) => [
+            'name' => $name,
+            'validity_months' => Document::VALIDITY_MONTHS[$name] ?? null,
+        ])->values());
+    }
+
+    /*
+    | POST /scholarships
+    | The program and its requirements are saved together.
+    | requirements: [{ name, is_required, description }]
+    */
     public function store(Request $request)
     {
         if ($this->notStaff($request)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $data = $request->validate($this->rules(true));
+        $data = $request->validate($this->rules(true) + [
+            'requirements' => 'nullable|array|max:30',
+            'requirements.*.name' => 'required|string|max:255|distinct',
+            'requirements.*.is_required' => 'nullable|boolean',
+            'requirements.*.description' => 'nullable|string|max:1000',
+        ]);
         $data['status'] = $data['status'] ?? 'active';
 
-        return response()->json(Scholarship::create($data), 201);
+        $requirements = $data['requirements'] ?? [];
+        unset($data['requirements']);
+
+        $scholarship = DB::transaction(function () use ($data, $requirements) {
+            $scholarship = Scholarship::create($data);
+
+            foreach ($requirements as $requirement) {
+                ScholarshipRequirement::create([
+                    'scholarship_id' => $scholarship->id,
+                    'name' => trim($requirement['name']),
+                    'description' => $requirement['description'] ?? null,
+                    'is_required' => $requirement['is_required'] ?? true,
+                ]);
+            }
+
+            return $scholarship;
+        });
+
+        return response()->json($scholarship->load('requirements'), 201);
     }
 
     public function update(Request $request, $id)
@@ -132,6 +176,24 @@ class ScholarshipController extends Controller
         ]);
 
         return response()->json($requirement, 201);
+    }
+
+    // PATCH /requirements/{id}: switch Required / Optional, or change the note.
+    public function updateRequirement(Request $request, $id)
+    {
+        if ($this->notStaff($request)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $data = $request->validate([
+            'is_required' => 'sometimes|boolean',
+            'description' => 'nullable|string|max:1000',
+        ]);
+
+        $requirement = ScholarshipRequirement::findOrFail($id);
+        $requirement->update($data);
+
+        return response()->json($requirement);
     }
 
     public function destroyRequirement(Request $request, $id)

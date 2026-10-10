@@ -18,6 +18,10 @@ export default function StaffScholarRecordsPage() {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tagging, setTagging] = useState(null);
+  const [editingAtm, setEditingAtm] = useState(null);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("active");
+  const [atmFilter, setAtmFilter] = useState("all");
 
   // Written with .then() (not await) so React's lint rule can see that the
   // state is set later, when the server answers, not during the effect.
@@ -60,6 +64,16 @@ export default function StaffScholarRecordsPage() {
       toast.error(errMsg(err, "Unable to update scholar record."));
     }
   }
+
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const shownRecords = records.filter((record) => {
+    if (statusFilter !== "all" && record.status !== statusFilter) return false;
+    if (atmFilter === "funded" && !(record.has_atm && record.atm_funds === "yes")) return false;
+    if (atmFilter === "waiting" && !(record.has_atm && record.atm_funds !== "yes")) return false;
+    if (atmFilter === "none" && record.has_atm) return false;
+    const haystack = `${fullName(record.student)} ${record.student?.student_id || ""} ${record.scholarship?.name || ""}`.toLowerCase();
+    return words.every((word) => haystack.includes(word));
+  });
 
   if (loading) return <Loading />;
 
@@ -108,41 +122,89 @@ export default function StaffScholarRecordsPage() {
       <section className="card">
         <h2>Current Scholar Records</h2>
 
-        {records.length === 0 ? (
-          <EmptyState message="No scholar records yet." />
+        <div className="inline-form table-search">
+          <label htmlFor="scholar-search" className="sr-only">
+            Search scholars
+          </label>
+          <input
+            id="scholar-search"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search name, student ID or scholarship"
+          />
+
+          <label htmlFor="scholar-status" className="sr-only">
+            Status
+          </label>
+          <select id="scholar-status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <option value="active">Active scholars</option>
+            <option value="completed">Completed</option>
+            <option value="inactive">Inactive</option>
+            <option value="all">All records</option>
+          </select>
+
+          <label htmlFor="scholar-atm" className="sr-only">
+            ATM status
+          </label>
+          <select id="scholar-atm" value={atmFilter} onChange={(event) => setAtmFilter(event.target.value)}>
+            <option value="all">Any ATM status</option>
+            <option value="funded">ATM · funded</option>
+            <option value="waiting">ATM · funds pending / none</option>
+            <option value="none">No ATM yet</option>
+          </select>
+
+          <span className="muted">
+            {shownRecords.length} of {records.length}
+          </span>
+        </div>
+
+        {shownRecords.length === 0 ? (
+          <EmptyState message="No scholar records in this list." />
         ) : (
           <div className="table-wrapper">
             <table>
               <thead>
                 <tr>
                   <th>Student</th>
+                  <th>Student ID</th>
                   <th>Scholarship</th>
                   <th>Status</th>
                   <th>Enrolled</th>
-                  <th>ATM</th>
+                  <th>Has ATM</th>
+                  <th>ATM funds</th>
+                  <th>If no ATM</th>
                   <th>Tagged</th>
                   <th>Actions</th>
                 </tr>
               </thead>
 
               <tbody>
-                {records.map((record) => (
+                {shownRecords.map((record) => (
                   <tr key={record.id}>
                     <td>{fullName(record.student)}</td>
+                    <td>{record.student?.student_id}</td>
                     <td>{record.scholarship?.name}</td>
                     <td>
                       <StatusBadge status={record.status} />
                     </td>
                     <td>{record.currently_enrolled ? "Yes" : "No"}</td>
                     <td>{record.has_atm ? "Yes" : "No"}</td>
+                    <td>
+                      {record.has_atm ? (
+                        <span className={`status status-${FUNDS_TONE[record.atm_funds] || "neutral"}`}>
+                          {FUNDS_LABEL[record.atm_funds] || "Not set"}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td>{record.has_atm ? "—" : record.atm_note || "—"}</td>
                     <td>{formatDate(record.grantee_tagged_at)}</td>
                     <td>
                       <div className="button-row">
-                        <button
-                          className="button button-small button-secondary"
-                          onClick={() => updateRecord(record, { has_atm: !record.has_atm })}
-                        >
-                          {record.has_atm ? "Mark no ATM" : "Mark has ATM"}
+                        <button className="button button-small button-secondary" onClick={() => setEditingAtm(record)}>
+                          ATM status
                         </button>
 
                         {record.status === "active" && (
@@ -193,6 +255,17 @@ export default function StaffScholarRecordsPage() {
         )}
       </section>
 
+      {editingAtm && (
+        <AtmModal
+          record={editingAtm}
+          onClose={() => setEditingAtm(null)}
+          onDone={async () => {
+            setEditingAtm(null);
+            await load();
+          }}
+        />
+      )}
+
       {tagging && (
         <TagGranteeModal
           application={tagging}
@@ -207,12 +280,159 @@ export default function StaffScholarRecordsPage() {
   );
 }
 
-/* ---------- Tag grantee form (replaces the old "Does this student have an ATM?" pop-up) ---------- */
+const FUNDS_LABEL = { yes: "Funded", no: "No funds yet", pending: "Pending" };
+const FUNDS_TONE = { yes: "success", no: "danger", pending: "warning" };
+const ATM_NOTES = [
+  "For ATM application",
+  "Pending bank processing",
+  "ATM released, not yet activated",
+  "Lost ATM, replacement requested",
+];
+
+/* ---------- ATM questions, used when tagging and when editing ---------- */
+
+function AtmFields({ value, onChange }) {
+  // "Other": a typed status (an empty one means "Other" was just picked).
+  const custom = typeof value.atm_note === "string" && !ATM_NOTES.includes(value.atm_note);
+
+  return (
+    <>
+      <fieldset className="choice-group">
+        <legend>Does the student have an ATM card for the stipend?</legend>
+
+        <label className="choice">
+          <input
+            type="radio"
+            name="atm"
+            checked={value.has_atm}
+            onChange={() => onChange({ ...value, has_atm: true, atm_funds: value.atm_funds || "pending" })}
+          />
+          Yes, has an ATM card
+        </label>
+
+        <label className="choice">
+          <input
+            type="radio"
+            name="atm"
+            checked={!value.has_atm}
+            onChange={() => onChange({ ...value, has_atm: false, atm_note: value.atm_note || ATM_NOTES[0] })}
+          />
+          No ATM card yet
+        </label>
+      </fieldset>
+
+      {value.has_atm ? (
+        <fieldset className="choice-group">
+          <legend>Has the stipend reached the ATM?</legend>
+          {Object.entries(FUNDS_LABEL).map(([key, label]) => (
+            <label className="choice" key={key}>
+              <input
+                type="radio"
+                name="atm-funds"
+                checked={value.atm_funds === key}
+                onChange={() => onChange({ ...value, atm_funds: key })}
+              />
+              {label}
+            </label>
+          ))}
+        </fieldset>
+      ) : (
+        <div>
+          <label htmlFor="atm-note">Status (no ATM yet)</label>
+          <select
+            id="atm-note"
+            value={custom ? "other" : value.atm_note}
+            onChange={(event) =>
+              onChange({ ...value, atm_note: event.target.value === "other" ? "" : event.target.value })
+            }
+          >
+            {ATM_NOTES.map((note) => (
+              <option key={note} value={note}>
+                {note}
+              </option>
+            ))}
+            <option value="other">Other (type below)</option>
+          </select>
+
+          {custom && (
+            <>
+              <label htmlFor="atm-note-other" className="sr-only">
+                Other ATM status
+              </label>
+              <input
+                id="atm-note-other"
+                value={value.atm_note}
+                onChange={(event) => onChange({ ...value, atm_note: event.target.value })}
+                maxLength={100}
+                placeholder="Type the status"
+              />
+            </>
+          )}
+        </div>
+      )}
+
+      <p className="muted small">Status tracking only. The system does not connect to any bank.</p>
+    </>
+  );
+}
+
+function AtmModal({ record, onClose, onDone }) {
+  const toast = useToast();
+  const [value, setValue] = useState({
+    has_atm: Boolean(record.has_atm),
+    atm_funds: record.atm_funds || "pending",
+    atm_note: record.atm_note || ATM_NOTES[0],
+  });
+  const [saving, setSaving] = useState(false);
+
+  async function save(event) {
+    event.preventDefault();
+    setSaving(true);
+
+    try {
+      await api.patch(`/scholar-records/${record.id}`, {
+        has_atm: value.has_atm,
+        atm_funds: value.has_atm ? value.atm_funds : null,
+        atm_note: value.has_atm ? null : value.atm_note.trim() || ATM_NOTES[0],
+      });
+      toast.success("ATM status saved.");
+      await onDone();
+    } catch (err) {
+      toast.error(errMsg(err, "Unable to save the ATM status."));
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal title="ATM status" onClose={onClose}>
+      <form onSubmit={save}>
+        <p>
+          <strong>{fullName(record.student)}</strong> · {record.student?.student_id}
+          <br />
+          <span className="muted">{record.scholarship?.name}</span>
+        </p>
+
+        <AtmFields value={value} onChange={setValue} />
+
+        <div className="modal-footer">
+          <button type="button" className="button button-secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="button button-primary" disabled={saving}>
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/* ---------- Tag grantee form ---------- */
 
 function TagGranteeModal({ application, onClose, onDone }) {
   const toast = useToast();
 
-  const [hasAtm, setHasAtm] = useState("no");
+  const [atm, setAtm] = useState({ has_atm: false, atm_funds: "pending", atm_note: ATM_NOTES[0] });
   const [remarks, setRemarks] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -224,7 +444,9 @@ function TagGranteeModal({ application, onClose, onDone }) {
       await api.post(`/applications/${application.id}/scholar-record`, {
         application_id: application.id,
         currently_enrolled: true,
-        has_atm: hasAtm === "yes",
+        has_atm: atm.has_atm,
+        atm_funds: atm.has_atm ? atm.atm_funds : null,
+        atm_note: atm.has_atm ? null : atm.atm_note.trim() || ATM_NOTES[0],
         remarks: remarks.trim() || null,
       });
 
@@ -247,31 +469,7 @@ function TagGranteeModal({ application, onClose, onDone }) {
           </span>
         </p>
 
-        <fieldset className="choice-group">
-          <legend>Does the student already have an ATM card for the stipend?</legend>
-
-          <label className="choice">
-            <input
-              type="radio"
-              name="atm"
-              value="yes"
-              checked={hasAtm === "yes"}
-              onChange={() => setHasAtm("yes")}
-            />
-            Yes, has an ATM card
-          </label>
-
-          <label className="choice">
-            <input
-              type="radio"
-              name="atm"
-              value="no"
-              checked={hasAtm === "no"}
-              onChange={() => setHasAtm("no")}
-            />
-            No ATM card yet
-          </label>
-        </fieldset>
+        <AtmFields value={atm} onChange={setAtm} />
 
         <label htmlFor="tag-remarks">Remarks (optional)</label>
 

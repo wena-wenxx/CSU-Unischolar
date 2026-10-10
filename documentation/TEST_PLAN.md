@@ -271,7 +271,70 @@ Run `php artisan migrate:fresh --seed` first. In `backend/.env` set `QUEUE_CONNE
 
 ---
 
+## Part E — Round 7 features
+
+Run `php artisan migrate:fresh --seed` first. Staff: `oas.staff@carsu.edu.ph` / `Staff@12345`.
+Test student: **Wena Rose Contiga** `wenarose.contiga@carsu.edu.ph` / `Student@12345` (starts with no applications).
+
+**Review steps in order**
+- [ ] **E1.** Applications → filter **Submitted** → Review. A gold "Next step" box explains what to do. Only
+  *Mark under review*, *Needs action*, *Complete: forward to agency* and *Save remarks only* are shown
+  (no Approved/Rejected yet).
+- [ ] **E2.** Press *Needs action* with empty Remarks → red message, nothing changes.
+- [ ] **E3.** Press *Complete: forward to agency* → now *Approved by agency* / *Rejected by agency* appear.
+  Press *Approved by agency* → *Undo agency decision* and *Verify enrollment* appear. A student already tagged as
+  grantee shows no Undo button.
+- [ ] **E4.** Filter **Drafts** → Review → no status buttons and no Remarks box.
+- [ ] **E5.** The review window shows college, e-mail, contact number, other applications, scholarships held,
+  each document's upload date and "valid until", and the application timeline. The table has an **AI flags** column.
+
+**Scholarship creation with requirements**
+- [ ] **E6.** Scholarships → fill the form, press *Create Scholarship* with no document ticked → red message.
+- [ ] **E7.** Search "grade" → only *Certificate of Grades* shows. Tick it; tick *Valid ID* and set it to *Optional*
+  with a note. Type "certificate of grades" under *Other requirement* → it is not added twice. Add a custom
+  "Essay" → it shows a **Custom** badge. Create → "Scholarship created with 3 requirements."
+- [ ] **E8.** Manage the new program → change *Valid ID* to *Required* → saved. *Add more requirements* lists only the
+  documents not yet on the program.
+
+**ATM status**
+- [ ] **E9.** Scholar Records → columns *Has ATM*, *ATM funds*, *If no ATM*. Filter *No ATM yet*.
+- [ ] **E10.** *ATM status* on a row → choose *No ATM card yet* → *Other* → type a status → Save → the row shows it.
+- [ ] **E11.** Log in as `student10@carsu.edu.ph` → My Profile → a read-only **My stipend** card shows the ATM status.
+
+**Payroll**
+- [ ] **E12.** Payroll → *1. Prepare payroll*: Period is a dropdown (current term marked). With *All programs*, the
+  amount says it is filled in from each program. *Preview payroll* → included / skipped / total / ATM warnings.
+- [ ] **E13.** *Confirm* → the list below shows the new drafts. Preview again for the same period → everyone is
+  *Skipped: Already in payroll for this period*.
+- [ ] **E14.** Tick the header box → *Mark Ready*. Filter *Ready* + *No ATM yet* → the total row adds up.
+  *Export CSV* downloads the shown rows; *Print / Save as PDF* opens the print window with the CSU letterhead.
+- [ ] **E15.** Choose one program → its amount is filled in; change it → an orange "Different from the program
+  amount" note. *3. Payroll history* → *View* filters the list to that period and program.
+
+**Data Bank**
+- [ ] **E16.** 25 students, A to Z by last name; *Show more* adds 25. Filters: college, year level, sex, standing,
+  program. *Export CSV (n)* downloads every match. Search "Contiga" → Wena; *Full history* shows Sex: Female.
+
+**Menu and test account**
+- [ ] **E17.** Staff menu: Dashboard, Applications, Approved Lists, Scholar Records, Payroll, Scholarships,
+  Announcements, Data Bank, Reports, Help. Student menu says *My Scholarship History*.
+- [ ] **E18.** The login page "Demo accounts" box lists Wena's account. Wena's profile shows *Sex: Female*.
+
+**E-mail with Gmail (optional, needs internet)**
+- [ ] **E19.** Set the Gmail values from `backend/.env.example` (App Password, `MAIL_ALWAYS_TO=wenarose.contiga@carsu.edu.ph`),
+  run `php artisan config:clear`, restart `php artisan serve`. As Wena, apply to an open program, upload the files,
+  submit. As staff: Complete → Approved by agency. The e-mail arrives in Wena's CSU inbox (check Spam too) and
+  Reports → *E-mails sent* shows SENT.
+
+---
+
 ## What has and has not been tested
+
+Part E (round 7) was tested by Claude on **10 Oct 2026**: E1–E18 in the browser (1366×900 and 390×844, no page
+scrolls sideways on a phone), plus the API rules (draft/submitted cannot be approved, needs-action needs remarks,
+an application with a missing required document cannot be forwarded, payroll is never added twice for the same
+period, students cannot open staff pages), `php artisan test` (2 passed), and the new migrations rolled back and
+re-run. **E19 (real Gmail) was not tested** — Claude's environment cannot reach Gmail.
 
 Part D (round 6) was tested by Claude on **7 Oct 2026** the same way (D1–D13 in the browser at 1366×900 and
 390×844, e-mails with MAIL_MAILER=log; a failing SMTP server was also tried: the approval still works and the

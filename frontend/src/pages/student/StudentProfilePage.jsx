@@ -14,6 +14,7 @@ const CORRECTABLE = {
   first_name: "First name",
   middle_name: "Middle name",
   last_name: "Last name",
+  sex: "Sex",
   student_id: "Student ID",
   course: "Course",
   year_level: "Year level",
@@ -150,6 +151,8 @@ export default function StudentProfilePage() {
           If something is wrong, use <strong>Request a correction</strong> below.
         </p>
       </section>
+
+      {profile.active_scholar_record && <StipendCard grant={profile.active_scholar_record} />}
 
       <div className="dashboard-grid">
         <section className="card">
@@ -292,5 +295,34 @@ export default function StudentProfilePage() {
         </section>
       )}
     </div>
+  );
+}
+
+// Read-only: OAS keeps the ATM status up to date. No banking is done here.
+function StipendCard({ grant }) {
+  const paid = (grant.payroll_records || []).filter((p) => p.status === "processed").length;
+  const funds = { yes: "The stipend has reached your ATM.", no: "No funds on your ATM yet.", pending: "Funds are being processed." };
+
+  return (
+    <section className="card">
+      <div className="card-header">
+        <h2>My stipend</h2>
+        <span className="lock-note">🔒 Updated by OAS · read-only</span>
+      </div>
+
+      <div className="detail-grid">
+        <ProfileItem label="Scholarship" value={grant.scholarship?.name} />
+        <ProfileItem label="Has ATM" value={grant.has_atm ? "Yes" : "No"} />
+        <ProfileItem
+          label={grant.has_atm ? "ATM funds" : "ATM status"}
+          value={grant.has_atm ? funds[grant.atm_funds] || "Not recorded yet" : grant.atm_note || "For ATM application"}
+        />
+        <ProfileItem label="Stipends released" value={String(paid)} />
+      </div>
+
+      <p className="muted small">
+        If this is wrong, contact the OAS. The system only records the status; it does not handle money.
+      </p>
+    </section>
   );
 }

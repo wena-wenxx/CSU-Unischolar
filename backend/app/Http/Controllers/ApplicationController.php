@@ -274,7 +274,41 @@ class ApplicationController extends Controller
                     'message' => 'Unauthorized.'
                 ], 403);
             }
+
+            return response()->json($application);
         }
+
+        // Staff only: what the review window needs at a glance.
+        $application->setAttribute('next_statuses', $application->staffNextStatuses());
+        $application->setAttribute('missing_requirements', $application->missingRequirementNames());
+
+        $application->documents->each(function ($document) {
+            $document->setAttribute('expires_at', $document->expiresAt()?->toDateString());
+            $document->setAttribute('is_expired', $document->isExpired());
+        });
+
+        $application->student?->loadMissing('user:id,email');
+
+        $application->setAttribute('other_applications', Application::with('scholarship:id,name')
+            ->where('student_id', $application->student_id)
+            ->where('id', '!=', $application->id)
+            ->latest()
+            ->get(['id', 'scholarship_id', 'status', 'submitted_at'])
+            ->map(fn ($a) => [
+                'id' => $a->id,
+                'scholarship' => $a->scholarship?->name,
+                'status' => $a->status,
+                'submitted_at' => $a->submitted_at,
+            ]));
+
+        $application->setAttribute('scholar_records', ScholarRecord::with('scholarship:id,name')
+            ->where('student_id', $application->student_id)
+            ->get(['id', 'scholarship_id', 'status', 'grantee_tagged_at'])
+            ->map(fn ($r) => [
+                'scholarship' => $r->scholarship?->name,
+                'status' => $r->status,
+                'tagged_at' => $r->grantee_tagged_at,
+            ]));
 
         return response()->json($application);
     }
@@ -467,6 +501,17 @@ class ApplicationController extends Controller
 
         $application = Application::findOrFail($id);
         $previousStatus = $application->status;
+
+        // Keep the steps in order (see Application::STAFF_NEXT).
+        if ($error = $application->staffChangeError($data['status'])) {
+            return response()->json(['message' => $error], 422);
+        }
+
+        if ($data['status'] === 'needs_action' && blank($data['remarks'] ?? null)) {
+            return response()->json([
+                'message' => 'Write in Remarks what the student needs to fix.'
+            ], 422);
+        }
 
         $changes = [
             'status' => $data['status'],

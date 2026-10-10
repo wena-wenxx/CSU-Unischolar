@@ -72,7 +72,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/scholarships/{id}', [ScholarshipController::class, 'update']);
     Route::delete('/scholarships/{id}', [ScholarshipController::class, 'destroy']);
     Route::post('/scholarships/{id}/requirements', [ScholarshipController::class, 'addRequirement']);
+    Route::patch('/requirements/{id}', [ScholarshipController::class, 'updateRequirement']);
     Route::delete('/requirements/{id}', [ScholarshipController::class, 'destroyRequirement']);
+    Route::get('/requirement-types', [ScholarshipController::class, 'requirementTypes']);
 
     /*
     |--------------------------------------------------------------------------
@@ -148,6 +150,10 @@ Route::middleware('auth:sanctum')->group(function () {
     */
 
     Route::get('/payroll', [PayrollController::class, 'index']);
+    Route::get('/payroll/periods', [PayrollController::class, 'periods']);
+    Route::get('/payroll/history', [PayrollController::class, 'history']);
+    Route::post('/payroll/prepare', [PayrollController::class, 'prepare']);
+    Route::post('/payroll/bulk-status', [PayrollController::class, 'bulkStatus']);
     Route::post('/scholar-records/{scholarRecordId}/payroll', [PayrollController::class, 'store']);
     Route::patch('/payroll/{id}', [PayrollController::class, 'update']);
 });

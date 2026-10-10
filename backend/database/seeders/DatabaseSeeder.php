@@ -38,5 +38,8 @@ class DatabaseSeeder extends Seeder
         // Bulk documents were inserted directly; record which student owns each.
         \App\Models\Document::backfillOwners();
         \App\Models\Document::alignSeededDates();
+
+        // Starting ATM status for every grantee (funded / pending / for ATM application).
+        \App\Models\ScholarRecord::backfillAtmStatus();
     }
 }

@@ -11,6 +11,7 @@ class ProfileChangeRequest extends Model
         'first_name' => 'First name',
         'middle_name' => 'Middle name',
         'last_name' => 'Last name',
+        'sex' => 'Sex',
         'student_id' => 'Student ID',
         'course' => 'Course',
         'year_level' => 'Year level',

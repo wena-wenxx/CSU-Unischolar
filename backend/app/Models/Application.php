@@ -49,6 +49,91 @@ class Application extends Model
         return $this->hasOne(ApplicationStatusLog::class)->latestOfMany();
     }
 
+    /*
+    | What OAS staff may change an application to, from each status.
+    | This keeps the steps in order: OAS checks the documents, forwards the
+    | complete application to the agency, then records the agency's decision.
+    |   draft         -> (nothing: the student has not submitted yet)
+    |   submitted     -> under review, needs action, complete (forward)
+    |   under_review  -> needs action, complete (forward)
+    |   needs_action  -> under review (the student normally resubmits)
+    |   complete      -> approved / rejected by the agency, or back to under review
+    |   approved      -> complete ("undo", only while not yet tagged as grantee)
+    |   rejected      -> complete ("undo")
+    */
+    public const STAFF_NEXT = [
+        'draft' => [],
+        'submitted' => ['under_review', 'needs_action', 'complete'],
+        'under_review' => ['needs_action', 'complete'],
+        'needs_action' => ['under_review'],
+        'complete' => ['approved', 'rejected', 'under_review'],
+        'approved' => ['complete'],
+        'rejected' => ['complete'],
+    ];
+
+    /** Statuses staff may move this application to right now. */
+    public function staffNextStatuses(): array
+    {
+        $next = self::STAFF_NEXT[$this->status] ?? [];
+
+        // An approved student who is already tagged as a grantee cannot be
+        // "un-approved" here; change the scholar record instead.
+        if ($this->status === 'approved' && $this->isTaggedGrantee()) {
+            $next = [];
+        }
+
+        // Only a complete application (no missing required document) can be
+        // forwarded to the agency.
+        if (in_array('complete', $next, true) && $this->status !== 'approved' && $this->status !== 'rejected'
+            && $this->missingRequirementNames()) {
+            $next = array_values(array_diff($next, ['complete']));
+        }
+
+        return $next;
+    }
+
+    /** Why a status change is not allowed, or null when it is. */
+    public function staffChangeError(string $to): ?string
+    {
+        // Saving remarks without changing the status is always fine once submitted.
+        if ($to === $this->status && $this->status !== 'draft') {
+            return null;
+        }
+
+        if ($this->status === 'draft') {
+            return 'This application is still a draft. The student has not submitted it yet.';
+        }
+
+        if ($to === 'complete' && !in_array($this->status, ['approved', 'rejected'], true)
+            && ($missing = $this->missingRequirementNames())) {
+            return 'Cannot forward to the agency: missing required documents ('.implode(', ', $missing).').';
+        }
+
+        if ($this->status === 'approved' && $to === 'complete' && $this->isTaggedGrantee()) {
+            return 'This student is already tagged as a grantee. Change the scholar record instead.';
+        }
+
+        if (!in_array($to, self::STAFF_NEXT[$this->status] ?? [], true)) {
+            $from = str_replace('_', ' ', $this->status);
+            $wanted = str_replace('_', ' ', $to);
+
+            if (in_array($to, ['approved', 'rejected'], true)) {
+                return "The agency's decision can only be recorded after the application is complete and forwarded (now: {$from}).";
+            }
+
+            return "An application that is \"{$from}\" cannot be changed to \"{$wanted}\".";
+        }
+
+        return null;
+    }
+
+    public function isTaggedGrantee(): bool
+    {
+        return ScholarRecord::where('student_id', $this->student_id)
+            ->where('scholarship_id', $this->scholarship_id)
+            ->exists();
+    }
+
     /** Names of REQUIRED requirements that have no uploaded document yet. */
     public function missingRequirementNames(): array
     {

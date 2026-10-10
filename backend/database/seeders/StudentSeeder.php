@@ -8,7 +8,12 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
 /**
- * Ten FICTIONAL demo students (no real CSU student data).
+ * Test student (REAL, used with her permission):
+ *   Wena Rose N. Contiga · 221-00462 · wenarose.contiga@carsu.edu.ph
+ *   Use this account for e-mail tests, login demos and screenshots.
+ *   She starts with NO applications so the full flow can be shown live.
+ *
+ * Plus ten FICTIONAL demo students (no real CSU student data).
  * Every account uses the password Student@12345.
  * "Demo" as the middle name makes it obvious these are not real people.
  */
@@ -28,8 +33,34 @@ class StudentSeeder extends Seeder
         [10, '2026-00010', 'Grace', 'Lim', 'Bachelor of Science in Chemistry', '2nd Year', 'College of Mathematics and Natural Sciences'],
     ];
 
+    public const TEST_STUDENT_EMAIL = 'wenarose.contiga@carsu.edu.ph';
+
     public function run(): void
     {
+        $wena = User::updateOrCreate(
+            ['email' => self::TEST_STUDENT_EMAIL],
+            [
+                'name' => 'Wena Rose Contiga',
+                'password' => Hash::make('Student@12345'),
+                'role' => 'student',
+            ]
+        );
+
+        Student::updateOrCreate(
+            ['student_id' => '221-00462'],
+            [
+                'user_id' => $wena->id,
+                'first_name' => 'Wena Rose',
+                'middle_name' => 'N.',
+                'last_name' => 'Contiga',
+                'sex' => 'Female',
+                'course' => 'Bachelor of Science in Information Technology',
+                'year_level' => '4th Year',
+                'college' => 'College of Computing and Information Sciences',
+                'contact_number' => null,
+            ]
+        );
+
         foreach (self::STUDENTS as [$number, $studentId, $first, $last, $course, $yearLevel, $college]) {
 
             $user = User::updateOrCreate(
@@ -48,6 +79,7 @@ class StudentSeeder extends Seeder
                     'first_name' => $first,
                     'middle_name' => 'Demo',
                     'last_name' => $last,
+                    'sex' => in_array($first, ['Maria', 'Ana', 'Liza', 'Rosa', 'Grace'], true) ? 'Female' : 'Male',
                     'course' => $course,
                     'year_level' => $yearLevel,
                     'college' => $college,

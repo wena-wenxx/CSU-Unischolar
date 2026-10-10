@@ -87,6 +87,8 @@ class ScholarRecordController extends Controller
             'application_id' => 'required|exists:applications,id',
             'currently_enrolled' => 'sometimes|boolean',
             'has_atm' => 'sometimes|boolean',
+            'atm_funds' => 'nullable|in:'.implode(',', ScholarRecord::ATM_FUNDS),
+            'atm_note' => 'nullable|string|max:100',
             'remarks' => 'nullable|string|max:5000',
         ]);
 
@@ -141,6 +143,8 @@ class ScholarRecordController extends Controller
                     $data['currently_enrolled'] ?? true,
                 'has_atm' =>
                     $data['has_atm'] ?? false,
+                'atm_funds' => !empty($data['has_atm']) ? ($data['atm_funds'] ?? 'pending') : null,
+                'atm_note' => !empty($data['has_atm']) ? null : ($data['atm_note'] ?? 'For ATM application'),
                 'grantee_tagged_at' => now(),
                 'remarks' =>
                     $data['remarks'] ?? null,
@@ -180,11 +184,26 @@ class ScholarRecordController extends Controller
                 'sometimes|boolean',
             'has_atm' =>
                 'sometimes|boolean',
+            'atm_funds' =>
+                'nullable|in:'.implode(',', ScholarRecord::ATM_FUNDS),
+            'atm_note' =>
+                'nullable|string|max:100',
             'remarks' =>
                 'nullable|string|max:5000',
         ]);
 
         $record = ScholarRecord::findOrFail($id);
+
+        // Funds only apply to a grantee with an ATM; the note only to one without.
+        if (array_key_exists('has_atm', $data)) {
+            if ($data['has_atm']) {
+                $data['atm_note'] = null;
+                $data['atm_funds'] = $data['atm_funds'] ?? ($record->atm_funds ?: 'pending');
+            } else {
+                $data['atm_funds'] = null;
+                $data['atm_note'] = $data['atm_note'] ?? ($record->atm_note ?: 'For ATM application');
+            }
+        }
 
         $record->update($data);
 

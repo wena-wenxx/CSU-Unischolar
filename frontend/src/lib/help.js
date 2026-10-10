@@ -30,7 +30,7 @@ export const WELCOME_STEPS = {
     },
     {
       title: "One active scholarship",
-      text: "You can hold only one active scholarship at a time. Your grants and payroll appear in Scholarship History.",
+      text: "You can hold only one active scholarship at a time. Your grants and payroll appear in My Scholarship History.",
     },
   ],
   staff: [
@@ -40,7 +40,7 @@ export const WELCOME_STEPS = {
     },
     {
       title: "Review applications",
-      text: "Applications lists the newest activity first. Press Review to see documents, run the AI check, and set the status.",
+      text: "Applications lists the newest activity first. Press Review to see documents, run the AI check, and choose the next step. Only the steps allowed right now are shown.",
     },
     {
       title: "The AI only flags",
@@ -48,11 +48,11 @@ export const WELCOME_STEPS = {
     },
     {
       title: "After the agency decides",
-      text: "Record Approved or Rejected (or upload the agency's approved list in Agency Lists), verify enrollment, then tag the grantee in Scholar Records.",
+      text: "Record Approved or Rejected (or upload the agency's approved list in Approved Lists), verify enrollment, then tag the grantee in Scholar Records.",
     },
     {
       title: "Payroll and reports",
-      text: "Payroll prepares entries for enrolled grantees. Reports exports CSV files for Excel, for all programs or for one program.",
+      text: "Payroll: choose the program and period, preview, then confirm. Each scholar gets their own program's amount. Reports exports CSV files for Excel.",
     },
   ],
 };
@@ -103,7 +103,7 @@ export const HELP = {
       title: "One active scholarship",
       steps: [
         "If you are currently a grantee, you can still view other programs but you cannot apply until your current grant ends.",
-        "Your grants, including completed ones, and their payroll entries are in Scholarship History.",
+        "Your grants, including completed ones, and their payroll entries are in My Scholarship History.",
       ],
     },
     {
@@ -137,8 +137,9 @@ export const HELP = {
     {
       title: "Recording the agency's decision",
       steps: [
-        "One at a time: open the application and press Approved by agency or Rejected.",
-        "Many at once: go to Agency Lists, choose the program, upload the agency's list as a CSV file, pick the column with the Student ID, and press Process. A summary shows matched, unmatched and error rows.",
+        "First forward the application: press Complete: forward to agency (only possible when every required document is uploaded).",
+        "One at a time: when the agency answers, open the application and press Approved by agency or Rejected by agency. A mistake can be undone until the student is tagged as a grantee.",
+        "Many at once: go to Approved Lists, choose the program, upload the agency's list as a CSV file, pick the column with the Student ID, and press Process. A summary shows matched, unmatched and error rows.",
       ],
     },
     {
@@ -146,13 +147,15 @@ export const HELP = {
       steps: [
         "For an approved application, press Verify enrollment and confirm the student is currently enrolled.",
         "Scholar Records → Ready to Tag as Grantee → Tag as Grantee. A student can hold only one active scholarship.",
-        "Payroll → add an entry for one scholar, or Prepare payroll for all enrolled scholars. Students already paid for that period are skipped.",
+        "Scholar Records → ATM status: record whether the grantee has an ATM and whether the stipend has reached it (status only; no banking).",
+        "Payroll → 1. Prepare: choose one program or all, and the period → Preview → Confirm. Students not enrolled or already in that period are skipped; ATM problems are shown as warnings.",
+        "Payroll → 2. Payroll list: tick entries and press Mark Ready, then Mark Processed after the payout. Export CSV or Print / Save as PDF.",
       ],
     },
     {
       title: "Programs and announcements",
       steps: [
-        "Scholarships → Create a program with its type, deadline and amount, then add its requirements in Manage.",
+        "Scholarships → Create a program with its type, deadline and amount, and tick its required documents in the same form (search the list, or add a custom requirement).",
         "To stop new applications, set the status to Closed or set the deadline. Programs with applications cannot be deleted, so their records are kept.",
         "Announcements → post deadline reminders and payout schedules. Students see the latest three on their dashboard until the expiry date.",
       ],

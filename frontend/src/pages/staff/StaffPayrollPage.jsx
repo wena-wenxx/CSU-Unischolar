@@ -1,50 +1,80 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
-import { formatMoney, fullName } from "../../lib/format";
+import { downloadCSV, formatDate, formatMoney, fullName } from "../../lib/format";
 import { useToast } from "../../lib/toast";
-import Modal from "../../components/Modal";
+import { useConfirm } from "../../lib/confirm";
 import PageHeader from "../../components/PageHeader";
 import StatusBadge from "../../components/StatusBadge";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 
-const DEFAULT_PERIOD = "1st Semester AY 2026-2027";
+/*
+  Payroll (status tracking only; no money is moved by this system).
+  1. Prepare: choose the program and the period, preview who is included
+     (each scholar gets their own program's amount), then confirm.
+  2. Payroll list: filter, select, mark Ready / Processed, export CSV,
+     print or save as PDF.
+  3. History: totals per period and program.
+*/
 
-const PAYROLL_FILTERS = [
+const STATUS_FILTERS = [
   ["all", "All"],
   ["draft", "Draft"],
   ["ready", "Ready"],
   ["processed", "Processed"],
 ];
 
-const samePeriod = (a, b) =>
-  String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+const ATM_FILTERS = {
+  all: "Any ATM status",
+  funded: "ATM · funded",
+  waiting: "ATM · funds pending / none",
+  none: "No ATM yet",
+};
+
+const stamp = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+const same = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+
+function atmGroup(record) {
+  if (!record) return "none";
+  if (!record.has_atm) return "none";
+  return record.atm_funds === "yes" ? "funded" : "waiting";
+}
 
 export default function StaffPayrollPage() {
   const toast = useToast();
-
-  // /staff/payroll?status=ready opens the list already filtered.
+  const confirm = useConfirm();
   const location = useLocation();
+  const listRef = useRef(null);
+
+  const [payroll, setPayroll] = useState([]);
+  const [scholarships, setScholarships] = useState([]);
+  const [periods, setPeriods] = useState({ current: "", periods: [] });
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // List filters. /staff/payroll?status=ready opens the list already filtered.
   const [statusFilter, setStatusFilter] = useState(() => {
     const wanted = new URLSearchParams(location.search).get("status");
-    return PAYROLL_FILTERS.some(([key]) => key === wanted) ? wanted : "all";
+    return STATUS_FILTERS.some(([key]) => key === wanted) ? wanted : "all";
   });
-
-  const [records, setRecords] = useState([]);
-  const [payroll, setPayroll] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [single, setSingle] = useState(null); // scholar record for the one-person form
-  const [batchOpen, setBatchOpen] = useState(false);
+  const [periodFilter, setPeriodFilter] = useState("all");
+  const [programFilter, setProgramFilter] = useState("all");
+  const [atmFilter, setAtmFilter] = useState("all");
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   // Written with .then() (not await) so React's lint rule can see that the
   // state is set later, when the server answers, not during the effect.
   const load = useCallback(
     () =>
-      Promise.all([api.get("/scholar-records"), api.get("/payroll")])
-        .then(([scholarsResponse, payrollResponse]) => {
-          setRecords(scholarsResponse.data);
+      Promise.all([api.get("/payroll"), api.get("/scholarships"), api.get("/payroll/periods"), api.get("/payroll/history")])
+        .then(([payrollResponse, scholarshipsResponse, periodsResponse, historyResponse]) => {
           setPayroll(payrollResponse.data);
+          setScholarships(scholarshipsResponse.data);
+          setPeriods(periodsResponse.data);
+          setHistory(historyResponse.data);
         })
         .catch((err) => toast.error(errMsg(err, "Unable to load payroll.")))
         .finally(() => setLoading(false)),
@@ -55,102 +85,124 @@ export default function StaffPayrollPage() {
     load();
   }, [load]);
 
-  async function setPayrollStatus(item, status) {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+
+  const shown = payroll.filter((item) => {
+    const record = item.scholar_record;
+    if (statusFilter !== "all" && item.status !== statusFilter) return false;
+    if (periodFilter !== "all" && !same(item.period, periodFilter)) return false;
+    if (programFilter !== "all" && String(record?.scholarship_id) !== programFilter) return false;
+    if (atmFilter !== "all" && atmGroup(record) !== atmFilter) return false;
+    const haystack = `${fullName(record?.student)} ${record?.student?.student_id || ""}`.toLowerCase();
+    return words.every((word) => haystack.includes(word));
+  });
+
+  const shownIds = shown.map((item) => item.id);
+  const selectedShown = selected.filter((id) => shownIds.includes(id));
+  const allSelected = shown.length > 0 && selectedShown.length === shown.length;
+  const total = shown.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const usedPeriods = [...new Set(payroll.map((item) => item.period))];
+  const programsInPayroll = scholarships.filter((s) => payroll.some((item) => item.scholar_record?.scholarship_id === s.id));
+
+  function toggle(id) {
+    setSelected((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]));
+  }
+
+  async function bulk(status, ids) {
+    const label = { ready: "Ready", processed: "Processed", draft: "Draft" }[status];
+
+    if (status === "processed") {
+      const ok = await confirm({
+        title: `Mark ${ids.length} entries as Processed?`,
+        message: "Processed means the stipend was released. Do this only after the payout is confirmed.",
+        confirmLabel: "Mark processed",
+      });
+      if (!ok) return;
+    }
+
+    setBulkBusy(true);
+
     try {
-      await api.patch(`/payroll/${item.id}`, { status });
-      toast.success(`Payroll entry marked ${status}.`);
+      const { data } = await api.post("/payroll/bulk-status", { ids, status });
+      if (data.changed) toast.success(data.message);
+      else toast.info(data.message);
+      setSelected([]);
       await load();
     } catch (err) {
-      toast.error(errMsg(err, "Unable to update payroll record."));
+      toast.error(errMsg(err, `Unable to mark entries ${label}.`));
+    } finally {
+      setBulkBusy(false);
     }
   }
 
-  const activeRecords = records.filter((record) => record.status === "active");
-  const eligible = activeRecords.filter((record) => record.currently_enrolled);
-  const readyCount = payroll.filter((item) => item.status === "ready").length;
-  const shownPayroll = statusFilter === "all" ? payroll : payroll.filter((item) => item.status === statusFilter);
+  function exportCSV() {
+    const ok = downloadCSV(
+      `payroll-${periodFilter === "all" ? "all-periods" : periodFilter.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${stamp()}.csv`,
+      shown.map((item) => ({
+        "Student ID": item.scholar_record?.student?.student_id,
+        "Last name": item.scholar_record?.student?.last_name,
+        "First name": item.scholar_record?.student?.first_name,
+        "Middle name": item.scholar_record?.student?.middle_name,
+        Course: item.scholar_record?.student?.course,
+        "Year level": item.scholar_record?.student?.year_level,
+        Scholarship: item.scholar_record?.scholarship?.name,
+        Period: item.period,
+        Amount: Number(item.amount || 0).toFixed(2),
+        "ATM status": item.scholar_record?.atm_label || item.bank_atm_status,
+        Status: item.status,
+        "Prepared by": item.preparer?.name || "",
+      }))
+    );
+    if (!ok) toast.info("Nothing to export in this list.");
+  }
+
+  function openFromHistory(row) {
+    setStatusFilter("all");
+    setPeriodFilter(row.period);
+    setProgramFilter(String(row.scholarship_id));
+    setAtmFilter("all");
+    setQuery("");
+    listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   if (loading) return <Loading />;
 
   return (
     <div>
       <PageHeader
-        title="Payroll Preparation"
-        subtitle="Prepare payroll entries for active, enrolled grantees"
-        actions={
-          <button
-            className="button button-primary"
-            onClick={() => setBatchOpen(true)}
-            disabled={eligible.length === 0}
-          >
-            Prepare payroll for all enrolled scholars ({eligible.length})
-          </button>
-        }
+        title="Payroll"
+        subtitle="Prepare stipend lists for active, enrolled grantees. Status tracking only: no money is moved by this system."
       />
 
-      <section className="card">
-        <h2>Active Scholars</h2>
+      <PreparePanel
+        scholarships={scholarships}
+        periods={periods}
+        onPrepared={async (period) => {
+          await load();
+          setStatusFilter("draft");
+          setPeriodFilter(period);
+          setProgramFilter("all");
+          listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }}
+      />
 
-        {activeRecords.length === 0 ? (
-          <EmptyState
-            message="No active scholars yet."
-            action={
-              <Link className="button button-secondary" to="/staff/scholars">
-                Go to Scholar Records
-              </Link>
-            }
-          />
-        ) : (
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>Student</th>
-                  <th>Scholarship</th>
-                  <th>Program amount</th>
-                  <th>Enrolled</th>
-                  <th>ATM</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {activeRecords.map((record) => (
-                  <tr key={record.id}>
-                    <td>{fullName(record.student)}</td>
-                    <td>{record.scholarship?.name}</td>
-                    <td>{formatMoney(record.scholarship?.amount)}</td>
-                    <td>{record.currently_enrolled ? "Yes" : "No"}</td>
-                    <td>{record.has_atm ? "Yes" : "No"}</td>
-                    <td>
-                      <button
-                        className="button button-small button-primary"
-                        onClick={() => setSingle(record)}
-                        disabled={!record.currently_enrolled}
-                        title={record.currently_enrolled ? "" : "Student must be currently enrolled"}
-                      >
-                        Add to Payroll
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <section className="card">
+      <section className="card" ref={listRef} id="payroll-list">
         <div className="card-header">
-          <h2>Payroll Records</h2>
-
-          <span className="muted">{readyCount} ready</span>
+          <h2>2. Payroll list</h2>
+          <div className="button-row">
+            <button className="button button-small button-secondary" onClick={exportCSV}>
+              Export CSV
+            </button>
+            <button className="button button-small button-secondary" onClick={() => window.print()}>
+              Print / Save as PDF
+            </button>
+          </div>
         </div>
 
-        <p className="muted">Draft → Ready (checked and ready to send) → Processed (released).</p>
+        <p className="muted small">Draft → Ready (checked) → Processed (stipend released).</p>
 
         <div className="filter-row" role="group" aria-label="Filter payroll by status">
-          {PAYROLL_FILTERS.map(([key, label]) => (
+          {STATUS_FILTERS.map(([key, label]) => (
             <button
               key={key}
               className={statusFilter === key ? "button button-small button-primary" : "button button-small button-secondary"}
@@ -162,63 +214,197 @@ export default function StaffPayrollPage() {
           ))}
         </div>
 
-        {shownPayroll.length === 0 ? (
-          <EmptyState message="No payroll records in this list." />
+        <div className="inline-form table-search payroll-filters">
+          <label htmlFor="payroll-search" className="sr-only">
+            Search
+          </label>
+          <input
+            id="payroll-search"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search name or student ID"
+          />
+
+          <label htmlFor="payroll-period-filter" className="sr-only">
+            Period
+          </label>
+          <select id="payroll-period-filter" value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)}>
+            <option value="all">All periods</option>
+            {usedPeriods.map((period) => (
+              <option key={period} value={period}>
+                {period}
+              </option>
+            ))}
+          </select>
+
+          <label htmlFor="payroll-program-filter" className="sr-only">
+            Scholarship
+          </label>
+          <select id="payroll-program-filter" value={programFilter} onChange={(event) => setProgramFilter(event.target.value)}>
+            <option value="all">All programs</option>
+            {programsInPayroll.map((scholarship) => (
+              <option key={scholarship.id} value={String(scholarship.id)}>
+                {scholarship.name}
+              </option>
+            ))}
+          </select>
+
+          <label htmlFor="payroll-atm-filter" className="sr-only">
+            ATM status
+          </label>
+          <select id="payroll-atm-filter" value={atmFilter} onChange={(event) => setAtmFilter(event.target.value)}>
+            {Object.entries(ATM_FILTERS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="bulk-bar print-hide">
+          <span>
+            <strong>{selectedShown.length}</strong> selected · {shown.length} shown · total{" "}
+            <strong>{formatMoney(total)}</strong>
+          </span>
+          <div className="button-row">
+            <button
+              className="button button-small button-primary"
+              disabled={bulkBusy || !selectedShown.length}
+              onClick={() => bulk("ready", selectedShown)}
+            >
+              Mark Ready
+            </button>
+            <button
+              className="button button-small button-success"
+              disabled={bulkBusy || !selectedShown.length}
+              onClick={() => bulk("processed", selectedShown)}
+            >
+              Mark Processed
+            </button>
+            <button
+              className="button button-small button-secondary"
+              disabled={bulkBusy || !selectedShown.length}
+              onClick={() => bulk("draft", selectedShown)}
+            >
+              Back to Draft
+            </button>
+          </div>
+        </div>
+
+        {shown.length === 0 ? (
+          <EmptyState message="No payroll entries in this list." />
         ) : (
           <div className="table-wrapper">
             <table>
               <thead>
                 <tr>
+                  <th className="print-hide">
+                    <label className="sr-only" htmlFor="payroll-select-all">
+                      Select all shown
+                    </label>
+                    <input
+                      id="payroll-select-all"
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={() =>
+                        setSelected((current) =>
+                          allSelected ? current.filter((id) => !shownIds.includes(id)) : [...new Set([...current, ...shownIds])]
+                        )
+                      }
+                    />
+                  </th>
                   <th>Student</th>
+                  <th>Student ID</th>
                   <th>Scholarship</th>
-                  <th>Amount</th>
                   <th>Period</th>
+                  <th className="numeric">Amount</th>
                   <th>ATM</th>
                   <th>Status</th>
-                  <th>Action</th>
                 </tr>
               </thead>
 
               <tbody>
-                {shownPayroll.map((item) => (
-                  <tr key={item.id}>
+                {shown.map((item) => (
+                  <tr key={item.id} className={selected.includes(item.id) ? "row-selected" : ""}>
+                    <td className="print-hide">
+                      <label className="sr-only" htmlFor={`payroll-${item.id}`}>
+                        Select {fullName(item.scholar_record?.student)}
+                      </label>
+                      <input
+                        id={`payroll-${item.id}`}
+                        type="checkbox"
+                        checked={selected.includes(item.id)}
+                        onChange={() => toggle(item.id)}
+                      />
+                    </td>
                     <td>{fullName(item.scholar_record?.student)}</td>
+                    <td>{item.scholar_record?.student?.student_id}</td>
                     <td>{item.scholar_record?.scholarship?.name}</td>
-                    <td>{formatMoney(item.amount)}</td>
                     <td>{item.period}</td>
-                    <td>{item.bank_atm_status}</td>
+                    <td className="numeric">{formatMoney(item.amount)}</td>
+                    <td>
+                      <AtmBadge record={item.scholar_record} />
+                    </td>
                     <td>
                       <StatusBadge status={item.status} />
                     </td>
+                  </tr>
+                ))}
+              </tbody>
+
+              <tfoot>
+                <tr>
+                  <td className="print-hide" />
+                  <td colSpan={4}>
+                    <strong>Total ({shown.length} scholars)</strong>
+                  </td>
+                  <td className="numeric">
+                    <strong>{formatMoney(total)}</strong>
+                  </td>
+                  <td colSpan={2} />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="card print-hide">
+        <h2>3. Payroll history</h2>
+
+        {history.length === 0 ? (
+          <EmptyState message="No payroll has been prepared yet." />
+        ) : (
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Period</th>
+                  <th>Scholarship</th>
+                  <th className="numeric">Scholars</th>
+                  <th className="numeric">Total</th>
+                  <th>Draft / Ready / Processed</th>
+                  <th>Last change</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((row) => (
+                  <tr key={`${row.period}-${row.scholarship_id}`}>
+                    <td>{row.period}</td>
+                    <td>{row.scholarship}</td>
+                    <td className="numeric">{row.scholars}</td>
+                    <td className="numeric">{formatMoney(row.total_amount)}</td>
                     <td>
-                      {item.status === "draft" && (
-                        <button
-                          className="button button-small button-primary"
-                          onClick={() => setPayrollStatus(item, "ready")}
-                        >
-                          Mark Ready
-                        </button>
-                      )}
-
-                      {item.status === "ready" && (
-                        <div className="button-row">
-                          <button
-                            className="button button-small button-success"
-                            onClick={() => setPayrollStatus(item, "processed")}
-                          >
-                            Mark Processed
-                          </button>
-
-                          <button
-                            className="button button-small button-secondary"
-                            onClick={() => setPayrollStatus(item, "draft")}
-                          >
-                            Back to Draft
-                          </button>
-                        </div>
-                      )}
-
-                      {item.status === "processed" && "—"}
+                      {row.draft} / {row.ready} / {row.processed}
+                      {row.processed === row.scholars && <span className="status status-success history-done">Done</span>}
+                    </td>
+                    <td>{formatDate(row.last_change)}</td>
+                    <td>
+                      <button className="button button-small button-secondary" onClick={() => openFromHistory(row)}>
+                        View
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -227,183 +413,240 @@ export default function StaffPayrollPage() {
           </div>
         )}
       </section>
-
-      {single && (
-        <PayrollFormModal
-          title="Add to Payroll"
-          intro={
-            <>
-              <strong>{fullName(single.student)}</strong> · {single.scholarship?.name}
-            </>
-          }
-          defaultAmount={single.scholarship?.amount ?? ""}
-          submitLabel="Add to payroll"
-          onClose={() => setSingle(null)}
-          onSubmit={async ({ amount, period }) => {
-            const already = payroll.some(
-              (item) => item.scholar_record_id === single.id && samePeriod(item.period, period)
-            );
-
-            if (already) {
-              toast.error(`${fullName(single.student)} already has a payroll entry for "${period}".`);
-              return false;
-            }
-
-            await api.post(`/scholar-records/${single.id}/payroll`, {
-              scholar_record_id: single.id,
-              amount,
-              period,
-              bank_atm_status: single.has_atm ? "Yes" : "No",
-            });
-
-            toast.success(`Payroll entry added for ${fullName(single.student)}.`);
-            setSingle(null);
-            await load();
-            return true;
-          }}
-        />
-      )}
-
-      {batchOpen && (
-        <PayrollFormModal
-          title="Prepare Payroll for All Enrolled Scholars"
-          intro={
-            <>
-              Creates one <strong>draft</strong> payroll entry for each of the{" "}
-              <strong>{eligible.length}</strong> active, currently enrolled scholars. Anyone who
-              already has an entry for the same period is skipped.
-            </>
-          }
-          defaultAmount=""
-          submitLabel={`Prepare payroll for ${eligible.length} scholars`}
-          onClose={() => setBatchOpen(false)}
-          onSubmit={async ({ amount, period }) => {
-            let created = 0;
-            let skipped = 0;
-            const failed = [];
-
-            // One request per scholar, using the existing endpoint.
-            for (const record of eligible) {
-              const already = payroll.some(
-                (item) => item.scholar_record_id === record.id && samePeriod(item.period, period)
-              );
-
-              if (already) {
-                skipped += 1;
-                continue;
-              }
-
-              try {
-                await api.post(`/scholar-records/${record.id}/payroll`, {
-                  scholar_record_id: record.id,
-                  amount,
-                  period,
-                  bank_atm_status: record.has_atm ? "Yes" : "No",
-                });
-                created += 1;
-              } catch (err) {
-                failed.push(`${fullName(record.student)}: ${errMsg(err)}`);
-              }
-            }
-
-            let summary = `Payroll prepared for ${created} scholar${created === 1 ? "" : "s"}.`;
-            if (skipped) summary += ` ${skipped} skipped (already had "${period}").`;
-
-            if (created > 0) toast.success(summary);
-            else toast.info(summary);
-
-            failed.forEach((message) => toast.error(message));
-
-            setBatchOpen(false);
-            await load();
-            return true;
-          }}
-        />
-      )}
     </div>
   );
 }
 
-/* ---------- Amount + period form, used for one scholar and for the batch ---------- */
+function AtmBadge({ record }) {
+  if (!record) return "—";
+  const group = atmGroup(record);
+  const tone = group === "funded" ? "success" : group === "waiting" ? "warning" : "neutral";
+  return <span className={`status status-${tone}`}>{record.atm_label}</span>;
+}
 
-function PayrollFormModal({ title, intro, defaultAmount, submitLabel, onClose, onSubmit }) {
+/* ---------- 1. Prepare payroll: choose, preview, confirm ---------- */
+
+function PreparePanel({ scholarships, periods, onPrepared }) {
   const toast = useToast();
 
-  const [amount, setAmount] = useState(defaultAmount === null ? "" : String(defaultAmount));
-  const [period, setPeriod] = useState(DEFAULT_PERIOD);
-  const [saving, setSaving] = useState(false);
+  const [programId, setProgramId] = useState("all");
+  const [period, setPeriod] = useState(periods.current || periods.periods[0] || "");
+  const [amount, setAmount] = useState("");
+  const [preview, setPreview] = useState(null);
+  const [showSkipped, setShowSkipped] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  async function save(event) {
+  const program = scholarships.find((s) => String(s.id) === programId);
+
+  function chooseProgram(id) {
+    setProgramId(id);
+    const chosen = scholarships.find((s) => String(s.id) === id);
+    setAmount(chosen?.amount ? String(Number(chosen.amount)) : "");
+    setPreview(null);
+  }
+
+  function body(confirmNow) {
+    const payload = { period, confirm: confirmNow };
+    if (program) {
+      payload.scholarship_id = program.id;
+      if (amount !== "" && Number(amount) !== Number(program.amount)) payload.amount = Number(amount);
+    }
+    return payload;
+  }
+
+  async function runPreview(event) {
     event.preventDefault();
 
-    const value = Number(String(amount).replaceAll(",", ""));
-
-    if (!String(amount).trim() || Number.isNaN(value) || value <= 0) {
-      toast.error("Please type a valid amount, for example 5000.");
+    if (program && amount !== "" && !(Number(amount) > 0)) {
+      toast.error("Type a valid amount, for example 5000.");
       return;
     }
 
-    if (!period.trim()) {
-      toast.error("Please type the payroll period.");
-      return;
-    }
-
-    setSaving(true);
-
+    setBusy(true);
     try {
-      const done = await onSubmit({ amount: value, period: period.trim() });
-      if (!done) setSaving(false);
+      const { data } = await api.post("/payroll/prepare", body(false));
+      setPreview(data);
+      setShowSkipped(false);
+      if (!data.summary.included) toast.info("Nobody can be added: see the reasons in the list.");
     } catch (err) {
-      toast.error(errMsg(err, "Unable to create payroll record."));
-      setSaving(false);
+      toast.error(errMsg(err, "Unable to preview the payroll."));
+    } finally {
+      setBusy(false);
     }
   }
 
+  async function confirmPayroll() {
+    setBusy(true);
+    try {
+      const { data } = await api.post("/payroll/prepare", body(true));
+      toast.success(data.message);
+      setPreview(null);
+      await onPrepared(data.summary.period);
+    } catch (err) {
+      toast.error(errMsg(err, "Unable to prepare the payroll."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const rows = preview ? preview.rows.filter((row) => showSkipped || row.include) : [];
+
   return (
-    <Modal title={title} onClose={saving ? undefined : onClose}>
-      <form onSubmit={save}>
-        <p>{intro}</p>
+    <section className="card print-hide">
+      <h2>1. Prepare payroll</h2>
+      <p className="muted small">
+        Only active grantees who are currently enrolled are included. Each scholar gets their own program's amount.
+        Anyone already in the payroll for the chosen period is skipped, so pressing this twice is safe.
+      </p>
 
-        <div className="form-grid">
-          <div>
-            <label htmlFor="payroll-amount">Amount per scholar (₱)</label>
+      <form className="form-grid" onSubmit={runPreview}>
+        <div>
+          <label htmlFor="prep-program">Scholarship</label>
+          <select id="prep-program" value={programId} onChange={(event) => chooseProgram(event.target.value)}>
+            <option value="all">All programs (batch)</option>
+            {scholarships.map((s) => (
+              <option key={s.id} value={String(s.id)}>
+                {s.name} · {formatMoney(s.amount)}
+              </option>
+            ))}
+          </select>
+        </div>
 
+        <div>
+          <label htmlFor="prep-period">Period</label>
+          <select
+            id="prep-period"
+            value={period}
+            onChange={(event) => {
+              setPeriod(event.target.value);
+              setPreview(null);
+            }}
+          >
+            {periods.periods.map((p) => (
+              <option key={p} value={p}>
+                {p}
+                {p === periods.current ? " (current)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          {program ? <label htmlFor="prep-amount">Amount per scholar (₱)</label> : <span className="field-label">Amount per scholar (₱)</span>}
+          {program ? (
             <input
-              id="payroll-amount"
+              id="prep-amount"
               type="number"
               min="1"
               step="0.01"
-              inputMode="decimal"
               value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-              placeholder="e.g. 5000"
-              required
-              autoFocus
+              onChange={(event) => {
+                setAmount(event.target.value);
+                setPreview(null);
+              }}
+              placeholder="Program amount"
             />
-          </div>
-
-          <div>
-            <label htmlFor="payroll-period">Period</label>
-
-            <input
-              id="payroll-period"
-              value={period}
-              onChange={(event) => setPeriod(event.target.value)}
-              required
-            />
-          </div>
+          ) : (
+            <p className="muted small prep-auto">
+              Filled in automatically from each scholar's program.
+            </p>
+          )}
         </div>
 
-        <div className="modal-footer">
-          <button type="button" className="button button-secondary" onClick={onClose} disabled={saving}>
-            Cancel
+        <div className="full-column button-row">
+          <button className="button button-primary" disabled={busy || !period}>
+            {busy && !preview ? "Checking..." : "Preview payroll"}
           </button>
-
-          <button className="button button-primary" disabled={saving}>
-            {saving ? "Working..." : submitLabel}
-          </button>
+          {program && amount !== "" && Number(amount) !== Number(program.amount) && (
+            <span className="small text-warning">
+              Different from the program amount ({formatMoney(program.amount)}).
+            </span>
+          )}
         </div>
       </form>
-    </Modal>
+
+      {preview && (
+        <div className="prep-preview">
+          <div className="prep-summary">
+            <span>
+              <strong>{preview.summary.included}</strong> included
+            </span>
+            <span>
+              <strong>{preview.summary.skipped}</strong> skipped
+            </span>
+            <span>
+              Total <strong>{formatMoney(preview.summary.total_amount)}</strong>
+            </span>
+            {preview.summary.with_warnings > 0 && (
+              <span className="text-warning">⚠ {preview.summary.with_warnings} with ATM issues</span>
+            )}
+            <span className="muted">{preview.summary.period}</span>
+          </div>
+
+          <label className="choice small">
+            <input type="checkbox" checked={showSkipped} onChange={(event) => setShowSkipped(event.target.checked)} />
+            Show skipped scholars and why
+          </label>
+
+          {rows.length === 0 ? (
+            <EmptyState
+              message="Nobody to show."
+              action={
+                <Link className="button button-secondary" to="/staff/scholars">
+                  Go to Scholar Records
+                </Link>
+              }
+            />
+          ) : (
+            <div className="table-wrapper prep-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>Student ID</th>
+                    <th>Scholarship</th>
+                    <th className="numeric">Amount</th>
+                    <th>ATM</th>
+                    <th>Result</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.scholar_record_id} className={row.include ? "" : "row-muted"}>
+                      <td>{row.student}</td>
+                      <td>{row.student_id}</td>
+                      <td>{row.scholarship}</td>
+                      <td className="numeric">{row.amount ? formatMoney(row.amount) : "—"}</td>
+                      <td className={row.warning ? "text-warning" : ""}>{row.warning ? `⚠ ${row.atm}` : row.atm}</td>
+                      <td>
+                        {row.include ? (
+                          <span className="status status-success">Included</span>
+                        ) : (
+                          <span className="status status-neutral">Skipped: {row.reason}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="button-row">
+            <button
+              className="button button-primary"
+              onClick={confirmPayroll}
+              disabled={busy || !preview.summary.included}
+            >
+              {busy ? "Saving..." : `Confirm: create ${preview.summary.included} draft entries`}
+            </button>
+            <button className="button button-secondary" onClick={() => setPreview(null)} disabled={busy}>
+              Cancel
+            </button>
+          </div>
+          <p className="muted small">ATM issues do not block payroll; they are listed so OAS can follow up with the bank.</p>
+        </div>
+      )}
+    </section>
   );
 }

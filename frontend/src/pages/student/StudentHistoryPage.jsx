@@ -22,7 +22,7 @@ export default function StudentHistoryPage() {
 
   return (
     <div>
-      <PageHeader title="Scholarship History" subtitle="Every scholarship you have been granted: current, completed and past" />
+      <PageHeader title="My Scholarship History" subtitle="Every scholarship you have been granted: current, completed and past" />
 
       <div className="card">
         {history.length === 0 ? (

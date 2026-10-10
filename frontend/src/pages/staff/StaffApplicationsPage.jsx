@@ -7,6 +7,7 @@ import Modal from "../../components/Modal";
 import PageHeader from "../../components/PageHeader";
 import ProfileItem from "../../components/ProfileItem";
 import StatusBadge from "../../components/StatusBadge";
+import StatusTimeline from "../../components/StatusTimeline";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 
@@ -200,6 +201,7 @@ export default function StaffApplicationsPage() {
                   <th>Scholarship</th>
                   <th>Submitted</th>
                   <th>Status</th>
+                  <th>AI flags</th>
                   <th>Last activity</th>
                   <th>Enrollment</th>
                   <th>Actions</th>
@@ -215,6 +217,9 @@ export default function StaffApplicationsPage() {
                     <td>{application.submitted_at ? formatDate(application.submitted_at) : "Not submitted"}</td>
                     <td>
                       <StatusBadge status={application.status} />
+                    </td>
+                    <td>
+                      <FlagCell application={application} />
                     </td>
                     <td className="activity-cell">
                       {application.latest_log ? (
@@ -283,7 +288,35 @@ export default function StaffApplicationsPage() {
   );
 }
 
+/* ---------- AI flag column: how many documents the AI flagged ---------- */
+
+function FlagCell({ application }) {
+  const flagged = (application.documents || []).filter((document) => document.status === "flagged").length;
+  if (flagged) return <span className="status status-warning">⚠ {flagged}</span>;
+  return <span className="muted">—</span>;
+}
+
 /* ---------- Review one application ---------- */
+
+// Buttons for each next status the backend allows (Application::STAFF_NEXT).
+const ACTIONS = {
+  under_review: { label: "Mark under review", className: "button-secondary" },
+  needs_action: { label: "Needs action (send remarks)", className: "button-warning" },
+  complete: { label: "Complete: forward to agency", className: "button-primary" },
+  approved: { label: "Approved by agency", className: "button-success" },
+  rejected: { label: "Rejected by agency", className: "button-danger" },
+};
+
+// What staff should do next, for each status.
+const NEXT_HINT = {
+  draft: "The student has not submitted this application yet. Nothing to review.",
+  submitted: "Check each document. Ask for corrections (Needs action) or forward the complete application to the agency.",
+  under_review: "Finish checking the documents, then forward the complete application to the agency or ask for corrections.",
+  needs_action: "Waiting for the student to upload the corrected documents and submit again.",
+  complete: "Forwarded to the agency. When the agency answers, record its decision here (or upload its list in Approved Lists).",
+  approved: "Approved by the agency. Next: verify enrollment, then tag the student as a grantee in Scholar Records.",
+  rejected: "The agency did not approve this application.",
+};
 
 function ReviewModal({ application, onClose, onChanged, onVerify }) {
   const toast = useToast();
@@ -294,7 +327,8 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
 
   async function review(status) {
     if (status === "needs_action" && !remarks.trim()) {
-      toast.error("Type in Remarks what the student needs to fix, then press Needs Action again.");
+      toast.error("Type in Remarks what the student needs to fix, then press Needs action again.");
+      document.getElementById("remarks")?.focus();
       return;
     }
 
@@ -306,7 +340,9 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
         remarks: remarks.trim() || null,
       });
 
-      toast.success(`Status changed to "${status.replaceAll("_", " ")}".`);
+      toast.success(
+        status === application.status ? "Remarks saved." : `Status changed to "${status.replaceAll("_", " ")}".`
+      );
 
       // Approval e-mail to the student (see Reports → E-mails sent).
       if (data.email?.status === "sent") toast.info(`Approval e-mail sent to ${data.email.to}.`);
@@ -338,7 +374,13 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
     await onChanged();
   }
 
-  const missing = missingRequirements(application);
+  const missing = application.missing_requirements || missingRequirements(application).map((r) => r.name);
+  const next = application.next_statuses || [];
+  const decided = ["approved", "rejected"].includes(application.status);
+  const student = application.student || {};
+  const others = application.other_applications || [];
+  const grants = application.scholar_records || [];
+  const flagged = (application.documents || []).filter((d) => d.status === "flagged").length;
 
   return (
     <Modal
@@ -347,22 +389,47 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
       subtitle={<StatusBadge status={application.status} />}
       onClose={onClose}
     >
+      <div className="review-next">
+        <strong>Next step:</strong> {NEXT_HINT[application.status] || "—"}
+      </div>
+
       <div className="detail-grid">
-        <ProfileItem label="Student" value={fullName(application.student)} />
-        <ProfileItem label="Student ID" value={application.student?.student_id} />
-        <ProfileItem label="Course" value={application.student?.course} />
-        <ProfileItem label="Year Level" value={application.student?.year_level} />
-        <ProfileItem label="Enrollment" value={enrollmentText(application)} />
+        <ProfileItem label="Student" value={fullName(student)} />
+        <ProfileItem label="Student ID" value={student.student_id} />
+        <ProfileItem label="Course" value={student.course} />
+        <ProfileItem label="Year Level" value={student.year_level} />
+        <ProfileItem label="College" value={student.college} />
+        <ProfileItem label="Email" value={student.user?.email} />
+        <ProfileItem label="Contact number" value={student.contact_number} />
         <ProfileItem label="Scholarship" value={application.scholarship?.name} />
+        <ProfileItem label="Submitted" value={application.submitted_at ? formatDate(application.submitted_at) : "Not submitted"} />
+        <ProfileItem label="Enrollment" value={enrollmentText(application)} />
+      </div>
+
+      <div className="review-strip">
+        <span>
+          <strong>Other applications:</strong>{" "}
+          {others.length
+            ? others.map((o) => `${o.scholarship} (${String(o.status).replaceAll("_", " ")})`).join(" · ")
+            : "none"}
+        </span>
+        <span>
+          <strong>Scholarships held:</strong>{" "}
+          {grants.length ? grants.map((g) => `${g.scholarship} (${g.status})`).join(" · ") : "none"}
+        </span>
+        {grants.some((g) => g.status === "active") && (
+          <span className="text-danger">⚠ This student already has an active scholarship (one active scholarship only).</span>
+        )}
       </div>
 
       {missing.length > 0 && (
-        <div className="alert alert-danger">
-          Missing required documents: {missing.map((requirement) => requirement.name).join(", ")}
-        </div>
+        <div className="alert alert-danger">Missing required documents: {missing.join(", ")}</div>
       )}
 
-      <h3>Submitted Documents</h3>
+      <h3>
+        Submitted Documents
+        {flagged > 0 && <span className="status status-warning review-flag-count">⚠ {flagged} flagged by the AI</span>}
+      </h3>
 
       {application.documents?.length ? (
         application.documents.map((document) => (
@@ -374,6 +441,14 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
                 <a href={fileUrl(document)} target="_blank" rel="noreferrer">
                   {document.original_filename}
                 </a>
+                {" · uploaded "}
+                {formatDate(document.created_at)}
+                {document.expires_at &&
+                  (document.is_expired ? (
+                    <span className="text-danger"> · expired {formatDate(document.expires_at)}</span>
+                  ) : (
+                    <> · valid until {formatDate(document.expires_at)}</>
+                  ))}
               </p>
 
               <AiResult result={document.validation_result} />
@@ -400,36 +475,51 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
         <EmptyState message="No documents submitted." />
       )}
 
-      <label htmlFor="remarks">Remarks (shown to the student)</label>
+      {application.status !== "draft" && (
+        <>
+          <label htmlFor="remarks">Remarks (shown to the student)</label>
 
-      <textarea
-        id="remarks"
-        value={remarks}
-        onChange={(event) => setRemarks(event.target.value)}
-        placeholder="Example: Your Certificate of Grades is blurry. Please upload a clearer copy."
-      />
+          <textarea
+            id="remarks"
+            value={remarks}
+            onChange={(event) => setRemarks(event.target.value)}
+            placeholder="Example: Your Certificate of Grades is blurry. Please upload a clearer copy."
+          />
+        </>
+      )}
 
-      <p className="muted">
-        OAS checks the documents. The external agency makes the final decision; use Approved /
-        Rejected to record it.
+      <p className="muted small">
+        OAS checks the documents and forwards complete applications. The external agency makes the final decision;
+        the AI only points things out.
       </p>
 
       <div className="button-row">
-        <button className="button button-secondary" disabled={busy} onClick={() => review("under_review")}>
-          Under Review
-        </button>
-        <button className="button button-warning" disabled={busy} onClick={() => review("needs_action")}>
-          Needs Action
-        </button>
-        <button className="button button-secondary" disabled={busy} onClick={() => review("complete")}>
-          Complete (forward to agency)
-        </button>
-        <button className="button button-primary" disabled={busy} onClick={() => review("approved")}>
-          Approved by agency
-        </button>
-        <button className="button button-danger" disabled={busy} onClick={() => review("rejected")}>
-          Rejected by agency
-        </button>
+        {next.map((status) => {
+          const undo = decided && status === "complete";
+          const action = undo
+            ? { label: "Undo agency decision", className: "button-secondary" }
+            : ACTIONS[status];
+          return (
+            <button
+              key={status}
+              className={`button ${action.className}`}
+              disabled={busy}
+              onClick={() => review(status)}
+            >
+              {action.label}
+            </button>
+          );
+        })}
+
+        {application.status !== "draft" && (
+          <button
+            className="button button-secondary"
+            disabled={busy || remarks.trim() === (application.remarks || "").trim()}
+            onClick={() => review(application.status)}
+          >
+            Save remarks only
+          </button>
+        )}
 
         {application.status === "approved" && (
           <button className="button button-success" onClick={onVerify}>
@@ -437,6 +527,13 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
           </button>
         )}
       </div>
+
+      {!next.includes("complete") && ["submitted", "under_review"].includes(application.status) && missing.length > 0 && (
+        <p className="muted small">“Complete: forward to agency” appears when every required document is uploaded.</p>
+      )}
+
+      <h3>Application timeline</h3>
+      <StatusTimeline application={application} />
     </Modal>
   );
 }
