@@ -375,7 +375,24 @@ Run `php artisan migrate:fresh --seed` first. Admin: `admin@carsu.edu.ph` / `Adm
 
 ---
 
+## Part G — Round 9: announcement pictures
+
+- [ ] **G1.** As Wena: the dashboard shows **Latest Announcements**: three cards with picture, date, title, a short
+  preview and *Read more*.
+- [ ] **G2.** *Read more* opens the announcement page with the full-size picture and the whole message. An expired
+  announcement (e.g. `/student/announcements/8`) says it is no longer available.
+- [ ] **G3.** As staff: Announcements shows a thumbnail for each one (8 seeded; 2 expired, shown faded).
+- [ ] **G4.** New announcement → choose a .txt file → "Choose a JPG, PNG or WebP picture." A picture over 2 MB →
+  "larger than 2 MB". A good JPG → preview → Post. The new announcement shows the picture.
+- [ ] **G5.** Edit it → *Remove picture* → Save → the CSU placeholder is shown and the file is deleted from
+  `backend/storage/app/public/announcements/`.
+
+---
+
 ## What has and has not been tested
+
+Part G (round 9) was tested by Claude on **10 Oct 2026** in the browser (G1–G5 at 1366×900, the dashboard also at
+390×844), and Part E was run again afterwards with the same results.
 
 Part F (round 8) was tested by Claude on **10 Oct 2026**: F1–F20 in the browser (1366×900; the new pages also at
 390×844 with no sideways scrolling), every new API rule (staff and students get 403 on admin pages, the admin gets

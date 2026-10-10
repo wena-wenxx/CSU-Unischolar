@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Announcement extends Model
 {
-    protected $fillable = ['title', 'body', 'posted_by', 'posted_at', 'expires_at'];
+    protected $fillable = ['title', 'body', 'image_path', 'posted_by', 'posted_at', 'expires_at'];
 
     protected $casts = [
         'posted_at' => 'datetime',
@@ -24,5 +24,11 @@ class Announcement extends Model
         $today = Scholarship::today();
 
         return $query->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>=', $today));
+    }
+
+    // An uploaded picture (not a sample shipped with the frontend).
+    public function hasUploadedImage(): bool
+    {
+        return $this->image_path && !str_starts_with($this->image_path, '/');
     }
 }

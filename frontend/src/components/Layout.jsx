@@ -54,6 +54,7 @@ function pageTitle(pathname, role) {
   if (/^\/student\/applications\/[^/]+$/.test(pathname)) return "Application";
   if (pathname.endsWith("/profile")) return "My Profile";
   if (pathname === "/staff/auto-review") return "Auto-Review";
+  if (/\/announcements\/[^/]+$/.test(pathname)) return "Announcement";
 
   const match = (NAVIGATION[role] || []).find(([path]) => path === pathname);
   return match ? match[1] : APP_NAME;

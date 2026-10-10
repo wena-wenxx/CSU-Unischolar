@@ -67,6 +67,19 @@ export function fileUrl(document) {
   return `${FILES_URL}/${document.file_path}`;
 }
 
+// Announcement picture: "/announcements/x.jpg" is a sample shipped with the
+// frontend; "announcements/abc.jpg" was uploaded by staff. null = no picture.
+export function announcementImage(item) {
+  if (!item?.image_path) return null;
+  return item.image_path.startsWith("/") ? item.image_path : `${FILES_URL}/${item.image_path}`;
+}
+
+// First words of a long text, for previews.
+export function preview(text, length = 140) {
+  const clean = String(text || "").replace(/\s+/g, " ").trim();
+  return clean.length > length ? `${clean.slice(0, length).replace(/\s+\S*$/, "").replace(/[.,;:]+$/, "")}…` : clean;
+}
+
 // Required requirements that have no uploaded document yet.
 export function missingRequirements(application) {
   const uploaded = new Set(

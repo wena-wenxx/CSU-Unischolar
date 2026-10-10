@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use App\Models\Announcement;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 /*
 | OAS announcements. Staff create, edit and delete them.
@@ -25,7 +26,40 @@ class AnnouncementController extends Controller
             'title' => 'required|string|max:150',
             'body' => 'required|string|max:5000',
             'expires_at' => 'nullable|date',
+            // Picture: JPG, PNG or WebP up to 2 MB (800 x 450 recommended).
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'remove_image' => 'sometimes|boolean',
         ];
+    }
+
+    // Saves a new picture (replacing an uploaded one) or removes it.
+    private function applyImage(Request $request, Announcement $announcement): void
+    {
+        $remove = $request->boolean('remove_image');
+
+        if (($request->hasFile('image') || $remove) && $announcement->hasUploadedImage()) {
+            Storage::disk('public')->delete($announcement->image_path);
+        }
+
+        if ($request->hasFile('image')) {
+            $announcement->image_path = $request->file('image')->store('announcements', 'public');
+        } elseif ($remove) {
+            $announcement->image_path = null;
+        }
+
+        $announcement->save();
+    }
+
+    // GET /announcements/{id}: one announcement (students: only if not expired).
+    public function show(Request $request, $id)
+    {
+        $query = Announcement::with('author:id,name');
+
+        if ($request->user()->role === 'student') {
+            $query->current();
+        }
+
+        return response()->json($query->findOrFail($id));
     }
 
     // GET /announcements?limit=3
@@ -48,10 +82,14 @@ class AnnouncementController extends Controller
     {
         $this->staffOnly($request);
 
-        $announcement = Announcement::create($request->validate($this->rules()) + [
+        $data = $request->validate($this->rules());
+        unset($data['image'], $data['remove_image']);
+
+        $announcement = Announcement::create($data + [
             'posted_by' => $request->user()->id,
             'posted_at' => now(),
         ]);
+        $this->applyImage($request, $announcement);
 
         ActivityLog::record($request->user(), 'announcement.created', "Posted announcement \"{$announcement->title}\".", $announcement);
 
@@ -63,7 +101,10 @@ class AnnouncementController extends Controller
         $this->staffOnly($request);
 
         $announcement = Announcement::findOrFail($id);
-        $announcement->update($request->validate($this->rules()));
+        $data = $request->validate($this->rules());
+        unset($data['image'], $data['remove_image']);
+        $announcement->fill($data);
+        $this->applyImage($request, $announcement);
         ActivityLog::record($request->user(), 'announcement.updated', "Edited announcement \"{$announcement->title}\".", $announcement);
 
         return response()->json($announcement->load('author:id,name'));
@@ -74,6 +115,9 @@ class AnnouncementController extends Controller
         $this->staffOnly($request);
 
         $announcement = Announcement::findOrFail($id);
+        if ($announcement->hasUploadedImage()) {
+            Storage::disk('public')->delete($announcement->image_path);
+        }
         $announcement->delete();
         ActivityLog::record($request->user(), 'announcement.deleted', "Deleted announcement \"{$announcement->title}\".");
 

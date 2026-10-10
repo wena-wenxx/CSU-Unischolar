@@ -34,6 +34,7 @@ import EnrollmentPage from "./pages/staff/EnrollmentPage";
 import MessagesPage from "./pages/staff/MessagesPage";
 import ContactPage from "./pages/student/ContactPage";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
+import AnnouncementDetailPage from "./pages/AnnouncementDetailPage";
 
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import ManageAccountsPage from "./pages/admin/ManageAccountsPage";
@@ -87,6 +88,7 @@ export default function App() {
                 <Route path="/student/help" element={<HelpPage />} />
                 <Route path="/student/documents" element={<MyDocumentsPage />} />
                 <Route path="/student/contact" element={<ContactPage />} />
+                <Route path="/student/announcements/:id" element={<AnnouncementDetailPage />} />
               </Route>
             </Route>
 
@@ -107,6 +109,7 @@ export default function App() {
                 <Route path="/staff/forwarded" element={<ForwardedPage />} />
                 <Route path="/staff/enrollment" element={<EnrollmentPage />} />
                 <Route path="/staff/messages" element={<MessagesPage />} />
+                <Route path="/staff/announcements/:id" element={<AnnouncementDetailPage />} />
               </Route>
             </Route>
 

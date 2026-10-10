@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
-import { formatDate } from "../../lib/format";
+import { announcementImage, formatDate } from "../../lib/format";
+import AnnouncementImage from "../../components/AnnouncementImage";
 import { useToast } from "../../lib/toast";
 import Modal from "../../components/Modal";
 import { useConfirm } from "../../lib/confirm";
@@ -8,7 +10,8 @@ import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 
-const EMPTY = { title: "", body: "", expires_at: "" };
+const EMPTY = { title: "", body: "", expires_at: "", image_path: null };
+const MAX_IMAGE = 2 * 1024 * 1024; // 2 MB
 
 const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
@@ -82,10 +85,14 @@ export default function StaffAnnouncementsPage() {
             const expired = item.expires_at && String(item.expires_at).slice(0, 10) < today();
 
             return (
-              <article className={expired ? "announcement expired" : "announcement"} key={item.id}>
+              <article className={expired ? "announcement with-image expired" : "announcement with-image"} key={item.id}>
+                <AnnouncementImage item={item} className="thumb" />
+                <div className="announcement-main">
                 <div className="announcement-head">
                   <div>
-                    <strong>{item.title}</strong>{" "}
+                    <Link to={`/staff/announcements/${item.id}`}>
+                      <strong>{item.title}</strong>
+                    </Link>{" "}
                     {expired ? (
                       <span className="status status-neutral">Expired · hidden from students</span>
                     ) : (
@@ -106,6 +113,7 @@ export default function StaffAnnouncementsPage() {
                           title: item.title,
                           body: item.body,
                           expires_at: item.expires_at ? String(item.expires_at).slice(0, 10) : "",
+                          image_path: item.image_path,
                         })
                       }
                     >
@@ -118,6 +126,7 @@ export default function StaffAnnouncementsPage() {
                 </div>
 
                 <p>{item.body}</p>
+                </div>
               </article>
             );
           })
@@ -142,21 +151,54 @@ function AnnouncementModal({ initial, onClose, onSaved }) {
   const toast = useToast();
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
+  const [image, setImage] = useState(null); // new File
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [removeImage, setRemoveImage] = useState(false);
 
   const field = (key) => (event) => setForm({ ...form, [key]: event.target.value });
+
+  // Free the preview picture's memory when it changes or the window closes.
+  useEffect(() => () => previewUrl && URL.revokeObjectURL(previewUrl), [previewUrl]);
+
+  function chooseImage(event) {
+    const file = event.target.files?.[0] || null;
+    if (!file) return;
+
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      toast.error("Choose a JPG, PNG or WebP picture.");
+      event.target.value = "";
+      return;
+    }
+    if (file.size > MAX_IMAGE) {
+      toast.error("The picture is larger than 2 MB. Make it smaller (800 × 450 is enough).");
+      event.target.value = "";
+      return;
+    }
+
+    setImage(file);
+    setRemoveImage(false);
+    setPreviewUrl(URL.createObjectURL(file));
+  }
 
   async function save(event) {
     event.preventDefault();
     setSaving(true);
 
-    const payload = { title: form.title.trim(), body: form.body.trim(), expires_at: form.expires_at || null };
+    // FormData so a picture can be sent; an edit is POST + _method=PUT.
+    const data = new FormData();
+    data.append("title", form.title.trim());
+    data.append("body", form.body.trim());
+    data.append("expires_at", form.expires_at || "");
+    if (image) data.append("image", image);
+    if (removeImage) data.append("remove_image", "1");
+    if (form.id) data.append("_method", "PUT");
 
     try {
       if (form.id) {
-        await api.put(`/announcements/${form.id}`, payload);
+        await api.post(`/announcements/${form.id}`, data, { headers: { "Content-Type": "multipart/form-data" } });
         toast.success("Announcement updated.");
       } else {
-        await api.post("/announcements", payload);
+        await api.post("/announcements", data, { headers: { "Content-Type": "multipart/form-data" } });
         toast.success("Announcement posted. Students can see it now.");
       }
       onSaved();
@@ -182,6 +224,37 @@ function AnnouncementModal({ initial, onClose, onSaved }) {
         <div>
           <label htmlFor="announcement-expires">Show until (optional)</label>
           <input id="announcement-expires" type="date" value={form.expires_at} onChange={field("expires_at")} />
+        </div>
+
+        <div className="full-column announcement-picture">
+          <label htmlFor="announcement-image">Picture (optional)</label>
+          <div className="picture-row">
+            {previewUrl ? (
+              <img className="announcement-image thumb" src={previewUrl} alt="" />
+            ) : (
+              <AnnouncementImage item={removeImage ? {} : form} className="thumb" />
+            )}
+            <div>
+              <input id="announcement-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={chooseImage} />
+              <p className="muted small">
+                JPG, PNG or WebP, up to 2 MB. Best size: 800 × 450 (landscape). Without a picture, the CSU logo is shown.
+              </p>
+              {(image || (announcementImage(form) && !removeImage)) && (
+                <button
+                  type="button"
+                  className="link-button small"
+                  onClick={() => {
+                    setImage(null);
+                    setPreviewUrl(null);
+                    setRemoveImage(Boolean(form.id && form.image_path));
+                    document.getElementById("announcement-image").value = "";
+                  }}
+                >
+                  Remove picture
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="full-column button-row">

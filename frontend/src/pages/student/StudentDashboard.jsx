@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
-import { availabilityInfo, deadlineText, formatDate, formatMoney, timeAgo } from "../../lib/format";
+import { availabilityInfo, deadlineText, formatDate, formatMoney, preview, timeAgo } from "../../lib/format";
 import DashboardHero from "../../components/DashboardHero";
 import QuickActions from "../../components/QuickActions";
 import StatCard from "../../components/StatCard";
 import StatusBadge from "../../components/StatusBadge";
 import EmptyState from "../../components/EmptyState";
+import AnnouncementImage from "../../components/AnnouncementImage";
 import Loading from "../../components/Loading";
 
 export default function StudentDashboard() {
@@ -114,24 +115,25 @@ export default function StudentDashboard() {
 
       <section className="card">
         <div className="card-header">
-          <h2>Announcements</h2>
+          <h2>Latest Announcements</h2>
         </div>
 
         {announcements.length === 0 ? (
           <EmptyState message="No announcements right now." />
         ) : (
-          announcements.map((item) => (
-            <article className="announcement" key={item.id}>
-              <div className="announcement-head">
-                <strong>{item.title}</strong>
-                <small className="muted">
-                  Posted {formatDate(item.posted_at)}
-                  {item.expires_at ? ` · until ${formatDate(item.expires_at)}` : ""}
-                </small>
-              </div>
-              <p>{item.body}</p>
-            </article>
-          ))
+          <div className="announcement-cards">
+            {announcements.map((item) => (
+              <Link className="announcement-card" key={item.id} to={`/student/announcements/${item.id}`}>
+                <AnnouncementImage item={item} />
+                <div className="announcement-card-text">
+                  <small className="muted">{formatDate(item.posted_at)}</small>
+                  <strong>{item.title}</strong>
+                  <p>{preview(item.body, 120)}</p>
+                  <span className="read-more">Read more →</span>
+                </div>
+              </Link>
+            ))}
+          </div>
         )}
       </section>
 

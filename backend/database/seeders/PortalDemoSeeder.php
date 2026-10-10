@@ -10,7 +10,7 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 
 /**
- * FICTIONAL DEMO DATA: OAS announcements, one pending
+ * FICTIONAL DEMO DATA: eight OAS announcements with pictures, one pending
  * "request a correction" and three Contact OAS messages from demo students.
  * Safe to run again (skips what already exists).
  */
@@ -20,30 +20,65 @@ class PortalDemoSeeder extends Seeder
     {
         $staff = User::where('role', 'staff')->first();
 
+        // Eight sample announcements. Pictures are original drawings in
+        // frontend/public/announcements/ (no agency logos are used).
+        // Dates fit the demo programs: expired ones are shown to staff only.
         $announcements = [
             [
-                'title' => 'Now open: CSU Cultural and Athletic Grants',
-                'body' => "Members of the CSU Choir, Dance Troupe, Kayam Ethno Band and varsity teams may now apply online until November 15, 2026. Prepare your COR, Certificate of Grades, Valid ID, Birth Certificate, Certificate of Good Moral Character and a recommendation letter from your coach or adviser.",
-                'posted_days_ago' => 10,
-                'expires_at' => '2026-11-15',
+                'title' => 'OAS Office Closed on November 5',
+                'body' => "The Office of Admission and Scholarship will be closed on Thursday, November 5, 2026. Online applications in ScholarGuide stay open. Messages sent through Contact OAS will be answered on the next working day.",
+                'image' => '/announcements/office-closed.jpg',
+                'posted_days_ago' => 0,
+                'expires_at' => '2026-11-05',
             ],
             [
-                'title' => 'Reminder: TES and CSU Student Assistance deadlines',
-                'body' => "Applications for the Tertiary Education Subsidy (TES) close on October 31, 2026 and the CSU Student Assistance Scholarship on October 30, 2026. Drafts that are not submitted by the deadline can no longer be submitted.",
-                'posted_days_ago' => 3,
-                'expires_at' => '2026-10-31',
-            ],
-            [
-                'title' => 'Payroll for 1st Semester AY 2026-2027',
-                'body' => "OAS is preparing the payroll for active grantees whose enrollment has been verified. The payout date will be posted here once the funding agency releases it. Grantees without an ATM card should coordinate with the OAS office.",
+                'title' => 'Payroll Schedule for 1st Semester',
+                'body' => "OAS is preparing the payroll for active grantees whose enrollment has been verified for the 1st Semester AY 2026-2027. The payout date will be posted here once the funding agency releases it. Grantees without an ATM card yet should message OAS through Contact OAS.",
+                'image' => '/announcements/payroll-schedule.jpg',
                 'posted_days_ago' => 1,
                 'expires_at' => null,
             ],
             [
-                'title' => 'Continuing grantees: submit your COR',
-                'body' => "Continuing grantees were asked to submit their Certificate of Registration for enrollment verification. This notice has expired and is shown only to staff.",
-                'posted_days_ago' => 40,
-                'expires_at' => '2026-09-15',
+                'title' => 'Congratulations to New Scholars',
+                'body' => "Congratulations to the students who were approved this semester! Please check My Applications: OAS will verify your enrollment and tag you as a grantee. Keep your contact number in My Profile up to date.",
+                'image' => '/announcements/new-scholars.jpg',
+                'posted_days_ago' => 3,
+                'expires_at' => '2026-11-30',
+            ],
+            [
+                'title' => 'LGU Butuan City Scholarship Orientation',
+                'body' => "Applicants of the Butuan City Scholarship Program are invited to an orientation on October 24, 2026. Bring a copy of your Certificate of Registration. Applications close on October 31, 2026.",
+                'image' => '/announcements/orientation.jpg',
+                'posted_days_ago' => 5,
+                'expires_at' => '2026-10-24',
+            ],
+            [
+                'title' => 'Deadline for TES Applications Extended',
+                'body' => "The deadline for Tertiary Education Subsidy (TES) applications is extended to October 31, 2026. Drafts that are not submitted by the deadline can no longer be submitted, so press Submit application once every required document is uploaded.",
+                'image' => '/announcements/deadline-extended.jpg',
+                'posted_days_ago' => 6,
+                'expires_at' => '2026-10-31',
+            ],
+            [
+                'title' => 'CSU Cultural Grant Auditions',
+                'body' => "Members of the CSU Choir, Dance Troupe and Kayam Ethno Band may apply for the CSU Cultural Grant until November 15, 2026. Auditions are scheduled by each group's adviser. Prepare your COR, Certificate of Grades, Valid ID and a recommendation letter.",
+                'image' => '/announcements/cultural-auditions.jpg',
+                'posted_days_ago' => 10,
+                'expires_at' => '2026-11-15',
+            ],
+            [
+                'title' => 'New DOST-SEI Scholarship Slots',
+                'body' => "Additional slots for the DOST-SEI Undergraduate Scholarship were announced for this cycle. Applications closed on August 14, 2026. This notice has expired and is shown only to staff.",
+                'image' => '/announcements/science-slots.jpg',
+                'posted_days_ago' => 80,
+                'expires_at' => '2026-08-14',
+            ],
+            [
+                'title' => 'CHED Merit Scholarship Now Open',
+                'body' => "Applications for the CHED Merit Scholarship Program (CMSP) were open until August 31, 2026. This notice has expired and is shown only to staff.",
+                'image' => '/announcements/scholarship-open.jpg',
+                'posted_days_ago' => 85,
+                'expires_at' => '2026-08-31',
             ],
         ];
 
@@ -52,6 +87,7 @@ class PortalDemoSeeder extends Seeder
                 ['title' => $a['title']],
                 [
                     'body' => $a['body'],
+                    'image_path' => $a['image'],
                     'posted_by' => $staff?->id,
                     'posted_at' => now()->subDays($a['posted_days_ago']),
                     'expires_at' => $a['expires_at'],
