@@ -8,6 +8,8 @@ import PageHeader from "../../components/PageHeader";
 import StatusBadge from "../../components/StatusBadge";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
+import SheetTabs from "../../components/SheetTabs";
+import { byLastName, lastFirst, programTabs } from "../../lib/programs";
 
 /*
   Payroll (status tracking only; no money is moved by this system).
@@ -87,22 +89,26 @@ export default function StaffPayrollPage() {
 
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
 
-  const shown = payroll.filter((item) => {
+  const filtered = payroll.filter((item) => {
     const record = item.scholar_record;
     if (statusFilter !== "all" && item.status !== statusFilter) return false;
     if (periodFilter !== "all" && !same(item.period, periodFilter)) return false;
-    if (programFilter !== "all" && String(record?.scholarship_id) !== programFilter) return false;
     if (atmFilter !== "all" && atmGroup(record) !== atmFilter) return false;
-    const haystack = `${fullName(record?.student)} ${record?.student?.student_id || ""}`.toLowerCase();
+    const haystack = `${lastFirst(record?.student)} ${record?.student?.student_id || ""}`.toLowerCase();
     return words.every((word) => haystack.includes(word));
   });
+  // One tab per program (like sheets in Excel); each list is A to Z.
+  const tabs = programTabs(filtered, (item) => item.scholar_record?.scholarship);
+  const activeProgram = tabs.some((tab) => tab.key === programFilter) ? programFilter : "all";
+  const shown = filtered
+    .filter((item) => activeProgram === "all" || String(item.scholar_record?.scholarship_id) === activeProgram)
+    .sort((a, b) => byLastName(a.scholar_record?.student, b.scholar_record?.student));
 
   const shownIds = shown.map((item) => item.id);
   const selectedShown = selected.filter((id) => shownIds.includes(id));
   const allSelected = shown.length > 0 && selectedShown.length === shown.length;
   const total = shown.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   const usedPeriods = [...new Set(payroll.map((item) => item.period))];
-  const programsInPayroll = scholarships.filter((s) => payroll.some((item) => item.scholar_record?.scholarship_id === s.id));
 
   function toggle(id) {
     setSelected((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]));
@@ -186,7 +192,7 @@ export default function StaffPayrollPage() {
         }}
       />
 
-      <section className="card" ref={listRef} id="payroll-list">
+      <section className="card sheet-card" ref={listRef} id="payroll-list">
         <div className="card-header">
           <h2>2. Payroll list</h2>
           <div className="button-row">
@@ -199,7 +205,9 @@ export default function StaffPayrollPage() {
           </div>
         </div>
 
-        <p className="muted small">Draft → Ready (checked) → Processed (stipend released).</p>
+        <p className="muted small">Draft → Ready (checked) → Processed (stipend released). Lists are A to Z by last name.</p>
+
+        <SheetTabs tabs={tabs} value={activeProgram} onChange={setProgramFilter} />
 
         <div className="filter-row" role="group" aria-label="Filter payroll by status">
           {STATUS_FILTERS.map(([key, label]) => (
@@ -234,18 +242,6 @@ export default function StaffPayrollPage() {
             {usedPeriods.map((period) => (
               <option key={period} value={period}>
                 {period}
-              </option>
-            ))}
-          </select>
-
-          <label htmlFor="payroll-program-filter" className="sr-only">
-            Scholarship
-          </label>
-          <select id="payroll-program-filter" value={programFilter} onChange={(event) => setProgramFilter(event.target.value)}>
-            <option value="all">All programs</option>
-            {programsInPayroll.map((scholarship) => (
-              <option key={scholarship.id} value={String(scholarship.id)}>
-                {scholarship.name}
               </option>
             ))}
           </select>
@@ -338,9 +334,11 @@ export default function StaffPayrollPage() {
                         onChange={() => toggle(item.id)}
                       />
                     </td>
-                    <td>{fullName(item.scholar_record?.student)}</td>
+                    <td>{lastFirst(item.scholar_record?.student)}</td>
                     <td>{item.scholar_record?.student?.student_id}</td>
-                    <td>{item.scholar_record?.scholarship?.name}</td>
+                    <td title={item.scholar_record?.scholarship?.name}>
+                      {item.scholar_record?.scholarship?.short_name || item.scholar_record?.scholarship?.name}
+                    </td>
                     <td>{item.period}</td>
                     <td className="numeric">{formatMoney(item.amount)}</td>
                     <td>

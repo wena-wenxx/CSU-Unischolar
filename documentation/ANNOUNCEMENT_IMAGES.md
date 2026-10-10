@@ -8,13 +8,13 @@ The 8 sample announcements use **original drawings made for this project**
 | File | Used for |
 |---|---|
 | `scholarship-open.jpg` | CHED Merit Scholarship Now Open |
-| `deadline-extended.jpg` | Deadline for TES Applications Extended |
-| `science-slots.jpg` | New DOST-SEI Scholarship Slots |
+| `deadline-extended.jpg` | Reminder: TES and TDP-TES Deadline |
+| `science-slots.jpg` | DOST Scholarship Updates |
 | `payroll-schedule.jpg` | Payroll Schedule for 1st Semester |
 | `office-closed.jpg` | OAS Office Closed on November 5 |
 | `new-scholars.jpg` | Congratulations to New Scholars (uses the CSU campus photo you gave) |
-| `cultural-auditions.jpg` | CSU Cultural Grant Auditions |
-| `orientation.jpg` | LGU Butuan City Scholarship Orientation |
+| `cultural-auditions.jpg` | Culture and Arts Financial Assistance |
+| `orientation.jpg` | Agency-Direct Scholarships: Apply at the Agency |
 
 All are 800 × 450 JPG, 16–57 KB.
 

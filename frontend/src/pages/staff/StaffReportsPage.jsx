@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api, { errMsg } from "../../services/api";
-import { downloadCSV, formatDate, formatDateTime, fullName, missingRequirements, statusLabel } from "../../lib/format";
+import { downloadCSV, flaggedCount, formatDate, formatDateTime, fullName, missingRequirements, statusLabel } from "../../lib/format";
 import { useToast } from "../../lib/toast";
 import PageHeader from "../../components/PageHeader";
 import Loading from "../../components/Loading";
@@ -100,7 +100,7 @@ export default function StaffReportsPage() {
           Missing_Documents: missingRequirements(item)
             .map((requirement) => requirement.name)
             .join("; "),
-          AI_Flagged_Documents: (item.documents || []).filter((d) => d.status === "flagged").length,
+          AI_Flagged_Documents: flaggedCount(item),
           Submitted: item.submitted_at ? formatDate(item.submitted_at) : "",
           Enrollment_Verified: item.enrollment_verified ? "Yes" : "No",
           Remarks: item.remarks || "",

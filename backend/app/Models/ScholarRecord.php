@@ -54,8 +54,16 @@ class ScholarRecord extends Model
         $paid = DB::table('payroll_records')->where('status', 'processed')->pluck('scholar_record_id')->unique()->all();
 
         $count = 0;
-        foreach (self::query()->whereNull('atm_funds')->whereNull('atm_note')->get() as $record) {
+        foreach (self::with('scholarship:id,application_mode')->whereNull('atm_funds')->whereNull('atm_note')->get() as $record) {
             $record->timestamps = false;
+
+            // Agency-direct programs pay the grantee themselves.
+            if ($record->scholarship?->application_mode === 'agency_direct') {
+                $record->forceFill(['atm_note' => 'Paid directly by the agency'])->save();
+                $count++;
+                continue;
+            }
+
             $record->forceFill($record->has_atm
                 ? ['atm_funds' => in_array($record->id, $paid) ? 'yes' : 'pending']
                 : ['atm_note' => 'For ATM application'])->save();

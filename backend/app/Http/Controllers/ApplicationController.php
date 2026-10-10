@@ -49,8 +49,8 @@ class ApplicationController extends Controller
             $request->scholarship_id
         );
 
-        // Closed, inactive, not yet open, or past its deadline.
-        if (!$scholarship->is_open) {
+        // Closed, inactive, not yet open, past its deadline, or applied for at the agency.
+        if ($scholarship->isAgencyDirect() || !$scholarship->is_open) {
             return response()->json([
                 'message' => $scholarship->closedReason()
             ], 422);
@@ -230,24 +230,63 @@ class ApplicationController extends Controller
             ], 403);
         }
 
-        // The list only needs what the tables, filters and CSV reports show.
+        // The list only sends what the tables, filters and CSV reports show
+        // (about 10x smaller than whole records, so pages open faster).
         // Full documents and AI results are loaded per application in show().
+        // ?status=approved (or a comma list) returns only those statuses.
         // Newest activity first: whatever changed most recently is on top.
-        $applications = Application::with([
-            'student',
-            'student.user:id,email',
-            'scholarship:id,name,provider,category,amount,status,application_start,application_end',
-            'scholarship.requirements:id,scholarship_id,name,is_required',
-            'documents:id,application_id,scholarship_requirement_id,status',
-            'latestLog',
-        ])
+        $statuses = array_filter(explode(',', (string) $request->query('status', '')));
+
+        $applications = Application::query()
+            ->select(['id', 'student_id', 'scholarship_id', 'status', 'remarks', 'submitted_at', 'forwarded_at',
+                'enrollment_verified', 'enrollment_verified_at', 'created_at', 'updated_at'])
+            ->with([
+                'student:id,user_id,student_id,first_name,middle_name,last_name,sex,course,year_level,college,contact_number',
+                'student.user:id,email',
+                'scholarship:id,name,short_name,provider,category,amount,status,application_mode',
+                'scholarship.requirements:id,scholarship_id,name,is_required',
+                'documents:id,application_id,scholarship_requirement_id,status',
+                'latestLog',
+            ])
+            ->when($statuses, fn ($q) => $q->whereIn('status', $statuses))
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
-            ->get();
+            ->get()
+            ->each(function (Application $application) {
+                $covered = $application->documents->pluck('scholarship_requirement_id')->filter()->all();
+                $application->setAttribute('missing_requirements', $application->scholarship?->requirements
+                    ->where('is_required', true)
+                    ->reject(fn ($r) => in_array($r->id, $covered))
+                    ->pluck('name')->values() ?? []);
+                $application->setAttribute('flagged_count', $application->documents->where('status', 'flagged')->count());
+                $application->setAttribute('documents_count', $application->documents->count());
+                $application->setRelation('documents', collect());
+                $application->makeHidden('documents');
+            });
+
+        $applications->pluck('scholarship')->filter()->unique('id')->each->makeHidden('requirements');
 
         return response()->json($applications);
     }
 
+
+    /*
+    | GET /staff/applications/version
+    | A tiny fingerprint of all applications and their documents. The
+    | Applications page asks for it every few seconds and reloads the list
+    | only when it changed (someone else worked on it, or Auto-Review ran).
+    */
+    public function version(Request $request)
+    {
+        if (!$request->user()->isOffice()) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
+        $apps = Application::query()->selectRaw('count(*) as c, max(updated_at) as u')->first();
+        $docs = \App\Models\Document::query()->whereNotNull('application_id')->selectRaw('count(*) as c, max(updated_at) as u')->first();
+
+        return response()->json(['version' => "{$apps->c}|{$apps->u}|{$docs->c}|{$docs->u}"]);
+    }
 
     /*
     |--------------------------------------------------------------------------

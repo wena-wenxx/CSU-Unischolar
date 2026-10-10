@@ -197,7 +197,7 @@ like `Running migrations`, `Seeding: Database\Seeders\BulkDemoSeeder` and
 3. Open **Applications** → any application → click a document's **View**.
    The PDF should open (this tests the volume + storage link).
 4. Log in as `student5@carsu.edu.ph` / `Student@12345` (Liza), apply to
-   **CSU Cultural Grant (Choir)**, upload one PDF from the demo kit, and run
+   **Culture and Arts**, upload one PDF from the demo kit, and run
    the AI check from the staff side. You should get a result in a few
    seconds (or ~1 minute if the Space was asleep).
 

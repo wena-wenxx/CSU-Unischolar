@@ -125,6 +125,18 @@ export default function SettingsPage() {
               <label htmlFor="set-phone">Phone</label>
               <input id="set-phone" value={form.oas_phone} onChange={field("oas_phone")} maxLength={60} />
             </div>
+            <div>
+              <label htmlFor="set-head">Head of office</label>
+              <input id="set-head" value={form.oas_head} onChange={field("oas_head")} maxLength={255} />
+            </div>
+            <div>
+              <label htmlFor="set-facebook">Facebook page</label>
+              <input id="set-facebook" type="url" value={form.oas_facebook} onChange={field("oas_facebook")} maxLength={255} />
+            </div>
+            <div className="full-column">
+              <label htmlFor="set-about">About the OAS (shown on Contact OAS)</label>
+              <textarea id="set-about" value={form.oas_about} onChange={field("oas_about")} maxLength={2000} rows={4} />
+            </div>
           </div>
         </section>
 

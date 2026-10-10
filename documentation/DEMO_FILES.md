@@ -186,7 +186,7 @@ a missing ID, an unreadable blank page) so the Needs Action, Flagged and Needs R
 ## Suggested panel demo order (about 10 minutes)
 
 1. `php artisan migrate:fresh --seed` before the panel arrives.
-2. **Student (Liza, student5):** apply for **CSU Cultural Grant (Choir)** → upload her 6 PDFs → Submit.
+2. **Student (Liza, student5):** apply for **Culture and Arts** → upload her 6 PDFs → Submit.
 3. **Staff:** Applications → search `2026-00002` → Review **Maria** → *Run AI check* on Certificate of Indigency → show the flag.
 4. Review **Rosa** → *Run AI check* on COR → show the name-mismatch flag.
 5. Review **Mark** → *Verify enrollment* → Scholar Records → *Tag as Grantee*.

@@ -17,6 +17,9 @@ class SettingController extends Controller
             'oas_location' => $values['oas_location'],
             'oas_email' => $values['oas_email'],
             'oas_phone' => $values['oas_phone'],
+            'oas_head' => $values['oas_head'],
+            'oas_facebook' => $values['oas_facebook'],
+            'oas_about' => $values['oas_about'],
             'current_period' => PayrollController::currentPeriod(),
         ]);
     }

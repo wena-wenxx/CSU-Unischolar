@@ -84,8 +84,9 @@ export const HELP = {
     {
       title: "How to apply for a scholarship",
       steps: [
-        "Go to Scholarships. Use the filters to show only Government, CSU-funded, LGU or Private programs, or the ones closing soon.",
+        "Go to Scholarships. Use the filters to show CHED-funded, Other Government, Private-funded or University-funded programs, or only the ones open now.",
         "Press Details to read the description, the deadline and the list of required documents.",
+        "Agency-direct programs (for example DOST, Iskolar ng Landbank, NGCP) are applied for directly at the agency, not here. Their page tells you how.",
         "Press Apply. A draft application opens with a checklist of the required documents.",
         "For each document, press Choose file, pick the file, then press Upload. The row turns green when it is uploaded.",
         "When every required document is uploaded, the progress bar is full and Submit application turns green. Press it and confirm.",

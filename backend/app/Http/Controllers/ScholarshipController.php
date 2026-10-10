@@ -47,6 +47,8 @@ class ScholarshipController extends Controller
     {
         return [
             'name' => ($creating ? 'required' : 'sometimes|required').'|string|max:255',
+            'short_name' => 'nullable|string|max:40',
+            'application_mode' => 'nullable|in:'.implode(',', Scholarship::MODES),
             'description' => 'nullable|string',
             'provider' => 'nullable|string|max:255',
             'category' => 'nullable|in:'.implode(',', Scholarship::CATEGORIES),
@@ -89,6 +91,7 @@ class ScholarshipController extends Controller
             'requirements.*.description' => 'nullable|string|max:1000',
         ]);
         $data['status'] = $data['status'] ?? 'active';
+        $data['application_mode'] = $data['application_mode'] ?? 'oas';
 
         $requirements = $data['requirements'] ?? [];
         unset($data['requirements']);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
-import { availabilityInfo, categoryLabel, formatDate, formatMoney } from "../../lib/format";
+import { availabilityInfo, categoryLabel, formatDate, formatMoney, isAgencyDirect } from "../../lib/format";
 import { useToast } from "../../lib/toast";
 import { startApplication } from "../../lib/applications";
 import PageHeader from "../../components/PageHeader";
@@ -53,7 +53,15 @@ export default function ScholarshipDetailPage() {
   const open = scholarship.availability === "open";
 
   let action;
-  if (mine) {
+  if (isAgencyDirect(scholarship)) {
+    action = (
+      <div className="alert alert-info">
+        This scholarship is <strong>agency-direct</strong>: submit your application directly to{" "}
+        <strong>{scholarship.provider || "the agency"}</strong> and transact requirements and allowances with its office.
+        The OAS posts announcements and updates when the agency requests it.
+      </div>
+    );
+  } else if (mine) {
     action = (
       <Link className="button button-primary" to={`/student/applications/${mine.id}`}>
         View my application
@@ -93,13 +101,23 @@ export default function ScholarshipDetailPage() {
         <p>{scholarship.description || "No description available."}</p>
 
         <div className="detail-grid">
-          <ProfileItem label="Amount (per semester)" value={formatMoney(scholarship.amount)} />
-          <ProfileItem label="Applications open" value={formatDate(scholarship.application_start)} />
-          <ProfileItem label="Deadline" value={formatDate(scholarship.application_end)} />
+          {!isAgencyDirect(scholarship) && (
+            <>
+              <ProfileItem label="Amount (per semester)" value={formatMoney(scholarship.amount)} />
+              <ProfileItem label="Applications open" value={formatDate(scholarship.application_start)} />
+              <ProfileItem label="Deadline" value={formatDate(scholarship.application_end)} />
+            </>
+          )}
           <ProfileItem label="Provider" value={scholarship.provider || "—"} />
         </div>
       </section>
 
+      {isAgencyDirect(scholarship) ? (
+        <section className="card">
+          <h2>How to apply</h2>
+          {action}
+        </section>
+      ) : (
       <section className="card">
         <h2>Documents you will need</h2>
 
@@ -123,6 +141,7 @@ export default function ScholarshipDetailPage() {
 
         {action}
       </section>
+      )}
     </div>
   );
 }

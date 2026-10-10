@@ -7,6 +7,8 @@ import { useConfirm } from "../../lib/confirm";
 import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
+import SheetTabs from "../../components/SheetTabs";
+import { programTabs } from "../../lib/programs";
 
 /*
   Auto-Review (staff). Sorts every submitted / under-review application:
@@ -26,8 +28,7 @@ export default function AutoReviewPage() {
   const toast = useToast();
   const confirm = useConfirm();
 
-  const [programs, setPrograms] = useState([]);
-  const [programId, setProgramId] = useState("");
+  const [programId, setProgramId] = useState("all");
   const [result, setResult] = useState(null);
   const [tab, setTab] = useState("ready");
   const [picked, setPicked] = useState([]);
@@ -36,9 +37,9 @@ export default function AutoReviewPage() {
 
   // .then() (not await) so React's lint rule sees the state is set later.
   const run = useCallback(
-    (id = "") =>
+    () =>
       api
-        .post("/staff/auto-review", id ? { scholarship_id: Number(id) } : {})
+        .post("/staff/auto-review", {})
         .then(({ data }) => {
           setResult(data);
           setPicked([]);
@@ -51,16 +52,12 @@ export default function AutoReviewPage() {
   );
 
   useEffect(() => {
-    api
-      .get("/scholarships")
-      .then((response) => setPrograms(response.data))
-      .catch(() => setPrograms([]));
     run();
   }, [run]);
 
-  async function rerun(id = programId) {
+  async function rerun() {
     setBusy(true);
-    await run(id);
+    await run();
     setBusy(false);
   }
 
@@ -77,7 +74,7 @@ export default function AutoReviewPage() {
       const { data } = await api.post("/staff/applications/forward", { ids });
       toast.success(data.message);
       (data.errors || []).forEach((message) => toast.error(message));
-      await run(programId);
+      await run();
     } catch (err) {
       toast.error(errMsg(err, "Unable to forward."));
     } finally {
@@ -103,7 +100,7 @@ export default function AutoReviewPage() {
     try {
       const { data } = await api.post("/staff/applications/needs-action", { items });
       toast.success(data.message);
-      await run(programId);
+      await run();
     } catch (err) {
       toast.error(errMsg(err, "Unable to send back."));
     } finally {
@@ -113,7 +110,14 @@ export default function AutoReviewPage() {
 
   if (!result) return <Loading />;
 
-  const shown = result.rows.filter((row) => row.group === tab);
+  // Program tabs (like sheets in Excel); each list is A to Z by last name.
+  const tabs = programTabs(result.rows, (row) => ({ id: row.scholarship_id, name: row.scholarship, short_name: row.short_name }));
+  const activeProgram = tabs.some((t) => t.key === programId) ? programId : "all";
+  const inProgram = result.rows.filter((row) => activeProgram === "all" || String(row.scholarship_id) === activeProgram);
+  const groupCount = (key) => inProgram.filter((row) => row.group === key).length;
+  const shown = inProgram
+    .filter((row) => row.group === tab)
+    .sort((a, b) => String(a.student).localeCompare(String(b.student)));
   const pickedRows = shown.filter((row) => picked.includes(row.id));
   const allPicked = shown.length > 0 && pickedRows.length === shown.length;
 
@@ -125,30 +129,23 @@ export default function AutoReviewPage() {
         subtitle="Sorts submitted applications so you can forward the complete ones in one step. It only suggests; you decide."
       />
 
-      <section className="card">
-        <div className="inline-form table-search">
-          <label htmlFor="ar-program" className="sr-only">
-            Program
-          </label>
-          <select
-            id="ar-program"
-            value={programId}
-            onChange={(event) => {
-              setProgramId(event.target.value);
-              rerun(event.target.value);
-            }}
-          >
-            <option value="">All programs</option>
-            {programs.map((p) => (
-              <option key={p.id} value={String(p.id)}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          <button className="button button-secondary" onClick={() => rerun()} disabled={busy}>
-            {busy ? "Checking..." : "Run Auto-Review again"}
+      <section className="card sheet-card">
+        <SheetTabs
+          tabs={tabs}
+          value={activeProgram}
+          onChange={(key) => {
+            setProgramId(key);
+            setPicked([]);
+          }}
+        />
+
+        <div className="sheet-toolbar">
+          <span className="sheet-meta muted">
+            {inProgram.length} application{inProgram.length === 1 ? "" : "s"} waiting for review · A–Z
+          </span>
+          <button className="button button-small button-secondary" onClick={() => rerun()} disabled={busy}>
+            {busy ? "Checking..." : "Run again"}
           </button>
-          <span className="muted">{result.rows.length} applications waiting for review</span>
         </div>
 
         <div className="auto-groups">
@@ -162,7 +159,7 @@ export default function AutoReviewPage() {
                 setPicked([]);
               }}
             >
-              <strong>{result.summary[key]}</strong>
+              <strong>{groupCount(key)}</strong>
               <span>{label}</span>
             </button>
           ))}
@@ -217,7 +214,7 @@ export default function AutoReviewPage() {
                       />
                     </th>
                     <th>Student</th>
-                    <th>Scholarship</th>
+                    {activeProgram === "all" && <th>Program</th>}
                     <th>Submitted</th>
                     <th>{tab === "ready" ? "Check" : "Why"}</th>
                     {tab === "incomplete" && <th>Remark to the student</th>}
@@ -245,7 +242,7 @@ export default function AutoReviewPage() {
                         <strong>{row.student}</strong>
                         <small className="muted account-note">{row.student_id}</small>
                       </td>
-                      <td>{row.scholarship}</td>
+                      {activeProgram === "all" && <td title={row.scholarship}>{row.short_name || row.scholarship}</td>}
                       <td>{formatDate(row.submitted_at)}</td>
                       <td>
                         {row.reasons.length ? (

@@ -115,4 +115,9 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+    /*
+    | Demo safety net: send EVERY e-mail to this one inbox (see .env.example).
+    */
+    'always_to' => env('MAIL_ALWAYS_TO'),
+
 ];

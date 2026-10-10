@@ -18,14 +18,18 @@ class Setting extends Model
 
     public const SEMESTERS = ['1st Semester', '2nd Semester', 'Summer'];
 
-    // Office details: only fill in real values confirmed by the OAS.
+    // Office details as published by the OAS (CSU website). Office hours were
+    // not published there; confirm them with the OAS.
     public const DEFAULTS = [
         'current_school_year' => null,        // e.g. 2026-2027 (null = worked out from today's date)
         'current_semester' => null,           // 1st Semester / 2nd Semester / Summer
         'oas_office_hours' => 'Monday to Friday, 8:00 AM to 5:00 PM',
-        'oas_location' => 'CSU Main Campus, Ampayon, Butuan City',
-        'oas_email' => null,
-        'oas_phone' => null,
+        'oas_location' => 'Caraga State University, Ampayon, Butuan City, Philippines',
+        'oas_email' => 'oas@carsu.edu.ph',
+        'oas_phone' => '0960 835 4606',
+        'oas_head' => 'Prof. Sheila Rae E. Permanes, Unit Head',
+        'oas_facebook' => 'https://www.facebook.com/carsuoas',
+        'oas_about' => 'The Office of Admission and Scholarship is responsible for the development and implementation of programs and initiatives that are aimed at attracting, admitting, and supporting a diverse and talented student body while facilitating access to scholarship opportunities and financial aid resources to promote affordability and student success.',
     ];
 
     public const LABELS = [
@@ -35,6 +39,9 @@ class Setting extends Model
         'oas_location' => 'OAS location',
         'oas_email' => 'OAS e-mail',
         'oas_phone' => 'OAS phone',
+        'oas_head' => 'OAS head',
+        'oas_facebook' => 'OAS Facebook page',
+        'oas_about' => 'About the OAS',
     ];
 
     public static function get(string $key): ?string

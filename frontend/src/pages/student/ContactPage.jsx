@@ -78,7 +78,14 @@ export default function ContactPage() {
       <div className="dashboard-grid">
         <section className="card contact-card">
           <h2>Office of Admission and Scholarship</h2>
+          {office?.oas_about && <p className="contact-about">{office.oas_about}</p>}
           <dl className="contact-list">
+            {office?.oas_head && (
+              <div>
+                <dt>👤 Head</dt>
+                <dd>{office.oas_head}</dd>
+              </div>
+            )}
             {office?.oas_location && (
               <div>
                 <dt>📍 Location</dt>
@@ -96,6 +103,16 @@ export default function ContactPage() {
                 <dt>✉️ E-mail</dt>
                 <dd>
                   <a href={`mailto:${office.oas_email}`}>{office.oas_email}</a>
+                </dd>
+              </div>
+            )}
+            {office?.oas_facebook && (
+              <div>
+                <dt>📣 Facebook</dt>
+                <dd>
+                  <a href={office.oas_facebook} target="_blank" rel="noreferrer">
+                    {office.oas_facebook.replace(/^https?:\/\/(www\.)?/, "")}
+                  </a>
                 </dd>
               </div>
             )}

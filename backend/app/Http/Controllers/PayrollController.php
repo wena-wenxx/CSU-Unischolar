@@ -135,7 +135,7 @@ class PayrollController extends Controller
 
         $period = trim(preg_replace('/\s+/', ' ', $data['period']));
 
-        $records = ScholarRecord::with(['student', 'scholarship:id,name,amount', 'payrollRecords:id,scholar_record_id,period'])
+        $records = ScholarRecord::with(['student', 'scholarship:id,name,amount,application_mode', 'payrollRecords:id,scholar_record_id,period'])
             ->where('status', 'active')
             ->when($data['scholarship_id'] ?? null, fn ($q, $id) => $q->where('scholarship_id', $id))
             ->get()
@@ -146,7 +146,9 @@ class PayrollController extends Controller
             $amount = $data['amount'] ?? $record->scholarship?->amount;
             $reason = null;
 
-            if (!$record->currently_enrolled) {
+            if ($record->scholarship?->application_mode === 'agency_direct') {
+                $reason = 'Paid directly by the agency';
+            } elseif (!$record->currently_enrolled) {
                 $reason = 'Not currently enrolled';
             } elseif ($record->payrollRecords->contains(fn ($p) => $this->samePeriod($p->period, $period))) {
                 $reason = 'Already in payroll for this period';
@@ -298,9 +300,11 @@ class PayrollController extends Controller
             ], 403);
         }
 
+        // Only the columns the payroll list and CSV use (keeps the page fast).
         $records = PayrollRecord::with([
-            'scholarRecord.student',
-            'scholarRecord.scholarship',
+            'scholarRecord:id,student_id,scholarship_id,status,currently_enrolled,has_atm,atm_funds,atm_note',
+            'scholarRecord.student:id,student_id,first_name,middle_name,last_name,course,year_level',
+            'scholarRecord.scholarship:id,name,short_name,application_mode',
             'preparer:id,name',
         ])
             ->latest()

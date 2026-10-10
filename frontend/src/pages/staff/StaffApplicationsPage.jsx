@@ -1,18 +1,20 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
-import { enrollmentText, fileUrl, formatDate, fullName, missingRequirements, stepLabel, timeAgo } from "../../lib/format";
+import { enrollmentText, fileUrl, flaggedCount, formatDate, fullName, missingRequirements, stepLabel, timeAgo } from "../../lib/format";
+import { byLastName, lastFirst, programTabs } from "../../lib/programs";
 import { useToast } from "../../lib/toast";
 import Modal from "../../components/Modal";
 import PageHeader from "../../components/PageHeader";
 import ProfileItem from "../../components/ProfileItem";
+import SheetTabs from "../../components/SheetTabs";
 import StatusBadge from "../../components/StatusBadge";
 import StatusTimeline from "../../components/StatusTimeline";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 
 const FILTERS = [
-  ["all", "All"],
+  ["all", "All statuses"],
   ["submitted", "Submitted"],
   ["under_review", "Under review"],
   ["needs_action", "Needs action"],
@@ -20,23 +22,28 @@ const FILTERS = [
   ["approved", "Approved"],
   ["to_verify", "Approved, enrollment not verified"],
   ["flagged", "Has AI flags"],
+  ["rejected", "Rejected"],
   ["draft", "Drafts"],
 ];
 
 const SORTS = {
   recent: "Latest activity first",
-  submitted_new: "Newest submitted first",
-  submitted_old: "Oldest submitted first (queue order)",
   name: "Student name (A–Z)",
+  submitted_old: "Oldest submitted first (queue)",
+  submitted_new: "Newest submitted first",
 };
 
+const REFRESH_SECONDS = 20; // checks for changes made by others or by Auto-Review
+
 const time = (value) => (value ? new Date(value).getTime() : 0);
+const clock = () => new Date().toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" });
 
 export default function StaffApplicationsPage() {
   const toast = useToast();
 
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [updatedAt, setUpdatedAt] = useState("");
   // The address can preselect a list, e.g. /staff/applications?filter=needs_action
   const location = useLocation();
   const [filter, setFilter] = useState(() => {
@@ -48,6 +55,7 @@ export default function StaffApplicationsPage() {
   const [sort, setSort] = useState("recent");
   const [selected, setSelected] = useState(null);
   const [verifying, setVerifying] = useState(null);
+  const version = useRef(null);
 
   // Written with .then() (not await) so React's lint rule can see that the
   // state is set later, when the server answers, not during the effect.
@@ -55,7 +63,10 @@ export default function StaffApplicationsPage() {
     () =>
       api
         .get("/applications")
-        .then((response) => setApplications(response.data))
+        .then((response) => {
+          setApplications(response.data);
+          setUpdatedAt(clock());
+        })
         .catch((err) => toast.error(errMsg(err, "Unable to load applications.")))
         .finally(() => setLoading(false)),
     [toast]
@@ -63,6 +74,29 @@ export default function StaffApplicationsPage() {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  // Stay up to date: every few seconds (and when you come back to this tab)
+  // ask the server for a small "version"; reload the list only if it changed.
+  useEffect(() => {
+    function check() {
+      if (document.visibilityState !== "visible") return;
+      api
+        .get("/staff/applications/version")
+        .then(({ data }) => {
+          if (version.current !== null && data.version !== version.current) load();
+          version.current = data.version;
+        })
+        .catch(() => {});
+    }
+
+    check();
+    const timer = window.setInterval(check, REFRESH_SECONDS * 1000);
+    window.addEventListener("focus", check);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", check);
+    };
   }, [load]);
 
   // /staff/applications?review=<id> opens that application's review window
@@ -92,14 +126,18 @@ export default function StaffApplicationsPage() {
     if (selected?.id === id) await openApplication(id);
   }
 
+  // A program tab lists its students A to Z (like a sheet in Excel).
+  function chooseProgram(key) {
+    setProgram(key);
+    setSort(key === "all" ? "recent" : "name");
+  }
+
   const inFilter = (application, key) => {
     if (key === "all") return true;
     if (key === "to_verify") {
       return application.status === "approved" && !application.enrollment_verified;
     }
-    if (key === "flagged") {
-      return (application.documents || []).some((document) => document.status === "flagged");
-    }
+    if (key === "flagged") return flaggedCount(application) > 0;
     return application.status === key;
   };
 
@@ -107,68 +145,71 @@ export default function StaffApplicationsPage() {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   const matchesSearch = (application) => {
     const haystack = [
-      fullName(application.student),
+      lastFirst(application.student),
       application.student?.student_id,
       application.scholarship?.name,
+      application.scholarship?.short_name,
     ]
       .join(" ")
       .toLowerCase();
     return words.every((word) => haystack.includes(word));
   };
 
-  const programs = [...new Map(applications.map((a) => [a.scholarship_id, a.scholarship?.name])).entries()].sort((a, b) =>
-    String(a[1]).localeCompare(String(b[1]))
-  );
-
-  const searched = applications
-    .filter(matchesSearch)
-    .filter((application) => program === "all" || String(application.scholarship_id) === program);
+  const searched = applications.filter(matchesSearch).filter((application) => inFilter(application, filter));
+  const tabs = programTabs(searched, (a) => a.scholarship);
+  const activeProgram = tabs.some((tab) => tab.key === program) ? program : "all";
 
   const shown = searched
-    .filter((application) => inFilter(application, filter))
+    .filter((application) => activeProgram === "all" || String(application.scholarship_id) === activeProgram)
     .sort((a, b) => {
       if (sort === "submitted_new") return time(b.submitted_at) - time(a.submitted_at);
       if (sort === "submitted_old") return (time(a.submitted_at) || Infinity) - (time(b.submitted_at) || Infinity);
-      if (sort === "name") return fullName(a.student).localeCompare(fullName(b.student));
+      if (sort === "name") return byLastName(a.student, b.student);
       return time(b.updated_at) - time(a.updated_at); // the backend's default order
     });
+
+  const statusCount = (key) =>
+    applications
+      .filter(matchesSearch)
+      .filter((a) => activeProgram === "all" || String(a.scholarship_id) === activeProgram)
+      .filter((a) => inFilter(a, key)).length;
 
   if (loading) return <Loading />;
 
   return (
     <div>
       <PageHeader
-        title="Application Review"
+        title="Applications"
         subtitle="Check documents, forward complete applications, record the agency's decision, and verify enrollment"
         actions={
           <Link className="button button-primary" to="/staff/auto-review">
-            Auto-Review submitted applications
+            Auto-Review
           </Link>
         }
       />
 
-      <div className="card">
-        <div className="inline-form table-search">
+      <div className="card sheet-card">
+        <SheetTabs tabs={tabs} value={activeProgram} onChange={chooseProgram} />
+
+        <div className="sheet-toolbar">
           <label htmlFor="application-search" className="sr-only">
             Search applications
           </label>
-
           <input
             id="application-search"
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search by student name, student ID or scholarship"
+            placeholder="Search name, Student ID or program"
           />
 
-          <label htmlFor="program-filter" className="sr-only">
-            Scholarship program
+          <label htmlFor="status-filter" className="sr-only">
+            Status
           </label>
-          <select id="program-filter" value={program} onChange={(event) => setProgram(event.target.value)}>
-            <option value="all">All programs</option>
-            {programs.map(([id, name]) => (
-              <option key={id} value={String(id)}>
-                {name}
+          <select id="status-filter" value={filter} onChange={(event) => setFilter(event.target.value)}>
+            {FILTERS.map(([key, label]) => (
+              <option key={key} value={key}>
+                {label} ({statusCount(key)})
               </option>
             ))}
           </select>
@@ -184,26 +225,9 @@ export default function StaffApplicationsPage() {
             ))}
           </select>
 
-          <span className="muted">
-            {shown.length} of {applications.length} applications
+          <span className="sheet-meta muted">
+            {shown.length} shown{updatedAt && ` · updated ${updatedAt}`}
           </span>
-        </div>
-
-        <div className="filter-row" role="group" aria-label="Filter applications">
-          {FILTERS.map(([key, label]) => (
-            <button
-              key={key}
-              className={
-                filter === key
-                  ? "button button-small button-primary"
-                  : "button button-small button-secondary"
-              }
-              aria-pressed={filter === key}
-              onClick={() => setFilter(key)}
-            >
-              {label} ({searched.filter((application) => inFilter(application, key)).length})
-            </button>
-          ))}
         </div>
 
         {shown.length === 0 ? (
@@ -215,7 +239,7 @@ export default function StaffApplicationsPage() {
                 <tr>
                   <th>Student</th>
                   <th>Student ID</th>
-                  <th>Scholarship</th>
+                  {activeProgram === "all" && <th>Program</th>}
                   <th>Submitted</th>
                   <th>Status</th>
                   <th>AI flags</th>
@@ -228,9 +252,13 @@ export default function StaffApplicationsPage() {
               <tbody>
                 {shown.map((application) => (
                   <tr key={application.id}>
-                    <td>{fullName(application.student)}</td>
+                    <td>{lastFirst(application.student)}</td>
                     <td>{application.student?.student_id}</td>
-                    <td>{application.scholarship?.name}</td>
+                    {activeProgram === "all" && (
+                      <td title={application.scholarship?.name}>
+                        {application.scholarship?.short_name || application.scholarship?.name}
+                      </td>
+                    )}
                     <td>{application.submitted_at ? formatDate(application.submitted_at) : "Not submitted"}</td>
                     <td>
                       <StatusBadge status={application.status} />
@@ -239,18 +267,7 @@ export default function StaffApplicationsPage() {
                       <FlagCell application={application} />
                     </td>
                     <td className="activity-cell">
-                      {application.latest_log ? (
-                        <>
-                          {application.latest_log.from_status && (
-                            <span className="muted">
-                              {application.latest_log.from_status.replaceAll("_", " ")} →{" "}
-                            </span>
-                          )}
-                          {stepLabel(application.latest_log.to_status)}
-                        </>
-                      ) : (
-                        "Updated"
-                      )}
+                      {application.latest_log ? stepLabel(application.latest_log.to_status) : "Updated"}
                       <small className="muted">{timeAgo(application.updated_at)}</small>
                     </td>
                     <td>{enrollmentText(application)}</td>
@@ -308,7 +325,7 @@ export default function StaffApplicationsPage() {
 /* ---------- AI flag column: how many documents the AI flagged ---------- */
 
 function FlagCell({ application }) {
-  const flagged = (application.documents || []).filter((document) => document.status === "flagged").length;
+  const flagged = flaggedCount(application);
   if (flagged) return <span className="status status-warning">⚠ {flagged}</span>;
   return <span className="muted">—</span>;
 }

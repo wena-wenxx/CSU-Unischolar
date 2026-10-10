@@ -17,27 +17,27 @@ What the demo data contains (one scenario per student):
 |---|---|---|---|
 | Juan | student1 | CMSP | Approved + enrollment verified → ready to tag |
 | Maria | student2 | TES | Submitted; her Indigency upload is really a Barangay Clearance |
-| Ana | student3 | DOST-SEI | Under review; also a completed past scholarship (Data Bank) |
-| Pedro | student4 | LGU Butuan | Needs action (clearer Barangay Clearance) |
-| Liza | student5 | CSU Student Assistance | Rejected by the agency (you will apply for the **CSU Cultural Grant (Choir)** as her) |
-| Carlo | student6 | CSU Cultural Grant (Kayam Ethno Band) | Draft, 1 of 6 documents |
-| Rosa | student7 | CSU Student Assistance | Complete; her COR belongs to another person |
+| Ana | student3 | TDP-SUC | Under review; also a completed past SA scholarship (Data Bank) |
+| Pedro | student4 | TDP-TES | Needs action (clearer Certificate of Indigency) |
+| Liza | student5 | Student Assistantship (SA) | Rejected (you will apply for **Culture and Arts** as her) |
+| Carlo | student6 | Culture and Arts | Draft, 1 of 6 documents |
+| Rosa | student7 | Student Assistantship (SA) | Complete; her COR belongs to another person |
 | Mark | student8 | TES | Approved, enrollment **not** verified |
 | Jose | student9 | TES | Active grantee, payroll entry **Ready** |
 | Grace | student10 | CMSP | Active grantee, no payroll yet |
 
-Besides these 10, the seeders add **120 more fictional students** with 3–6 applications each, so every
+Besides these 10 (and Wena's test account), the seeders add **120 more fictional students** with 1–3 applications each, so every
 screen has realistic numbers right after `migrate:fresh --seed`:
 
 | Table | Rows |
 |---|---|
-| Students | 130 |
-| Scholarship programs | 20 (16 active, 3 closed, 1 inactive) |
-| Applications | 560 (approved 99, complete 55, draft 43, needs action 49, rejected 162, submitted 81, under review 71) |
-| Scholar records | 76 (active 61, completed 11, inactive 4) |
-| Payroll entries | 109 (processed 62, draft 29, ready 18) over 3 semesters |
-| Documents | 4,287 (validated 3,400, flagged 225, needs review 16, not yet checked 646) |
-| AI check results | 3,641 |
+| Students | 131 |
+| Scholarship programs | 13, as listed by the OAS: 6 applied for through the OAS (4 CHED-funded, 2 university-funded) and 7 agency-direct |
+| Applications | 262 (approved 94, complete/forwarded 40, draft 13, needs action 15, rejected 40, submitted 30, under review 30) |
+| Scholar records | 80 (active 62, completed 12, inactive 6) |
+| Payroll entries | 106 (processed 68, draft 19, ready 19) over 3 semesters |
+| Documents | 1,744 (validated 1,399, flagged 66, needs review 6, not yet checked 273) |
+| AI check results | 1,471 |
 
 ---
 
@@ -85,7 +85,7 @@ Every request needs the header **Accept: application/json**. After logging in, p
   `email=oas.staff@carsu.edu.ph`, `password=Staff@12345`. Expect **200**, a `token`, `"role": "staff"`.
 - [ ] **A2. Student login** — same with `student5@carsu.edu.ph` / `Student@12345`. Expect **200**, `"role": "student"`.
 - [ ] **A3. Wrong password** — A1 with `password=wrong`. Expect **422** "Invalid credentials."
-- [ ] **A4. Scholarships** — `GET /api/scholarships` (student token). Expect **200** and **20** programs with `requirements`.
+- [ ] **A4. Scholarships** — `GET /api/scholarships` (student token). Expect **200** and **12** programs with `requirements` (CMSP is closed, so students do not see it).
 - [ ] **A5. Staff dashboard** — `GET /api/staff/dashboard` (staff token). Expect **200**, `total_applicants: 130`, `total_applications: 560`, `needs_action: 49`, `approved: 99`, `active_scholars: 61`, `payroll_ready: 18`, `ai_flags: 225`, `scholarships: 20`.
 - [ ] **A6. Students are blocked** — A5 with the *student* token. Expect **403**.
 - [ ] **A7. Data Bank** — `GET /api/staff/data-bank?q=2026-00003` (staff token). Expect **200** and Ana Demo Student in the list.
@@ -99,9 +99,9 @@ Every request needs the header **Accept: application/json**. After logging in, p
 - [ ] **B1. Login** — Open http://localhost:5173. Sign in as `student5@carsu.edu.ph` / `Student@12345`.
   Expect: a **Welcome to ScholarGuide** window with 5 steps (press **Next** … **Got it**; it does not appear again in
   this browser), then **/student/dashboard**, "Welcome, Liza", and 3 announcements.
-- [ ] **B2. Details** — Click **Scholarships**, then **Details** on *CSU Cultural Grant (Choir)*.
+- [ ] **B2. Details** — Click **Scholarships**, then **Details** on *Culture and Arts*.
   Expect: a page at **/student/scholarships/5** listing 6 required documents. Click **← All scholarships**.
-- [ ] **B3. Apply** — Click **Apply** on CSU Cultural Grant (Choir).
+- [ ] **B3. Apply** — Click **Apply** on Culture and Arts.
   Expect: a page at **/student/applications/<number>** with the green note "Your application was saved as a draft…".
   A checklist shows the 6 required documents ("0 of 6 uploaded"); **Submit application** is **grey** and disabled.
 - [ ] **B4. Upload** — On each checklist row, click **Choose File**, pick the matching PDF from
@@ -114,7 +114,7 @@ Every request needs the header **Accept: application/json**. After logging in, p
   box appears, and the timeline shows "Application started → Submitted to OAS" with the next steps faded.
 - [ ] **B6. Back and refresh** — Click **My Applications**, then the browser **Back** button.
   Expect: you return to the application page. Press **F5** (refresh): you stay on the same page.
-- [ ] **B7. Duplicate prevention** — Go to **Scholarships** and find the Choir grant.
+- [ ] **B7. Duplicate prevention** — Go to **Scholarships** and find Culture and Arts.
   Expect: its button now says **View my application** instead of Apply. (The server also refuses a second
   application with "You already applied to this scholarship.")
 - [ ] **B8. Staff pages are protected** — Type http://localhost:5173/staff/dashboard in the address bar.
@@ -163,7 +163,7 @@ Every request needs the header **Accept: application/json**. After logging in, p
   Expect: "Payroll prepared for 0 scholars. 62 skipped…"
 - [ ] **B21. Payroll status** — Click **Mark Ready** on a Draft row (→ **Ready**), then **Mark Processed** (→ **Processed**).
 - [ ] **B22. Data Bank** — **Data Bank** → type `2026-00003` → **Search** → **Full history** on Ana.
-  Expect: Ana's completed CSU Student Assistance record with a processed payroll entry, and her current DOST-SEI application.
+  Expect: Ana's completed SA record with a processed payroll entry, and her current TDP-SUC application.
 
 ### Reports and settings
 
@@ -190,9 +190,9 @@ change with the real date.
 **Deadlines and programs**
 - [ ] **C1.** As Liza: **Scholarships** shows filter buttons *All (16) · Government (1) · CSU-funded (5) · LGU (1) ·
   Private / Foundation (9)*, a deadline on every card, and a coloured label (Open / Open · N days left / Opens …).
-- [ ] **C2.** As staff: **Scholarships → Manage** on *CSU Cultural Grant (Kayam Ethno Band)* → set **Deadline** to
-  yesterday → **Save changes**. The table shows **Closed · deadline passed**. Log in as Carlo (student6): Kayam is no longer
-  in Scholarships, and his Kayam draft says the deadline has passed with **Submit** disabled. Set the deadline back after.
+- [ ] **C2.** As staff: **Scholarships → Manage** on *Culture and Arts* → set **Deadline** to
+  yesterday → **Save changes**. The table shows **Closed · deadline passed**. Log in as Carlo (student6): Culture and Arts is no longer
+  in Scholarships, and his Culture and Arts draft says the deadline has passed with **Submit** disabled. Set the deadline back after.
 - [ ] **C3.** As staff: create a program with **Type**, **Applications open** and **Deadline** → it appears in the table.
   In its **Manage** window press **Delete** → "Scholarship deleted." Open **Manage** on TES: **Delete** is disabled
   ("This program has 71 application(s)…").
@@ -217,7 +217,7 @@ change with the real date.
   a program dropdown (CMSP → 44 of 561) and a sort dropdown (Latest activity first is the default).
 - [ ] **C11.** **Announcements → New announcement** → title, message, *Show until* → **Post**. Log in as a student: it is
   the first of the 3 announcements on the dashboard. The expired demo notice shows only to staff.
-- [ ] **C12.** **Agency Lists**: choose *CSU Cultural Grant (Choir)*, upload a CSV with a Student ID column (use
+- [ ] **C12.** **Agency Lists**: choose *Culture and Arts*, upload a CSV with a Student ID column (use
   **Download sample template** to see the layout), check the guessed columns, **Process**. Expect a summary such as
   "Matched 2 student(s), 1 unmatched, 1 error(s)" and one line per row (a grantee of another program is an error, an unknown
   ID is unmatched). The upload appears under **Upload history**.
@@ -238,7 +238,7 @@ Run `php artisan migrate:fresh --seed` first. In `backend/.env` set `QUEUE_CONNE
   **Needs attention**.
 - [ ] **D3.** On COR choose Liza's COR → **Replace** → "Certificate of Registration (COR) saved." **Show 1 older copy**
   lists the previous file.
-- [ ] **D4.** Scholarships → **Apply** on the Choir grant. A gold box says "You already have 5 of these documents in My
+- [ ] **D4.** Scholarships → **Apply** on Culture and Arts. A gold box says "You already have 5 of these documents in My
   Documents" → **Use my saved documents** → "5 saved documents added", 5 of 6 uploaded, **Submit** still grey. The
   Birth Certificate row shows **Use saved file** with "⚠ The AI flagged this saved file". Upload Liza's own birth
   certificate on that row → Submit turns green → submit.
@@ -389,7 +389,35 @@ Run `php artisan migrate:fresh --seed` first. Admin: `admin@carsu.edu.ph` / `Adm
 
 ---
 
+## Part H — Round 10: OAS programs, program tabs, auto-refresh
+
+- [ ] **H1.** Footer: OAS name, address, oas@carsu.edu.ph and 0960 835 4606; no semester text.
+- [ ] **H2.** As Wena → Scholarships: filters *CHED-funded, Other Government, Private-funded, University-funded*;
+  6 program cards with Apply, then one compact list **Apply directly at the agency** (7 programs). Details on
+  one of them explains how to apply at the agency (no Apply button).
+- [ ] **H3.** Contact OAS shows the OAS description, Prof. Sheila Rae E. Permanes (Unit Head), e-mail, phone and the
+  Facebook page.
+- [ ] **H4.** Staff → Applications: a row of **program tabs** (like Excel sheets) with counts; *All programs* stays
+  visible. Click *TES* → only TES, sorted A–Z by last name, and the Program column disappears. The status dropdown
+  shows counts.
+- [ ] **H5.** Auto-refresh: keep Applications open; in another window change an application (or run Auto-Review →
+  Forward). Within about 20 seconds the list updates by itself ("updated" time changes).
+- [ ] **H6.** The same program tabs, A–Z, on Scholar Records, Payroll (payroll list), Forwarded to Agency and
+  Auto-Review.
+- [ ] **H7.** Payroll → Preview: grantees of agency-direct programs (e.g. DOST) are *Skipped: Paid directly by the
+  agency*.
+- [ ] **H8.** Approved Lists: upload `approved-list-sa.csv` (from `sample-approved-lists.zip`, or run
+  `php artisan demo:agency-lists` after your own testing) for *Student Assistantship (SA)* → "Matched 6, 1 unmatched,
+  0 errors". `approved-list-dost.csv` for *DOST* → 3 grantees recorded.
+- [ ] **H9.** Staff → Scholarships → create a program with *How students apply: Agency-direct* → no document picker;
+  the table says *Apply at the agency*.
+
+---
+
 ## What has and has not been tested
+
+Part H (round 10) was tested by Claude on **10 Oct 2026** in the browser (H1–H9; the staff pages also at 390×844),
+and every sample approved list was processed through the API with 0 errors.
 
 Part G (round 9) was tested by Claude on **10 Oct 2026** in the browser (G1–G5 at 1366×900, the dashboard also at
 390×844), and Part E was run again afterwards with the same results.

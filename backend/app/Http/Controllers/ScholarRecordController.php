@@ -25,8 +25,8 @@ class ScholarRecordController extends Controller
         }
 
         $records = ScholarRecord::with([
-            'student',
-            'scholarship'
+            'student:id,student_id,first_name,middle_name,last_name,sex,course,year_level,college',
+            'scholarship:id,name,short_name,provider,category,amount,application_mode',
         ])
             ->latest()
             ->get();

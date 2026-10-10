@@ -200,9 +200,9 @@ export default function Layout() {
   );
 }
 
-// Contact details of the OAS on every page (only the fields the admin filled in).
+// Contact details of the OAS on every page (only the fields that are set).
 function OfficeFooter({ office, isStudent }) {
-  const parts = [office.oas_location, office.oas_office_hours, office.oas_email, office.oas_phone].filter(Boolean);
+  const parts = [office.oas_location, office.oas_email, office.oas_phone].filter(Boolean);
 
   return (
     <footer className="office-footer">
@@ -211,15 +211,7 @@ function OfficeFooter({ office, isStudent }) {
         {parts.length > 0 && " · "}
         {parts.join(" · ")}
       </span>
-      <span>
-        {office.current_period}
-        {isStudent && (
-          <>
-            {" · "}
-            <NavLink to="/student/contact">Contact OAS</NavLink>
-          </>
-        )}
-      </span>
+      {isStudent && <NavLink to="/student/contact">Contact OAS</NavLink>}
     </footer>
   );
 }

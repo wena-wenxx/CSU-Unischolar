@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
-import { CATEGORY_LABELS, availabilityInfo, categoryLabel, deadlineText, formatMoney } from "../../lib/format";
+import { CATEGORY_LABELS, availabilityInfo, categoryLabel, deadlineText, formatMoney, isAgencyDirect } from "../../lib/format";
 import { startApplication } from "../../lib/applications";
 import { useToast } from "../../lib/toast";
 import PageHeader from "../../components/PageHeader";
@@ -48,8 +48,11 @@ export default function ScholarshipsPage() {
 
   const applicationFor = (scholarshipId) => myApplications.find((a) => a.scholarship_id === scholarshipId);
 
-  const shown = scholarships
-    .filter((s) => category === "all" || s.category === category)
+  const inCategory = scholarships.filter((s) => category === "all" || s.category === category);
+  // Agency-direct programs are listed once, compactly, under the cards.
+  const direct = inCategory.filter(isAgencyDirect).sort((a, b) => a.name.localeCompare(b.name));
+  const shown = inCategory
+    .filter((s) => !isAgencyDirect(s))
     .filter((s) => !openOnly || s.availability === "open")
     .sort((a, b) => {
       if (sort === "amount") return Number(b.amount || 0) - Number(a.amount || 0);
@@ -72,7 +75,7 @@ export default function ScholarshipsPage() {
 
       <div className="card filter-card">
         <div className="filter-row" role="group" aria-label="Program type">
-          {[["all", "All"], ...Object.entries(CATEGORY_LABELS)].map(([key, label]) => (
+          {[["all", "All"], ...Object.entries(CATEGORY_LABELS)].filter(([key]) => countIn(key) > 0).map(([key, label]) => (
             <button
               key={key}
               className={category === key ? "button button-small button-primary" : "button button-small button-secondary"}
@@ -101,7 +104,7 @@ export default function ScholarshipsPage() {
         </div>
       </div>
 
-      {shown.length === 0 && (
+      {shown.length === 0 && direct.length === 0 && (
         <div className="card">
           <EmptyState message="No scholarships match these filters." />
         </div>
@@ -164,6 +167,33 @@ export default function ScholarshipsPage() {
           );
         })}
       </div>
+
+      {direct.length > 0 && (
+        <section className="card direct-list">
+          <div className="card-header">
+            <h2>Apply directly at the agency</h2>
+          </div>
+          <p className="muted small">
+            These scholarships are agency-direct: submit your application to the scholarship-giving agency and transact
+            requirements and allowances with its office. The OAS posts announcements and updates when the agency requests it.
+          </p>
+          <ul>
+            {direct.map((scholarship) => (
+              <li key={scholarship.id}>
+                <div>
+                  <strong>{scholarship.name}</strong>
+                  <small className="muted">
+                    {scholarship.provider} · {categoryLabel(scholarship.category)}
+                  </small>
+                </div>
+                <Link className="button button-small button-secondary" to={`/student/scholarships/${scholarship.id}`}>
+                  Details
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

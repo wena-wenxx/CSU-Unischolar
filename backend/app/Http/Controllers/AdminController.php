@@ -392,6 +392,9 @@ class AdminController extends Controller
             'oas_location' => 'nullable|string|max:255',
             'oas_email' => 'nullable|email|max:255',
             'oas_phone' => 'nullable|string|max:60',
+            'oas_head' => 'nullable|string|max:255',
+            'oas_facebook' => 'nullable|url|max:255',
+            'oas_about' => 'nullable|string|max:2000',
         ], [
             'current_school_year.regex' => 'Write the school year like 2026-2027.',
         ]);

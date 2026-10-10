@@ -58,20 +58,23 @@ class BulkDemoSeeder extends Seeder
         ['Bachelor of Science in Civil Engineering', 'College of Engineering and Geo-Sciences', 16],
     ];
 
-    // How popular each program is (higher = more applicants).
+    // How popular each OAS-processed program is (higher = more applicants).
     private const POPULARITY = [
-        DemoDataSeeder::TES => 30, DemoDataSeeder::CSU_SA => 26, DemoDataSeeder::BUTUAN => 18, DemoDataSeeder::CMSP => 16,
-        DemoDataSeeder::DOST => 9, DemoDataSeeder::CHOIR => 4, DemoDataSeeder::DANCE => 4, DemoDataSeeder::KAYAM => 3,
-        DemoDataSeeder::ATHLETIC => 5, 'SM College Scholarship' => 8, 'Ayala U-Go Scholarship' => 8, 'BPI Science Scholarship' => 6,
-        'Metrobank Scholarship' => 6, 'Aboitiz Future Leaders Scholarship' => 6, 'Megaworld Scholarship' => 7,
-        'DMCI Homes Scholarship' => 5, 'San Miguel Foundation Scholarship' => 7, 'Manila Water Foundation Scholarship' => 6,
-        'Unilab Foundation Scholarship' => 6,
+        DemoDataSeeder::TES => 30, DemoDataSeeder::SA => 26, DemoDataSeeder::TDP_TES => 22,
+        DemoDataSeeder::CMSP => 16, DemoDataSeeder::TDP_SUC => 14, DemoDataSeeder::CULTURE => 8,
+    ];
+
+    // Agency-direct programs: students apply at the agency; OAS only records
+    // the agency's grantees (as if uploaded in Approved Lists).
+    private const AGENCY_DIRECT = [
+        DemoDataSeeder::DOST => 5, DemoDataSeeder::LANDBANK => 4, DemoDataSeeder::DA_ACEF => 3,
+        DemoDataSeeder::GIAHEP => 2, DemoDataSeeder::NGCP => 2, DemoDataSeeder::MEKONG => 1,
     ];
 
     // Status mix for applications that do not end in a grantee record.
     private const STATUS_WEIGHTS = [
         'draft' => 8, 'submitted' => 17, 'under_review' => 16, 'needs_action' => 10,
-        'complete' => 12, 'approved' => 9, 'rejected' => 28,
+        'complete' => 22, 'approved' => 9, 'rejected' => 18,
     ];
 
     private const REJECT_REMARKS = [
@@ -227,11 +230,11 @@ class BulkDemoSeeder extends Seeder
 
         $p['row_id'] = $studentRowId;
 
-        // Which programs this student applied to this cycle (3 to 6).
+        // Which programs this student applied to this cycle (1 to 3).
         $open = array_filter(self::POPULARITY, fn ($w, $name) => isset($this->programs[$name])
             && $this->programs[$name]['status'] !== 'inactive', ARRAY_FILTER_USE_BOTH);
         $chosen = [];
-        $count = mt_rand(3, 6);
+        $count = mt_rand(1, 3);
         while (count($chosen) < $count) {
             $chosen[$this->weighted($open)] = true;
         }
@@ -240,9 +243,18 @@ class BulkDemoSeeder extends Seeder
         // About 45% of students currently hold a scholarship (one only).
         $granteeProgram = $this->chance(0.45) ? $this->pick($chosen) : null;
 
+        // About 1 in 10 of the others is a grantee of an agency-direct program.
+        if (!$granteeProgram && $this->chance(0.1)) {
+            $direct = array_filter(self::AGENCY_DIRECT, fn ($w, $name) => isset($this->programs[$name]), ARRAY_FILTER_USE_BOTH);
+            if ($direct) {
+                $this->seedAgencyDirectGrantee($p, $this->weighted($direct));
+                $granteeProgram = 'agency-direct';
+            }
+        }
+
         // About 15% also finished (or dropped) a scholarship last year.
-        if ($this->chance(0.15)) {
-            $pastOptions = array_values(array_diff(array_keys($open), $chosen));
+        $pastOptions = array_values(array_diff(array_keys($open), $chosen));
+        if ($pastOptions && $this->chance(0.15)) {
             $this->seedPastScholarship($p, $this->pick($pastOptions));
         }
 
@@ -347,6 +359,35 @@ class BulkDemoSeeder extends Seeder
                     Carbon::parse('2026-09-25')->addDays(mt_rand(0, 9)));
             }
         }
+    }
+
+    // A grantee recorded from an agency-direct program's list (no documents, no OAS payroll).
+    private function seedAgencyDirectGrantee(array $p, string $programName): void
+    {
+        $program = $this->programs[$programName];
+        $taggedAt = $this->between('2025-08-01', '2026-09-01');
+
+        DB::table('applications')->insert([
+            'student_id' => $p['row_id'],
+            'scholarship_id' => $program['id'],
+            'status' => 'approved',
+            'remarks' => 'Grantee per the agency\'s list (agency-direct program).',
+            'submitted_at' => null,
+            'enrollment_verified' => true,
+            'enrollment_verified_at' => $taggedAt,
+            'created_at' => $taggedAt, 'updated_at' => $taggedAt,
+        ]);
+
+        DB::table('scholar_records')->insert([
+            'student_id' => $p['row_id'],
+            'scholarship_id' => $program['id'],
+            'status' => 'active',
+            'currently_enrolled' => true,
+            'has_atm' => false,
+            'grantee_tagged_at' => $taggedAt,
+            'remarks' => 'Allowance is paid directly by the agency.',
+            'created_at' => $taggedAt, 'updated_at' => $taggedAt,
+        ]);
     }
 
     private function seedPastScholarship(array $p, string $programName): void

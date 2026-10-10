@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
-import { downloadCSV, formatDate, fullName } from "../../lib/format";
+import { downloadCSV, formatDate } from "../../lib/format";
 import { useToast } from "../../lib/toast";
 import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
+import SheetTabs from "../../components/SheetTabs";
+import { byLastName, lastFirst, programTabs } from "../../lib/programs";
 
 /*
   Forwarded to Agency (staff): every application OAS has sent to an agency
@@ -29,7 +31,7 @@ export default function ForwardedPage() {
   const load = useCallback(
     () =>
       api
-        .get("/applications")
+        .get("/applications", { params: { status: "complete" } })
         .then(({ data }) => {
           const now = Date.now();
           setRows(
@@ -55,18 +57,21 @@ export default function ForwardedPage() {
 
   if (!rows) return <Loading />;
 
-  const programs = [...new Map(rows.map((a) => [a.scholarship_id, a.scholarship])).values()].sort((a, b) =>
-    String(a?.name).localeCompare(String(b?.name))
-  );
+  const programs = [...new Map(rows.map((a) => [a.scholarship_id, a.scholarship])).values()];
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  const shown = rows.filter((a) => {
-    if (programId !== "all" && String(a.scholarship_id) !== programId) return false;
-    const haystack = `${fullName(a.student)} ${a.student?.student_id || ""}`.toLowerCase();
+  const searched = rows.filter((a) => {
+    const haystack = `${lastFirst(a.student)} ${a.student?.student_id || ""}`.toLowerCase();
     return words.every((word) => haystack.includes(word));
   });
+  const tabs = programTabs(searched, (a) => a.scholarship);
+  const active = tabs.some((tab) => tab.key === programId) ? programId : "all";
+  // All programs: longest waiting first. One program: A to Z, like a sheet.
+  const shown = searched
+    .filter((a) => active === "all" || String(a.scholarship_id) === active)
+    .sort((a, b) => (active === "all" ? 0 : byLastName(a.student, b.student)));
 
   function exportCSV() {
-    const program = programs.find((p) => String(p?.id) === programId);
+    const program = programs.find((p) => String(p?.id) === active);
     const code = program ? program.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase().replace(/^-|-$/g, "") : "all-programs";
     const ok = downloadCSV(
       `forwarded-${code}-${stamp()}.csv`,
@@ -106,31 +111,10 @@ export default function ForwardedPage() {
         }
       />
 
-      <section className="card">
-        <div className="program-chips">
-          <button
-            className={programId === "all" ? "chip active" : "chip"}
-            aria-pressed={programId === "all"}
-            onClick={() => setProgramId("all")}
-          >
-            All programs <strong>{rows.length}</strong>
-          </button>
-          {programs.map((p) => {
-            const count = rows.filter((a) => a.scholarship_id === p?.id).length;
-            return (
-              <button
-                key={p?.id}
-                className={programId === String(p?.id) ? "chip active" : "chip"}
-                aria-pressed={programId === String(p?.id)}
-                onClick={() => setProgramId(String(p?.id))}
-              >
-                {p?.name} <strong>{count}</strong>
-              </button>
-            );
-          })}
-        </div>
+      <section className="card sheet-card">
+        <SheetTabs tabs={tabs} value={active} onChange={setProgramId} />
 
-        <div className="inline-form table-search">
+        <div className="sheet-toolbar">
           <label htmlFor="fw-search" className="sr-only">
             Search
           </label>
@@ -141,8 +125,8 @@ export default function ForwardedPage() {
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search name or Student ID"
           />
-          <span className="muted">
-            {shown.length} of {rows.length}, longest waiting first
+          <span className="sheet-meta muted">
+            {shown.length} shown · {active === "all" ? "longest waiting first" : "A–Z"}
           </span>
         </div>
 
@@ -172,7 +156,7 @@ export default function ForwardedPage() {
               <tbody>
                 {shown.map((a) => (
                   <tr key={a.id}>
-                    <td>{fullName(a.student)}</td>
+                    <td>{lastFirst(a.student)}</td>
                     <td>{a.student?.student_id}</td>
                     <td>
                       {a.student?.course}

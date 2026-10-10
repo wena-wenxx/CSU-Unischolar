@@ -12,6 +12,8 @@ import RequirementPicker from "../../components/RequirementPicker";
 
 const EMPTY_FORM = {
   name: "",
+  short_name: "",
+  application_mode: "oas",
   description: "",
   provider: "",
   category: "",
@@ -20,6 +22,16 @@ const EMPTY_FORM = {
   application_end: "",
   status: "active",
 };
+
+// How students apply: through ScholarGuide (OAS) or directly at the agency.
+function ModeSelect({ id, value, onChange }) {
+  return (
+    <select id={id} value={value} onChange={onChange}>
+      <option value="oas">Through the OAS (students apply here)</option>
+      <option value="agency_direct">Agency-direct (students apply at the agency)</option>
+    </select>
+  );
+}
 
 function CategorySelect({ id, value, onChange }) {
   return (
@@ -78,7 +90,7 @@ export default function StaffScholarshipsPage() {
   async function createScholarship(event) {
     event.preventDefault();
 
-    if (!requirements.some((item) => item.is_required)) {
+    if (form.application_mode === "oas" && !requirements.some((item) => item.is_required)) {
       toast.error("Choose at least one required document under “Required documents”.");
       document.getElementById("new-req-search")?.focus();
       return;
@@ -93,7 +105,8 @@ export default function StaffScholarshipsPage() {
         amount: form.amount === "" ? null : Number(form.amount),
         application_start: form.application_start || null,
         application_end: form.application_end || null,
-        requirements: requirements.map((item) => ({
+        short_name: form.short_name.trim() || null,
+        requirements: (form.application_mode === "oas" ? requirements : []).map((item) => ({
           name: item.name,
           is_required: item.is_required,
           description: item.description?.trim() || null,
@@ -103,7 +116,11 @@ export default function StaffScholarshipsPage() {
       setForm(EMPTY_FORM);
       setRequirements([]);
       await load();
-      toast.success(`Scholarship created with ${requirements.length} requirement${requirements.length === 1 ? "" : "s"}.`);
+      toast.success(
+        form.application_mode === "oas"
+          ? `Scholarship created with ${requirements.length} requirement${requirements.length === 1 ? "" : "s"}.`
+          : "Agency-direct scholarship created."
+      );
     } catch (err) {
       toast.error(errMsg(err, "Unable to create scholarship."));
     } finally {
@@ -129,8 +146,18 @@ export default function StaffScholarshipsPage() {
           </div>
 
           <div>
+            <label htmlFor="new-short">Short name (for tabs)</label>
+            <input id="new-short" value={form.short_name} onChange={field("short_name")} maxLength={40} placeholder="e.g. TES" />
+          </div>
+
+          <div>
             <label htmlFor="new-provider">Provider</label>
             <input id="new-provider" value={form.provider} onChange={field("provider")} />
+          </div>
+
+          <div>
+            <label htmlFor="new-mode">How students apply</label>
+            <ModeSelect id="new-mode" value={form.application_mode} onChange={field("application_mode")} />
           </div>
 
           <div>
@@ -167,22 +194,31 @@ export default function StaffScholarshipsPage() {
             <textarea id="new-description" value={form.description} onChange={field("description")} />
           </div>
 
-          <fieldset className="full-column req-fieldset">
-            <legend>Required documents</legend>
-            <p className="muted small">
-              Tick the documents students must upload. Documents from this list can be reused from the student's My
-              Documents and have an expiry date; a custom requirement must be uploaded each time.
+          {form.application_mode === "oas" ? (
+            <fieldset className="full-column req-fieldset">
+              <legend>Required documents</legend>
+              <p className="muted small">
+                Tick the documents students must upload. Documents from this list can be reused from the student's My
+                Documents and have an expiry date; a custom requirement must be uploaded each time.
+              </p>
+              <RequirementPicker value={requirements} onChange={setRequirements} types={types} idPrefix="new-req" />
+            </fieldset>
+          ) : (
+            <p className="full-column muted small">
+              Agency-direct: students see this program and its description but apply at the agency, so no documents
+              are needed here. Record the agency's grantees later in Approved Lists.
             </p>
-            <RequirementPicker value={requirements} onChange={setRequirements} types={types} idPrefix="new-req" />
-          </fieldset>
+          )}
 
           <div className="full-column button-row">
             <button className="button button-primary" disabled={saving}>
               {saving ? "Creating..." : "Create Scholarship"}
             </button>
-            <span className="muted small">
-              {requirements.length} requirement{requirements.length === 1 ? "" : "s"} selected
-            </span>
+            {form.application_mode === "oas" && (
+              <span className="muted small">
+                {requirements.length} requirement{requirements.length === 1 ? "" : "s"} selected
+              </span>
+            )}
           </div>
         </form>
       </section>
@@ -276,6 +312,8 @@ function ManageScholarshipModal({ scholarshipId, types, onClose, onDeleted }) {
 
           setForm({
             name: data.name || "",
+            short_name: data.short_name || "",
+            application_mode: data.application_mode || "oas",
             provider: data.provider || "",
             category: data.category || "",
             description: data.description || "",
@@ -305,6 +343,7 @@ function ManageScholarshipModal({ scholarshipId, types, onClose, onDeleted }) {
         amount: form.amount === "" ? null : Number(form.amount),
         application_start: form.application_start || null,
         application_end: form.application_end || null,
+        short_name: form.short_name.trim() || null,
       });
 
       toast.success("Scholarship saved.");
@@ -401,8 +440,18 @@ function ManageScholarshipModal({ scholarshipId, types, onClose, onDeleted }) {
             </div>
 
             <div>
+              <label htmlFor="edit-short">Short name (for tabs)</label>
+              <input id="edit-short" value={form.short_name} onChange={field("short_name")} maxLength={40} />
+            </div>
+
+            <div>
               <label htmlFor="edit-provider">Provider</label>
               <input id="edit-provider" value={form.provider} onChange={field("provider")} />
+            </div>
+
+            <div>
+              <label htmlFor="edit-mode">How students apply</label>
+              <ModeSelect id="edit-mode" value={form.application_mode} onChange={field("application_mode")} />
             </div>
 
             <div>

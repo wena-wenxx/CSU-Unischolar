@@ -9,6 +9,8 @@ import PageHeader from "../../components/PageHeader";
 import StatusBadge from "../../components/StatusBadge";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
+import SheetTabs from "../../components/SheetTabs";
+import { byLastName, lastFirst, programTabs } from "../../lib/programs";
 
 export default function StaffScholarRecordsPage() {
   const toast = useToast();
@@ -22,12 +24,13 @@ export default function StaffScholarRecordsPage() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
   const [atmFilter, setAtmFilter] = useState("all");
+  const [program, setProgram] = useState("all");
 
   // Written with .then() (not await) so React's lint rule can see that the
   // state is set later, when the server answers, not during the effect.
   const load = useCallback(
     () =>
-      Promise.all([api.get("/scholar-records"), api.get("/applications")])
+      Promise.all([api.get("/scholar-records"), api.get("/applications", { params: { status: "approved" } })])
         .then(([recordsResponse, applicationsResponse]) => {
           setRecords(recordsResponse.data);
           setApplications(applicationsResponse.data.filter((a) => a.status === "approved"));
@@ -65,15 +68,21 @@ export default function StaffScholarRecordsPage() {
     }
   }
 
+  // Filters first, then one tab per program; every list is A to Z by last name.
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  const shownRecords = records.filter((record) => {
+  const filtered = records.filter((record) => {
     if (statusFilter !== "all" && record.status !== statusFilter) return false;
     if (atmFilter === "funded" && !(record.has_atm && record.atm_funds === "yes")) return false;
     if (atmFilter === "waiting" && !(record.has_atm && record.atm_funds !== "yes")) return false;
     if (atmFilter === "none" && record.has_atm) return false;
-    const haystack = `${fullName(record.student)} ${record.student?.student_id || ""} ${record.scholarship?.name || ""}`.toLowerCase();
+    const haystack = `${lastFirst(record.student)} ${record.student?.student_id || ""} ${record.scholarship?.name || ""}`.toLowerCase();
     return words.every((word) => haystack.includes(word));
   });
+  const tabs = programTabs(filtered, (record) => record.scholarship);
+  const activeProgram = tabs.some((tab) => tab.key === program) ? program : "all";
+  const shownRecords = filtered
+    .filter((record) => activeProgram === "all" || String(record.scholarship_id) === activeProgram)
+    .sort((a, b) => byLastName(a.student, b.student));
 
   if (loading) return <Loading />;
 
@@ -119,10 +128,12 @@ export default function StaffScholarRecordsPage() {
         )}
       </section>
 
-      <section className="card">
+      <section className="card sheet-card">
         <h2>Current Scholar Records</h2>
 
-        <div className="inline-form table-search">
+        <SheetTabs tabs={tabs} value={activeProgram} onChange={setProgram} />
+
+        <div className="sheet-toolbar">
           <label htmlFor="scholar-search" className="sr-only">
             Search scholars
           </label>
@@ -154,9 +165,7 @@ export default function StaffScholarRecordsPage() {
             <option value="none">No ATM yet</option>
           </select>
 
-          <span className="muted">
-            {shownRecords.length} of {records.length}
-          </span>
+          <span className="sheet-meta muted">{shownRecords.length} shown, A–Z</span>
         </div>
 
         {shownRecords.length === 0 ? (
@@ -168,7 +177,7 @@ export default function StaffScholarRecordsPage() {
                 <tr>
                   <th>Student</th>
                   <th>Student ID</th>
-                  <th>Scholarship</th>
+                  {activeProgram === "all" && <th>Program</th>}
                   <th>Status</th>
                   <th>Enrolled</th>
                   <th>Has ATM</th>
@@ -182,9 +191,11 @@ export default function StaffScholarRecordsPage() {
               <tbody>
                 {shownRecords.map((record) => (
                   <tr key={record.id}>
-                    <td>{fullName(record.student)}</td>
+                    <td>{lastFirst(record.student)}</td>
                     <td>{record.student?.student_id}</td>
-                    <td>{record.scholarship?.name}</td>
+                    {activeProgram === "all" && (
+                      <td title={record.scholarship?.name}>{record.scholarship?.short_name || record.scholarship?.name}</td>
+                    )}
                     <td>
                       <StatusBadge status={record.status} />
                     </td>

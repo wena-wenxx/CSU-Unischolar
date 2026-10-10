@@ -42,7 +42,7 @@ class ReviewQueueController extends Controller
         $data = $request->validate(['scholarship_id' => 'nullable|exists:scholarships,id']);
 
         $applications = Application::with([
-            'student', 'scholarship:id,name,provider', 'scholarship.requirements', 'documents.validationResult', 'documents.requirement:id,name',
+            'student', 'scholarship:id,name,short_name,provider', 'scholarship.requirements', 'documents.validationResult', 'documents.requirement:id,name',
         ])
             ->whereIn('status', ['submitted', 'under_review'])
             ->when($data['scholarship_id'] ?? null, fn ($q, $id) => $q->where('scholarship_id', $id))
@@ -105,6 +105,8 @@ class ReviewQueueController extends Controller
                 'student_id' => $application->student?->student_id,
                 'student' => trim(($application->student?->last_name ?? '').', '.($application->student?->first_name ?? ''), ', '),
                 'scholarship' => $application->scholarship?->name,
+                'scholarship_id' => $application->scholarship_id,
+                'short_name' => $application->scholarship?->short_name,
                 'provider' => $application->scholarship?->provider,
                 'status' => $application->status,
                 'submitted_at' => $application->submitted_at,

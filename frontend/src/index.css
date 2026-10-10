@@ -3533,3 +3533,169 @@ tbody tr:nth-child(even) {
     background: none;
   }
 }
+
+/* =====================================================================
+   ROUND 10: program sheet tabs (like Excel), tidy toolbars
+   ===================================================================== */
+
+.sheet-card > h2 {
+  margin-bottom: 12px;
+}
+
+/* One tab per program. Scrolls sideways when there are many. */
+.sheet-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 0 0 14px;
+  padding: 0 2px;
+  overflow-x: auto;
+  border-bottom: 2px solid var(--primary-color);
+  scrollbar-width: thin;
+}
+
+.sheet-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: var(--surface-muted);
+  color: var(--text);
+  font: 500 14px var(--font-body);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.sheet-tab small {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(var(--primary-rgb), 0.1);
+  color: var(--primary-color);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.sheet-tab:hover {
+  background: var(--surface-hover);
+  color: var(--primary-color);
+}
+
+.sheet-tab.active {
+  border-color: var(--primary-color);
+  background: var(--primary-color);
+  color: var(--bg-surface);
+  font-weight: 600;
+}
+
+.sheet-tab.active small {
+  background: var(--accent-color);
+  color: var(--csu-green-dark);
+}
+
+/* Search, dropdowns and the count on one aligned row. */
+.sheet-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.sheet-toolbar input[type="search"] {
+  flex: 1 1 240px;
+  min-width: 0;
+  margin: 0;
+}
+
+.sheet-toolbar select {
+  width: auto;
+  max-width: 100%;
+  margin: 0;
+}
+
+.sheet-meta {
+  margin-left: auto;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.contact-about {
+  margin: 0 0 12px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+@media (max-width: 640px) {
+  .sheet-meta {
+    margin-left: 0;
+  }
+
+  .sheet-toolbar select {
+    flex: 1 1 100%;
+  }
+}
+
+@media print {
+  .sheet-tabs,
+  .sheet-toolbar {
+    display: none !important;
+  }
+}
+
+/* Tabs fit more programs; "All programs" stays visible while scrolling. */
+.sheet-tab {
+  padding: 7px 11px;
+  font-size: 13px;
+}
+
+.sheet-tab.pinned {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  box-shadow: 4px 0 6px -4px rgba(var(--shadow-rgb), 0.25);
+}
+
+.sheet-tab.pinned:not(.active) {
+  background: var(--surface);
+}
+
+/* A checkbox in a filter row keeps its own size. */
+.inline-form .choice {
+  flex: 0 0 auto;
+}
+
+.inline-form .choice input {
+  flex: none;
+  min-width: 0;
+}
+
+/* Agency-direct programs: one compact list instead of many cards. */
+.direct-list ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.direct-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.direct-list li:last-child {
+  border-bottom: 0;
+}
+
+.direct-list li small {
+  display: block;
+  margin-top: 2px;
+}

@@ -9,10 +9,15 @@ class Scholarship extends Model
     // The OAS is in the Philippines: "today" for deadlines is Manila time.
     public const TIMEZONE = 'Asia/Manila';
 
-    public const CATEGORIES = ['government', 'csu', 'lgu', 'private'];
+    // Grouped like the OAS list: CHED-funded, other government, private, university.
+    // ("lgu" is kept for older records.)
+    public const CATEGORIES = ['ched', 'government', 'private', 'csu', 'lgu'];
+
+    public const MODES = ['oas', 'agency_direct'];
 
     protected $fillable = [
-        'name', 'description', 'provider', 'category', 'application_start', 'application_end', 'amount', 'status',
+        'name', 'short_name', 'description', 'provider', 'category', 'application_mode',
+        'application_start', 'application_end', 'amount', 'status',
     ];
 
     // Sent with every scholarship so the frontend can show "Open", "Closed", ...
@@ -58,6 +63,12 @@ class Scholarship extends Model
         return $this->availability === 'open';
     }
 
+    // Students apply directly at the agency, not in ScholarGuide.
+    public function isAgencyDirect(): bool
+    {
+        return $this->application_mode === 'agency_direct';
+    }
+
     // Students may browse programs that are open or opening soon.
     public function scopeVisibleToStudents($query)
     {
@@ -72,6 +83,10 @@ class Scholarship extends Model
     {
         $start = $this->day($this->application_start);
         $end = $this->day($this->application_end);
+
+        if ($this->isAgencyDirect()) {
+            return 'Apply directly at '.($this->provider ?: 'the agency').'. This scholarship is not applied for through the OAS.';
+        }
 
         return match ($this->availability) {
             'open' => null,

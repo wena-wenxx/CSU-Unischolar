@@ -37,75 +37,65 @@ class DemoDataSeeder extends Seeder
     // Requirement sets (names live in Support/DemoDocuments.php)
     private const GOV = [Doc::COR, Doc::GRADES, Doc::BIRTH, Doc::INDIGENCY, Doc::VALID_ID, Doc::GOOD_MORAL, Doc::ITR, Doc::BARANGAY];
     private const TALENT = [Doc::COR, Doc::GRADES, Doc::VALID_ID, Doc::BIRTH, Doc::GOOD_MORAL, Doc::RECOMMENDATION];
-    private const PRIVATE_ALL = [Doc::COR, Doc::GRADES, Doc::BIRTH, Doc::INDIGENCY, Doc::VALID_ID, Doc::BARANGAY, Doc::GOOD_MORAL, Doc::ITR, Doc::RECOMMENDATION];
-    private const PRIVATE_MERIT = [Doc::COR, Doc::GRADES, Doc::BIRTH, Doc::VALID_ID, Doc::BARANGAY, Doc::GOOD_MORAL, Doc::ITR, Doc::RECOMMENDATION];
 
+    // The scholarship programs listed by the CSU Office of Admission and
+    // Scholarship (OAS). Names follow the OAS list.
     public const CMSP = 'CHED Merit Scholarship Program (CMSP)';
-    public const TES = 'Tertiary Education Subsidy (TES)';
-    public const DOST = 'DOST-SEI Undergraduate Scholarship';
-    public const CSU_SA = 'CSU Student Assistance Scholarship';
-    public const CHOIR = 'CSU Cultural Grant (Choir)';
-    public const DANCE = 'CSU Cultural Grant (Dance Troupe)';
-    public const KAYAM = 'CSU Cultural Grant (Kayam Ethno Band)';
-    public const ATHLETIC = 'CSU Athletic Grant';
-    public const BUTUAN = 'Butuan City Scholarship Program';
+    public const TDP_TES = 'CHED Tulong-Dunong Program (TDP-TES)';
+    public const TES = 'CHED Tertiary Education Subsidy (TES)';
+    public const TDP_SUC = 'CHED TDP - State Universities and Colleges (TDP-SUC)';
+    public const SA = 'Student Assistantship (SA) Program';
+    public const CULTURE = 'Culture and Arts';
+    public const LANDBANK = 'Iskolar ng Landbank Program';
+    public const DA_ACEF = 'Department of Agriculture - Agricultural Competitiveness Enhancement Fund (DA-ACEF)';
+    public const GIAHEP = 'Agricultural Competitiveness Enhancement Fund - Grant-in-Aid for Higher Education Program (ACEF-GIAHEP)';
+    public const DOST = 'Department of Science and Technology (DOST)';
+    public const BAYUGAN = 'Local Government Unit-Bayugan (LGU-Bayugan) Graduate School Scholarship Program';
+    public const NGCP = 'The National Grid Corporation of the Philippines (NGCP) Scholarship Program';
+    public const MEKONG = 'Enfants du Mekong Scholarship';
+
+    // Older names used by the test plan (same programs).
+    public const CSU_SA = self::SA;
+
+    private const AGENCY_DIRECT_NOTE = 'Apply directly to the scholarship-giving agency; requirements and allowances are handled by its office. The OAS posts announcements and updates when the agency requests it.';
 
     /**
-     * 20 programs. amount = demo amount per semester (PHP).
-     * status: active = open for applications; closed = deadline passed;
-     *         inactive = not offered this academic year.
+     * [name, short name, provider, category, mode, amount, start, end, status, description, requirements]
+     * mode: oas = apply in ScholarGuide; agency_direct = apply at the agency (no requirements here).
+     * Amounts and dates of the OAS-processed programs are DEMO values: replace
+     * them with the official figures (Scholarships page) before real use.
      */
     public const PROGRAMS = [
-        // Government
-        [self::CMSP, 'Commission on Higher Education (CHED)', 'government', 20000, '2026-06-15', '2026-08-31', 'closed',
-            'Merit-based scholarship for students with high academic performance from qualified low-income households.', self::GOV],
-        [self::TES, 'Commission on Higher Education (CHED) - UniFAST', 'government', 20000, '2026-07-01', '2026-10-31', 'active',
-            'Grant-in-aid for financially disadvantaged students enrolled in public higher education institutions.',
+        // CHED-funded (processed through the OAS)
+        [self::CMSP, 'CMSP', 'Commission on Higher Education (CHED)', 'ched', 'oas', 20000, '2026-06-15', '2026-08-31', 'closed',
+            'CHED-funded merit scholarship processed through the OAS, with Full SSP and Half SSP grantees.', self::GOV],
+        [self::TDP_TES, 'TDP-TES', 'Commission on Higher Education (CHED)', 'ched', 'oas', 7500, '2026-07-01', '2026-10-31', 'active',
+            'CHED-funded financial assistance processed through the OAS.',
+            [Doc::COR, Doc::GRADES, Doc::VALID_ID, Doc::INDIGENCY, Doc::ITR, Doc::BIRTH]],
+        [self::TES, 'TES', 'Commission on Higher Education (CHED)', 'ched', 'oas', 20000, '2026-07-01', '2026-10-31', 'active',
+            'CHED-funded tertiary education subsidy processed through the OAS.',
             [Doc::COR, Doc::GRADES, Doc::BIRTH, Doc::INDIGENCY, Doc::VALID_ID, Doc::ITR, Doc::BARANGAY, Doc::GOOD_MORAL]],
-        [self::DOST, 'Department of Science and Technology - Science Education Institute (DOST-SEI)', 'government', 40000, '2026-06-01', '2026-08-14', 'closed',
-            'Scholarship for students taking priority science, technology, engineering and mathematics courses.',
-            [Doc::COR, Doc::GRADES, Doc::BIRTH, Doc::VALID_ID, Doc::GOOD_MORAL, Doc::ITR, Doc::RECOMMENDATION, Doc::BARANGAY]],
+        [self::TDP_SUC, 'TDP-SUC', 'Commission on Higher Education (CHED)', 'ched', 'oas', 7500, '2026-07-15', '2026-11-15', 'active',
+            'CHED-funded Tulong-Dunong assistance for students of state universities and colleges, processed through the OAS.',
+            [Doc::COR, Doc::GRADES, Doc::VALID_ID, Doc::INDIGENCY, Doc::ITR]],
 
-        // CSU-funded
-        [self::CSU_SA, 'Caraga State University', 'csu', 5000, '2026-07-15', '2026-10-30', 'active',
-            'University-funded assistance for financially challenged students in good academic standing.',
+        // University-funded scholarship / financial assistance
+        [self::SA, 'SA', 'Caraga State University', 'csu', 'oas', 5000, '2026-07-15', '2026-10-30', 'active',
+            'University-funded student assistantship program.',
             [Doc::COR, Doc::GRADES, Doc::INDIGENCY, Doc::VALID_ID, Doc::GOOD_MORAL, Doc::ITR, Doc::BARANGAY, Doc::RECOMMENDATION]],
-        [self::CHOIR, 'Caraga State University', 'csu', 6000, '2026-08-01', '2026-11-15', 'active',
-            'Grant for active members of the CSU Choir.', self::TALENT],
-        [self::DANCE, 'Caraga State University', 'csu', 6000, '2026-08-01', '2026-11-15', 'active',
-            'Grant for active members of the CSU Dance Troupe.', self::TALENT],
-        [self::KAYAM, 'Caraga State University', 'csu', 6000, '2026-08-01', '2026-11-15', 'active',
-            'Grant for active members of the Kayam Ethno Band.', self::TALENT],
-        [self::ATHLETIC, 'Caraga State University', 'csu', 8000, '2026-08-01', '2026-11-15', 'active',
-            'Grant for varsity athletes representing the university.', self::TALENT],
+        [self::CULTURE, 'Culture & Arts', 'Caraga State University', 'csu', 'oas', 6000, '2026-08-01', '2026-11-15', 'active',
+            'University-funded financial assistance for students in CSU culture and arts groups.', self::TALENT],
 
-        // LGU
-        [self::BUTUAN, 'City Government of Butuan', 'lgu', 10000, '2026-07-01', '2026-10-31', 'active',
-            'Scholarship for qualified bona fide residents of Butuan City.', self::GOV],
+        // Other government-funded (agency-direct)
+        [self::LANDBANK, 'Landbank', 'Land Bank of the Philippines', 'government', 'agency_direct', null, null, null, 'active', self::AGENCY_DIRECT_NOTE, []],
+        [self::DA_ACEF, 'DA-ACEF', 'Department of Agriculture', 'government', 'agency_direct', null, null, null, 'active', self::AGENCY_DIRECT_NOTE, []],
+        [self::GIAHEP, 'ACEF-GIAHEP', 'Department of Agriculture', 'government', 'agency_direct', null, null, null, 'active', self::AGENCY_DIRECT_NOTE, []],
+        [self::DOST, 'DOST', 'Department of Science and Technology', 'government', 'agency_direct', null, null, null, 'active', self::AGENCY_DIRECT_NOTE, []],
+        [self::BAYUGAN, 'LGU-Bayugan', 'Local Government Unit of Bayugan', 'government', 'agency_direct', null, null, null, 'active', self::AGENCY_DIRECT_NOTE, []],
 
-        // Private / foundation
-        ['SM College Scholarship', 'SM Foundation', 'private', 15000, '2026-04-01', '2026-06-30', 'closed',
-            'College scholarship for deserving students from low-income families.', self::PRIVATE_ALL],
-        ['Ayala U-Go Scholarship', 'Ayala Foundation', 'private', 25000, '2026-08-01', '2026-11-30', 'active',
-            'Scholarship for academically promising students who want to make a difference in their communities.', self::PRIVATE_ALL],
-        ['BPI Science Scholarship', 'BPI Foundation', 'private', 30000, '2026-08-15', '2026-11-15', 'active',
-            'Scholarship for students in science and mathematics programs.', self::PRIVATE_MERIT],
-        ['Metrobank Scholarship', 'Metrobank Foundation', 'private', 35000, '2026-07-15', '2026-10-31', 'active',
-            'Scholarship for high-achieving students in selected degree programs.', self::PRIVATE_MERIT],
-        ['Aboitiz Future Leaders Scholarship', 'Aboitiz Foundation', 'private', 30000, '2026-08-01', '2026-11-15', 'active',
-            'Scholarship for students with strong leadership potential.', self::PRIVATE_MERIT],
-        ['Megaworld Scholarship', 'Megaworld Foundation', 'private', 20000, '2026-07-01', '2026-10-31', 'active',
-            'Scholarship for financially challenged students with good grades.', self::PRIVATE_ALL],
-        ['DMCI Homes Scholarship', 'DMCI Homes', 'private', 25000, '2026-08-01', '2026-11-30', 'active',
-            'Scholarship for engineering and architecture-related programs.', self::PRIVATE_MERIT],
-        ['Petron Bataan Refinery Scholarship', 'Petron Foundation', 'private', 15000, '2026-06-01', '2026-07-31', 'inactive',
-            'Not offered to CSU students this academic year.', self::PRIVATE_ALL],
-        ['San Miguel Foundation Scholarship', 'San Miguel Foundation', 'private', 20000, '2026-07-15', '2026-11-15', 'active',
-            'Scholarship for deserving students from partner communities.', self::PRIVATE_ALL],
-        ['Manila Water Foundation Scholarship', 'Manila Water Foundation', 'private', 15000, '2026-08-01', '2026-11-30', 'active',
-            'Scholarship for students in environment- and health-related programs.', self::PRIVATE_ALL],
-        ['Unilab Foundation Scholarship', 'United Laboratories (Unilab Foundation)', 'private', 25000, '2026-08-01', '2026-11-30', 'active',
-            'Scholarship for students in health sciences and STEM programs.', self::PRIVATE_MERIT],
+        // Private-funded (agency-direct)
+        [self::NGCP, 'NGCP', 'National Grid Corporation of the Philippines', 'private', 'agency_direct', null, null, null, 'active', self::AGENCY_DIRECT_NOTE, []],
+        [self::MEKONG, 'Enfants du Mekong', 'Enfants du Mekong', 'private', 'agency_direct', null, null, null, 'active', self::AGENCY_DIRECT_NOTE, []],
     ];
 
     public function run(): void
@@ -116,12 +106,14 @@ class DemoDataSeeder extends Seeder
 
     private function seedPrograms(): void
     {
-        foreach (self::PROGRAMS as [$name, $provider, $category, $amount, $start, $end, $status, $description, $requirements]) {
+        foreach (self::PROGRAMS as [$name, $short, $provider, $category, $mode, $amount, $start, $end, $status, $description, $requirements]) {
             $scholarship = Scholarship::firstOrCreate(
                 ['name' => $name],
                 [
+                    'short_name' => $short,
                     'provider' => $provider,
                     'category' => $category,
+                    'application_mode' => $mode,
                     'description' => $description,
                     'amount' => $amount, // demo amount per semester
                     'application_start' => $start,
@@ -142,11 +134,11 @@ class DemoDataSeeder extends Seeder
     /**
      *  Juan   CMSP      approved + enrollment verified -> ready to TAG as grantee
      *  Maria  TES       submitted; her "Indigency" upload is really a Barangay Clearance (AI should flag it)
-     *  Ana    DOST-SEI  under review; also a COMPLETED past scholarship with processed payroll (Data Bank history)
-     *  Pedro  Butuan    needs action (OAS asked for a clearer document)
-     *  Liza   CSU SA    rejected by the agency (applies live to the CSU Choir grant during the demo)
-     *  Carlo  Kayam     draft, only 1 of 6 documents uploaded
-     *  Rosa   CSU SA    complete (forwarded); her COR belongs to another person (AI should flag the name)
+     *  Ana    TDP-SUC   under review; also a COMPLETED past SA scholarship with processed payroll (Data Bank history)
+     *  Pedro  TDP-TES   needs action (OAS asked for a clearer document)
+     *  Liza   SA        rejected (applies live to Culture and Arts during the demo)
+     *  Carlo  Culture   draft, only 1 of 6 documents uploaded
+     *  Rosa   SA        complete (forwarded); her COR belongs to another person (AI should flag the name)
      *  Mark   TES       approved, enrollment NOT yet verified -> demo "Verify enrollment"
      *  Jose   TES       active grantee with a READY payroll entry
      *  Grace  CMSP      active grantee with no payroll yet -> demo batch payroll
@@ -167,13 +159,13 @@ class DemoDataSeeder extends Seeder
             'grantee' => ['status' => 'completed', 'has_atm' => true, 'tagged_days_ago' => 375,
                 'payroll' => ['period' => '2nd Semester AY 2025-2026', 'amount' => 5000, 'status' => 'processed']],
         ]);
-        $this->scenario('2026-00003', self::DOST, [
+        $this->scenario('2026-00003', self::TDP_SUC, [
             'status' => 'under_review', 'submitted_days_ago' => 60,
         ]);
 
-        $this->scenario('2026-00004', self::BUTUAN, [
+        $this->scenario('2026-00004', self::TDP_TES, [
             'status' => 'needs_action', 'submitted_days_ago' => 9,
-            'remarks' => 'Your Barangay Clearance is hard to read. Please upload a clearer copy.',
+            'remarks' => 'Your Certificate of Indigency is hard to read. Please upload a clearer copy.',
         ]);
 
         $this->scenario('2026-00005', self::CSU_SA, [
@@ -181,7 +173,7 @@ class DemoDataSeeder extends Seeder
             'remarks' => 'Not included in the agency\'s approved list for this semester.',
         ]);
 
-        $this->scenario('2026-00006', self::KAYAM, [
+        $this->scenario('2026-00006', self::CULTURE, [
             'status' => 'draft', 'only' => [Doc::COR],
         ]);
 

@@ -74,6 +74,12 @@ export function announcementImage(item) {
   return item.image_path.startsWith("/") ? item.image_path : `${FILES_URL}/${item.image_path}`;
 }
 
+// Number of documents the AI flagged in an application (list or full record).
+export function flaggedCount(application) {
+  if (typeof application.flagged_count === "number") return application.flagged_count;
+  return (application.documents || []).filter((document) => document.status === "flagged").length;
+}
+
 // First words of a long text, for previews.
 export function preview(text, length = 140) {
   const clean = String(text || "").replace(/\s+/g, " ").trim();
@@ -81,7 +87,12 @@ export function preview(text, length = 140) {
 }
 
 // Required requirements that have no uploaded document yet.
+// (The staff list sends missing_requirements as names, to stay small.)
 export function missingRequirements(application) {
+  if (Array.isArray(application.missing_requirements)) {
+    return application.missing_requirements.map((name) => ({ name }));
+  }
+
   const uploaded = new Set(
     (application.documents || []).map(
       (document) => document.scholarship_requirement_id
@@ -170,16 +181,20 @@ export function formatDateTime(date) {
 
 /* ---------- Scholarship programs ---------- */
 
+// Grouped like the OAS list of scholarship programs.
 export const CATEGORY_LABELS = {
-  government: "Government",
-  csu: "CSU-funded",
-  lgu: "LGU",
-  private: "Private / Foundation",
+  ched: "CHED-funded",
+  government: "Other Government",
+  private: "Private-funded",
+  csu: "University-funded",
 };
 
 export function categoryLabel(category) {
-  return CATEGORY_LABELS[category] || "Other";
+  return CATEGORY_LABELS[category] || (category === "lgu" ? "LGU" : "Other");
 }
+
+// Agency-direct: students apply directly at the agency, not in ScholarGuide.
+export const isAgencyDirect = (scholarship) => scholarship?.application_mode === "agency_direct";
 
 // Whole days from today (Manila) until a YYYY-MM-DD date. Negative = past.
 function daysUntil(day) {
@@ -193,6 +208,8 @@ function daysUntil(day) {
 
 // Label + colour for a program's availability (computed by the backend).
 export function availabilityInfo(scholarship) {
+  if (isAgencyDirect(scholarship)) return { label: "Apply at the agency", tone: "neutral" };
+
   const left = daysUntil(scholarship.application_end);
 
   switch (scholarship.availability) {
@@ -213,6 +230,7 @@ export function availabilityInfo(scholarship) {
 }
 
 export function deadlineText(scholarship) {
+  if (isAgencyDirect(scholarship)) return "Apply directly at the agency";
   if (!scholarship.application_end) return "No deadline set";
 
   return `Deadline: ${formatDate(scholarship.application_end)}`;

@@ -17,7 +17,7 @@ use Illuminate\Database\Seeder;
  *   Bulk demo    s<student id without dash>@demo.carsu.edu.ph   / Student@12345
  *                (e.g. the student 2024-10123 logs in as s202410123@demo.carsu.edu.ph)
  *
- * DemoDataSeeder: 20 scholarship programs + the 10 named demo scenarios.
+ * DemoDataSeeder: the 13 programs on the OAS list + the 10 named demo scenarios.
  * BulkDemoSeeder: 120 more students with a full cycle of applications,
  *                 documents, AI results, grantees and payroll.
  * StatusLogSeeder: timeline / notifications / "last updated" for every application.

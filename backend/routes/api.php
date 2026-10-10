@@ -99,6 +99,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/applications', [ApplicationController::class, 'store']);
     Route::get('/my-applications', [ApplicationController::class, 'myApplications']);
     Route::get('/applications', [ApplicationController::class, 'index']);
+    Route::get('/staff/applications/version', [ApplicationController::class, 'version']);
     Route::get('/applications/{id}', [ApplicationController::class, 'show']);
     Route::post('/applications/{id}/submit', [ApplicationController::class, 'submit']);
     Route::patch('/applications/{id}/review', [ApplicationController::class, 'review']);
