@@ -141,14 +141,10 @@ class AgencyListController extends Controller
 
         $line['student'] = trim("{$student->first_name} {$student->last_name}");
 
-        $otherGrant = ScholarRecord::with('scholarship:id,name')
-            ->where('student_id', $student->id)
-            ->where('status', 'active')
-            ->where('scholarship_id', '!=', $scholarship->id)
-            ->first();
+        $otherGrant = $student->otherActiveScholarship($scholarship->id);
 
         if ($otherGrant) {
-            return $line + ['result' => 'error', 'note' => "Already an active grantee of {$otherGrant->scholarship->name} (one active scholarship rule). Not changed; check with the agency."];
+            return $line + ['result' => 'error', 'note' => "Already an active grantee of {$otherGrant} (one active scholarship rule). Not changed; check with the agency."];
         }
 
         $approvalNote = $this->approvalNote($row['approval_date'] ?? null, $data['agency_name'], $data['file_name']);

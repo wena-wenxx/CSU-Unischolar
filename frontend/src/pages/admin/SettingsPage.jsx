@@ -8,11 +8,12 @@ import Loading from "../../components/Loading";
   System Settings (admin):
   - current school year and semester (the default payroll period),
   - OAS contact details shown to students (Contact OAS page and page footer).
+  - signatories printed on the General Payroll (General Form No. 6-A).
 */
 export default function SettingsPage() {
   const toast = useToast();
   const [form, setForm] = useState(null);
-  const [meta, setMeta] = useState({ semesters: [], current_period: "" });
+  const [meta, setMeta] = useState({ semesters: [], current_period: "", signatory_slots: {} });
   const [saving, setSaving] = useState(false);
 
   const fill = (values) =>
@@ -25,7 +26,7 @@ export default function SettingsPage() {
         .get("/admin/settings")
         .then(({ data }) => {
           setForm(fill(data.values));
-          setMeta({ semesters: data.semesters, current_period: data.current_period });
+          setMeta({ semesters: data.semesters, current_period: data.current_period, signatory_slots: data.signatory_slots || {} });
         })
         .catch((err) => toast.error(errMsg(err, "Unable to load the settings."))),
     [toast]
@@ -140,6 +141,23 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        <section className="card">
+          <h2>Payroll form signatories</h2>
+          <p className="muted small">
+            Printed at the bottom of the General Payroll (General Form No. 6-A). Type each official&apos;s name as it should
+            appear; change them when the officials change. &quot;Prepared by&quot; is the staff member who makes the form.
+          </p>
+
+          <div className="signatory-grid">
+            <span className="field-label">On the form</span>
+            <span className="field-label">Name</span>
+            <span className="field-label">Position</span>
+            {Object.entries(meta.signatory_slots).map(([slot, place]) => (
+              <SignatoryRow key={slot} slot={slot} place={place} form={form} field={field} />
+            ))}
+          </div>
+        </section>
+
         <div className="button-row">
           <button className="button button-primary" disabled={saving}>
             {saving ? "Saving..." : "Save settings"}
@@ -147,5 +165,33 @@ export default function SettingsPage() {
         </div>
       </form>
     </div>
+  );
+}
+
+function SignatoryRow({ slot, place, form, field }) {
+  const name = `payroll_${slot}_name`;
+  const title = `payroll_${slot}_title`;
+  return (
+    <>
+      <span className="signatory-place">{place}</span>
+      <div>
+        <label htmlFor={`sig-${slot}-name`} className="sr-only">
+          {place}: name
+        </label>
+        <input
+          id={`sig-${slot}-name`}
+          value={form[name] ?? ""}
+          onChange={field(name)}
+          maxLength={120}
+          placeholder="Full name, e.g. Juan A. Dela Cruz, PhD"
+        />
+      </div>
+      <div>
+        <label htmlFor={`sig-${slot}-title`} className="sr-only">
+          {place}: position
+        </label>
+        <input id={`sig-${slot}-title`} value={form[title] ?? ""} onChange={field(title)} maxLength={120} />
+      </div>
+    </>
   );
 }

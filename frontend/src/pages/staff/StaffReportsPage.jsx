@@ -38,19 +38,25 @@ export default function StaffReportsPage() {
       api.get("/payroll"),
       api.get("/scholarships"),
       api.get("/staff/email-logs").catch(() => ({ data: [] })),
+      api
+        .get("/staff/external-grantees", { params: { export: 1, match: "all", status: "all" } })
+        .catch(() => ({ data: { data: [] } })),
+      api.get("/staff/recommendation-logs").catch(() => ({ data: [] })),
     ])
-      .then(([applications, scholars, payroll, scholarships, emails]) =>
+      .then(([applications, scholars, payroll, scholarships, emails, external, recLogs]) =>
         setData({
           applications: applications.data,
           scholars: scholars.data,
           payroll: payroll.data,
           scholarships: scholarships.data,
           emails: emails.data,
+          external: external.data.data,
+          recLogs: recLogs.data,
         })
       )
       .catch((err) => {
         toast.error(errMsg(err, "Unable to load report data."));
-        setData({ applications: [], scholars: [], payroll: [], scholarships: [], emails: [] });
+        setData({ applications: [], scholars: [], payroll: [], scholarships: [], emails: [], external: [], recLogs: [] });
       });
   }, [toast]);
 
@@ -171,6 +177,46 @@ export default function StaffReportsPage() {
         })),
     },
     {
+      title: "External Grantees",
+      note: "Every saved line of the outside-scholarship lists (LGU, CHED, foundations): matched, did not match, and errors (not filtered).",
+      count: data.external.length,
+      file: `external-grantees-${stamp()}.csv`,
+      rows: () =>
+        data.external.map((item) => ({
+          Student_ID: item.student?.student_id || item.extracted_student_id || "",
+          Student: item.student ? fullName(item.student) : "",
+          Name_on_List: item.extracted_name || "",
+          Scholarship: item.program_name,
+          Given_By: item.agency || "",
+          School_Year: item.school_year || "",
+          Match: item.match_status,
+          Matched_By: item.match_method || "",
+          Match_Score: item.match_score ?? "",
+          Status: item.status,
+          File: item.upload?.file_name || "",
+          Confirmed_By: item.confirmer?.name || "",
+          Saved: formatDate(item.created_at),
+        })),
+    },
+    {
+      title: "AI Recommendation Log",
+      note: "Every staff decision on AI Recommendations (invited, added, dismissed, marked wrong, restored), with the score at that moment.",
+      count: data.recLogs.length,
+      file: `ai-recommendation-log-${stamp()}.csv`,
+      rows: () =>
+        data.recLogs.map((item) => ({
+          When: formatDateTime(item.created_at),
+          Staff: item.user?.name || "",
+          Action: item.action,
+          Student_ID: item.student?.student_id || "",
+          Student: item.student ? `${item.student.first_name} ${item.student.last_name}` : "",
+          Scholarship: item.scholarship?.name || "",
+          Score_Then: item.score ?? "",
+          Verdict_Then: item.verdict || "",
+          Note: item.note || "",
+        })),
+    },
+    {
       title: "Scholarship Programs",
       note: "All programs with their requirements (not filtered).",
       count: data.scholarships.length,
@@ -254,7 +300,8 @@ export default function StaffReportsPage() {
         </div>
 
         <p className="muted small">
-          Students get an e-mail when their application is approved (by review or by an agency list). Demo setting:
+          Students get an e-mail when their application is approved (by review or by an agency list), and when OAS invites
+          them from AI Recommendations. Demo setting:
           e-mails are written to the server log or caught by a Mailtrap test inbox, never delivered to real addresses.
         </p>
 
@@ -282,7 +329,13 @@ export default function StaffReportsPage() {
                     </td>
                     <td>{item.to_email}</td>
                     <td>{item.subject}</td>
-                    <td>{item.trigger === "agency_list" ? "Agency list" : "Review"}</td>
+                    <td>
+                      {item.trigger === "agency_list"
+                        ? "Agency list"
+                        : item.trigger === "ai_recommendation"
+                          ? "AI Recommendations"
+                          : "Review"}
+                    </td>
                     <td>
                       <span
                         className={`status status-${item.status === "sent" ? "success" : item.status === "failed" ? "danger" : "warning"}`}

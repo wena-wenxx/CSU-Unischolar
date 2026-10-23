@@ -56,14 +56,13 @@ class ApplicationController extends Controller
             ], 422);
         }
 
-        $activeRecord = ScholarRecord::with('scholarship:id,name')
-            ->where('student_id', $student->id)
-            ->where('status', 'active')
-            ->first();
+        // One active scholarship per student: ScholarGuide grantee records and
+        // scholarships from outside parties (External Grantees).
+        $holding = $student->otherActiveScholarship();
 
-        if ($activeRecord) {
+        if ($holding) {
             return response()->json([
-                'message' => 'You are currently a grantee of '.$activeRecord->scholarship->name
+                'message' => 'You are currently a grantee of '.$holding
                     .'. Only one active scholarship is allowed, so you cannot apply for a new one at this time.'
             ], 422);
         }
@@ -301,6 +300,7 @@ class ApplicationController extends Controller
             'student',
             'scholarship.requirements',
             'documents.validationResult',
+            'documents.staffVerifier:id,name',
             'documents.requirement',
             'statusLogs',
         ])->findOrFail($id);

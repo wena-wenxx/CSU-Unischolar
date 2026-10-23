@@ -17,3 +17,5 @@ pymupdf
 pillow
 pytest
 httpx
+openpyxl
+python-docx

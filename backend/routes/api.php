@@ -11,8 +11,10 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DataBankController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\EnrollmentListController;
+use App\Http\Controllers\ExternalGranteeController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\ProfileChangeRequestController;
+use App\Http\Controllers\RecommendationController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReviewQueueController;
 use App\Http\Controllers\ScholarRecordController;
@@ -56,6 +58,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/profile', [StudentController::class, 'profile']);
     Route::get('/student/history', [StudentController::class, 'history']);
     Route::patch('/profile', [StudentController::class, 'updateProfile']);
+    Route::patch('/profile/eligibility', [StudentController::class, 'updateEligibility']);   // GWA + family income
     Route::get('/student/notifications', [StudentController::class, 'notifications']);
     Route::post('/student/notifications/read', [StudentController::class, 'markNotificationsRead']);
     Route::get('/student/change-requests', [StudentController::class, 'changeRequests']);
@@ -89,6 +92,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/requirements/{id}', [ScholarshipController::class, 'updateRequirement']);
     Route::delete('/requirements/{id}', [ScholarshipController::class, 'destroyRequirement']);
     Route::get('/requirement-types', [ScholarshipController::class, 'requirementTypes']);
+    Route::get('/eligibility-options', [ScholarshipController::class, 'eligibilityOptions']);
 
     /*
     |--------------------------------------------------------------------------
@@ -140,6 +144,39 @@ Route::middleware('auth:sanctum')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
+    | AI Recommendations (rule-based eligibility scores; staff decide)
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/staff/recommendations', [RecommendationController::class, 'index']);
+    Route::post('/staff/recommendations/recalculate', [RecommendationController::class, 'recalculate']);
+    Route::get('/staff/recommendations/{id}', [RecommendationController::class, 'show']);
+    Route::post('/staff/recommendations/{id}/invite', [RecommendationController::class, 'invite']);
+    Route::post('/staff/recommendations/{id}/add', [RecommendationController::class, 'add']);
+    Route::post('/staff/recommendations/{id}/dismiss', [RecommendationController::class, 'dismiss']);
+    Route::post('/staff/recommendations/{id}/wrong', [RecommendationController::class, 'wrong']);
+    Route::post('/staff/recommendations/{id}/restore', [RecommendationController::class, 'restore']);
+    Route::get('/staff/recommendation-logs', [RecommendationController::class, 'logs']);
+    Route::post('/staff/students/{id}/eligibility', [RecommendationController::class, 'verifyStudentData']);
+
+    /*
+    |--------------------------------------------------------------------------
+    | External Grantees (lists from LGUs, CHED, foundations; staff confirm)
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/staff/external-grantees', [ExternalGranteeController::class, 'index']);
+    Route::patch('/staff/external-grantees/{id}', [ExternalGranteeController::class, 'update']);
+    Route::get('/staff/external-grantees/uploads', [ExternalGranteeController::class, 'uploads']);
+    Route::post('/staff/external-grantees/uploads', [ExternalGranteeController::class, 'store']);
+    Route::get('/staff/external-grantees/uploads/{id}', [ExternalGranteeController::class, 'showUpload']);
+    Route::get('/staff/external-grantees/uploads/{id}/file', [ExternalGranteeController::class, 'download']);
+    Route::post('/staff/external-grantees/uploads/{id}/save', [ExternalGranteeController::class, 'save']);
+    Route::post('/staff/external-grantees/uploads/{id}/discard', [ExternalGranteeController::class, 'discard']);
+    Route::post('/staff/read-table', [ExternalGranteeController::class, 'readTable']);   // Approved Lists / Enrollment: Excel, Word, PDF
+
+    /*
+    |--------------------------------------------------------------------------
     | Announcements (students read; staff manage)
     |--------------------------------------------------------------------------
     */
@@ -159,6 +196,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/applications/{id}/documents', [ApplicationController::class, 'uploadDocument']);
     Route::post('/documents/{documentId}/validate', [AIController::class, 'validateDocument']);
+    Route::post('/documents/{documentId}/verify', [AIController::class, 'verify']);   // staff: "verified genuine"
 
     /*
     |--------------------------------------------------------------------------
@@ -182,6 +220,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/payroll/history', [PayrollController::class, 'history']);
     Route::post('/payroll/prepare', [PayrollController::class, 'prepare']);
     Route::post('/payroll/bulk-status', [PayrollController::class, 'bulkStatus']);
+    Route::post('/payroll/form', [PayrollController::class, 'form']);            // General Form No. 6-A (print / PDF)
+    Route::post('/payroll/form/docx', [PayrollController::class, 'formDocx']);   // the same form as Word
     Route::post('/scholar-records/{scholarRecordId}/payroll', [PayrollController::class, 'store']);
     Route::patch('/payroll/{id}', [PayrollController::class, 'update']);
 

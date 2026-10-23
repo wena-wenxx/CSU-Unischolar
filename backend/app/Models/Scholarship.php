@@ -18,6 +18,16 @@ class Scholarship extends Model
     protected $fillable = [
         'name', 'short_name', 'description', 'provider', 'category', 'application_mode',
         'application_start', 'application_end', 'amount', 'status',
+        // Eligibility rules used by AI Recommendations (empty = no rule)
+        'max_gwa', 'max_family_income', 'year_levels', 'colleges', 'one_scholarship_only',
+    ];
+
+    protected $casts = [
+        'max_gwa' => 'decimal:2',
+        'max_family_income' => 'decimal:2',
+        'year_levels' => 'array',
+        'colleges' => 'array',
+        'one_scholarship_only' => 'boolean',
     ];
 
     // Sent with every scholarship so the frontend can show "Open", "Closed", ...
@@ -25,6 +35,7 @@ class Scholarship extends Model
 
     public function requirements() { return $this->hasMany(ScholarshipRequirement::class); }
     public function applications() { return $this->hasMany(Application::class); }
+    public function recommendations() { return $this->hasMany(AiRecommendation::class); }
 
     public static function today(): string
     {

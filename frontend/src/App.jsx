@@ -30,6 +30,9 @@ import HelpPage from "./pages/HelpPage";
 import StaffProfilePage from "./pages/staff/StaffProfilePage";
 import AutoReviewPage from "./pages/staff/AutoReviewPage";
 import ForwardedPage from "./pages/staff/ForwardedPage";
+import RecommendationsPage from "./pages/staff/RecommendationsPage";
+import ExternalGranteesPage from "./pages/staff/ExternalGranteesPage";
+import GeneralPayrollPage from "./pages/staff/GeneralPayrollPage";
 import EnrollmentPage from "./pages/staff/EnrollmentPage";
 import MessagesPage from "./pages/staff/MessagesPage";
 import ContactPage from "./pages/student/ContactPage";
@@ -107,10 +110,14 @@ export default function App() {
                 <Route path="/staff/profile" element={<StaffProfilePage />} />
                 <Route path="/staff/auto-review" element={<AutoReviewPage />} />
                 <Route path="/staff/forwarded" element={<ForwardedPage />} />
+                <Route path="/staff/recommendations" element={<RecommendationsPage />} />
+                <Route path="/staff/external-grantees" element={<ExternalGranteesPage />} />
                 <Route path="/staff/enrollment" element={<EnrollmentPage />} />
                 <Route path="/staff/messages" element={<MessagesPage />} />
                 <Route path="/staff/announcements/:id" element={<AnnouncementDetailPage />} />
               </Route>
+              {/* The General Payroll form opens without the menu, so it prints like the paper form. */}
+              <Route path="/staff/payroll/form" element={<GeneralPayrollPage />} />
             </Route>
 
             <Route element={<ProtectedRoute role="admin" />}>

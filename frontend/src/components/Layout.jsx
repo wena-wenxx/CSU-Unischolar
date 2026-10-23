@@ -20,14 +20,20 @@ const NAVIGATION = {
     ["/student/help", "Help"],
   ],
   // Same order as the OAS workflow: review -> agency's list -> grantees -> payroll.
+  // { heading } entries are small group titles, so the longer menu stays easy to scan.
   staff: [
     ["/staff/dashboard", "Dashboard"],
+    { heading: "Applications" },
     ["/staff/applications", "Applications"],
+    ["/staff/recommendations", "AI Recommendations"],
     ["/staff/agency-lists", "Approved Lists"],
     ["/staff/forwarded", "Forwarded to Agency"],
+    { heading: "Grantees" },
     ["/staff/scholars", "Scholar Records"],
+    ["/staff/external-grantees", "External Grantees"],
     ["/staff/enrollment", "Enrollment"],
     ["/staff/payroll", "Payroll"],
+    { heading: "Office" },
     ["/staff/scholarships", "Scholarships"],
     ["/staff/announcements", "Announcements"],
     ["/staff/messages", "Student Messages"],
@@ -56,7 +62,7 @@ function pageTitle(pathname, role) {
   if (pathname === "/staff/auto-review") return "Auto-Review";
   if (/\/announcements\/[^/]+$/.test(pathname)) return "Announcement";
 
-  const match = (NAVIGATION[role] || []).find(([path]) => path === pathname);
+  const match = (NAVIGATION[role] || []).find((item) => Array.isArray(item) && item[0] === pathname);
   return match ? match[1] : APP_NAME;
 }
 
@@ -117,15 +123,21 @@ export default function Layout() {
         <SidebarProfile />
 
         <nav aria-label="Main menu">
-          {navigation.map(([path, label]) => (
-            <NavLink
-              key={path}
-              to={path}
-              className={({ isActive }) => (isActive ? "nav-item active" : "nav-item")}
-            >
-              {label}
-            </NavLink>
-          ))}
+          {navigation.map((item) =>
+            Array.isArray(item) ? (
+              <NavLink
+                key={item[0]}
+                to={item[0]}
+                className={({ isActive }) => (isActive ? "nav-item active" : "nav-item")}
+              >
+                {item[1]}
+              </NavLink>
+            ) : (
+              <span key={item.heading} className="nav-heading">
+                {item.heading}
+              </span>
+            )
+          )}
         </nav>
 
         <div className="sidebar-footer">

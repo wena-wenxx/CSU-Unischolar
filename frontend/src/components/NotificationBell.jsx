@@ -11,7 +11,7 @@ import { stepLabel, timeAgo } from "../lib/format";
 */
 export default function NotificationBell() {
   const location = useLocation();
-  const [data, setData] = useState({ unread: 0, items: [], unread_replies: 0 });
+  const [data, setData] = useState({ unread: 0, items: [], unread_replies: 0, invitations: [] });
   const [open, setOpen] = useState(false);
   const boxRef = useRef(null);
 
@@ -75,6 +75,22 @@ export default function NotificationBell() {
             <Link className="bell-reply" to="/student/contact" onClick={() => setOpen(false)}>
               ✉️ OAS replied to {data.unread_replies === 1 ? "your message" : `${data.unread_replies} of your messages`}. Open Contact OAS →
             </Link>
+          )}
+
+          {data.invitations?.length > 0 && (
+            <div className="bell-invites">
+              <strong className="bell-title">OAS thinks you may be eligible for</strong>
+              {data.invitations.map((item) => (
+                <Link
+                  key={item.scholarship_id}
+                  className="bell-reply"
+                  to={`/student/scholarships/${item.scholarship_id}`}
+                  onClick={() => setOpen(false)}
+                >
+                  🎓 {item.scholarship} <small className="muted">· {timeAgo(item.invited_at)}</small>
+                </Link>
+              ))}
+            </div>
           )}
 
           <strong className="bell-title">Updates on your applications</strong>

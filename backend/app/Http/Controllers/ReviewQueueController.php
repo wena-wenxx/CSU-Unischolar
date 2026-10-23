@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use App\Models\Application;
 use App\Models\ApplicationStatusLog;
+use App\Models\ExternalGrantee;
 use App\Models\ScholarRecord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -55,7 +56,15 @@ class ReviewQueueController extends Controller
             ->get()
             ->groupBy('student_id');
 
-        $rows = $applications->map(function (Application $application) use ($activeGrants) {
+        // Scholarships from outside parties (External Grantees) count too.
+        $externalGrants = ExternalGrantee::query()
+            ->where('match_status', 'matched')
+            ->where('status', 'active')
+            ->whereIn('student_id', $applications->pluck('student_id'))
+            ->get()
+            ->groupBy('student_id');
+
+        $rows = $applications->map(function (Application $application) use ($activeGrants, $externalGrants) {
             $blocking = [];
             $review = [];
 
@@ -67,6 +76,8 @@ class ReviewQueueController extends Controller
                 ->firstWhere(fn ($r) => $r->scholarship_id !== $application->scholarship_id);
             if ($other) {
                 $blocking[] = "Already an active grantee of {$other->scholarship?->name} (one active scholarship only)";
+            } elseif ($external = ($externalGrants[$application->student_id] ?? collect())->first()) {
+                $blocking[] = "Already holds {$external->label()} (one active scholarship only)";
             }
 
             $required = $application->scholarship->requirements->where('is_required', true)->pluck('id')->all();

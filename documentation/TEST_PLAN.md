@@ -412,9 +412,133 @@ Run `php artisan migrate:fresh --seed` first. Admin: `admin@carsu.edu.ph` / `Adm
 - [ ] **H9.** Staff → Scholarships → create a program with *How students apply: Agency-direct* → no document picker;
   the table says *Apply at the agency*.
 
+## Part I — Round 11: AI Recommendations
+
+Before: `php artisan migrate`, then `php artisan migrate:fresh --seed` (adds sample rules, GWA and income for the
+fictional students, and the first run of the recommendations). See `AI_RECOMMENDATIONS.md`.
+
+- [ ] **I1.** As Wena → My Profile → **Grades and family income**: type GWA `1.75`, income `180000`, Save →
+  "Waiting for OAS to check". A GWA of `7` is refused (must be 1.00–5.00).
+- [ ] **I2.** Staff menu has group titles (Applications / Grantees / Office) and two new pages: **AI Recommendations**
+  and **External Grantees**.
+- [ ] **I3.** AI Recommendations: program tabs with counts; default *Meets the rules (recommended)*, highest score
+  first; each row shows Score (%, bar, "x of y"), Met, Not met, Applied, Decision, **Why?** and **Review**.
+- [ ] **I4.** Filters: *Applied or not → Not applied yet* (proactive list), *Any score → 90–100%*, the *Show* list
+  (Not enough data / Fails a must-have rule / Marked wrong / Everything), search `Contiga` + Enter. Click **Score**
+  to sort lowest first; click again for highest first.
+- [ ] **I5.** Wena's **Why?**: "2 of 10 checks met (2 of 2 must-have rules, 0 of 8 documents) = 20%" for TES; every
+  check shows the rule, her data ("PHP 180,000, typed by the student, not yet verified") and the result.
+- [ ] **I6.** Press **Mark GWA and income as checked** → "Checked by OAS". Press **Send invitation** with a note →
+  e-mail logged (Reports → E-mails sent, From: AI Recommendations). Wena's bell lists the invitation.
+- [ ] **I7.** **Add to scholarship** → confirm → Wena has a *Draft* application (My Applications), her bell says
+  "Application started", and the row's Decision is *Added (draft)*. Pressing it again is refused.
+- [ ] **I8.** Open a *Fails a must-have rule* row → Send invitation without a note → refused ("Write a short reason").
+- [ ] **I9.** **Mark as wrong** without a note → refused; with a note → listed under *Show: Marked wrong*; **Restore**
+  puts it back. The window's History lists every decision with the staff name and the score at that time.
+- [ ] **I10.** Scholarships → Manage *Student Assistantship* → **Eligibility rules**: change the highest GWA to 2.25,
+  tick *1st Year*, Save → the list shows "GWA ≤ 2.25 · ≤ ₱250,000 · 1 year level(s)". AI Recommendations →
+  **Recalculate** → SA scores change.
+- [ ] **I11.** Reports → **AI Recommendation Log** CSV lists every decision; **Export CSV** on AI Recommendations
+  downloads the current list with Met / Not met / Calculation columns.
+
+## Part J — Round 11: External Grantees
+
+Before: `php artisan demo:external-lists` (writes 4 sample lists to `backend/storage/app/demo-external-lists/`), and
+the AI service running with `openpyxl` and `python-docx` installed (`pip install -r requirements.txt`).
+
+- [ ] **J1.** External Grantees shows one saved sample list (*Sample Municipal Scholarship*, 3 students).
+- [ ] **J2.** Upload `lgu-educational-assistance.xlsx` as *Sample LGU Educational Assistance* → "Read 6 line(s): 5
+  matched … 1 did not match". The misspelled name ("Gacria") is matched by name (about 93%).
+- [ ] **J3.** Upload `foundation-scholars.docx` → 2 matched, **1 to check** (the Student ID belongs to another
+  student; the row is orange and says why), 1 did not match. Choose the student for the Check line (or *Find by
+  Student ID…*), then **Save confirmed list**.
+- [ ] **J4.** Upload `regional-scholars-list.pdf` → 3 matched and 1 error (the "sample list" note at the bottom).
+  Untick nothing and Save, or **Discard upload** to test discarding.
+- [ ] **J5.** Upload `barangay-scholars.csv` → 2 matched. Upload an old `.xls` file → refused with "Save As .xlsx".
+- [ ] **J6.** The student list has a tab per scholarship; *Lines that did not match* shows the unmatched people;
+  **Mark ended** / **Re-activate** works.
+- [ ] **J7.** Exports: **Export CSV** (current list), **Lines CSV** in the history (every line the AI read, with its
+  result and score), **Export CSV** of the upload history (file, staff, time), **Original file** downloads the upload.
+- [ ] **J8.** Data Bank → *Holds an outside scholarship*, and the program list's *Outside scholarships* group →
+  only those students. Full history shows the outside scholarship.
+- [ ] **J9.** Log in as one of the matched students (`s<ID without dash>@demo.carsu.edu.ph` / `Student@12345`) →
+  My Profile shows **Outside scholarship … from …**; Scholarships → Apply → refused (one active scholarship).
+- [ ] **J10.** AI Recommendations for that student → every program *Fails a rule* ("Holds … (external, …)").
+  Mark the holding ended → Recalculate → the student meets the rules again.
+- [ ] **J11.** (OCR) Print `regional-scholars-list.pdf` and take a clear phone photo, or use
+  `regional-scholars-photo.png` from the zip, and upload it → read with OCR, with a warning to check every line.
+
+---
+
+## Part K — Round 12: General Payroll (Form 6-A)
+
+Before: `php artisan migrate` (adds the document-verification columns), and `extension=zip` on in `php.ini`.
+
+- [ ] **K1.** Log in as the admin → System Settings → **Payroll form signatories**: the positions are filled in,
+  the names are empty. Type sample names (e.g. the OAS Director and the Cashier) → Save → "Settings saved."
+- [ ] **K2.** Staff → Payroll → 2. Payroll list, *All programs* → **General Payroll (Form 6-A)** → the window says
+  "Click one program tab first". Choose two periods' worth of entries in one program → "Choose one period".
+- [ ] **K3.** Click the *TES* tab, choose one period → **General Payroll (Form 6-A)** → batch "TES GRANTEES
+  BATCH 1" and purpose "<period> Stipend" are filled in. Type a voucher (e.g. `OR#0146829`).
+- [ ] **K4.** **Download Word (.docx)** → open it in Microsoft Word: landscape long bond, one sheet per page, the
+  table borders and the yellow boxes show, names A to Z, the amount in the right semester column, red totals,
+  ***NOTHING FOLLOWS***, and the signatory names from K1.
+- [ ] **K5.** **Open form to print / save as PDF** → the same form on screen. **Print / Save as PDF** with paper
+  Legal / Long, Landscape, Headers and footers off, Background graphics on → each sheet fits one page; WITH ATM and
+  WITHOUT ATM grantees are on separate sheets. **← Payroll** goes back.
+- [ ] **K6.** With more than 15 grantees: the sheets continue (Sheet No. 1, 2, …), "continued on the next sheet",
+  and the GRAND TOTAL on the last sheet of the group. Change *Rows per sheet* and *First sheet no.* → applied.
+- [ ] **K7.** Activity Logs (admin) → "payroll.form_exported" after a Word download.
+
+## Part L — Round 12: Is the score and the document believable?
+
+- [ ] **L1.** AI Recommendations → Why? for a student with an uploaded but **unchecked** document → that document
+  says "not AI-checked yet (run the AI check to count it)" and is not counted.
+- [ ] **L2.** Rows show **GWA/income not checked** until the GWA and income are marked checked. Tick **Only
+  GWA/income checked by OAS** → only checked students remain.
+- [ ] **L3.** Applications → Review → under a document, **How to check it is genuine** → the steps for that type
+  (Valid ID: PhilSys Check). Type a note → **Mark as verified** → "✓ Verified by … on …". Recalculate → the
+  document now counts. **Undo** → removed.
+- [ ] **L4.** Upload a PDF that was edited with an online PDF editor (or saved again in another program) and run the
+  AI check → a yellow **Possible edit (not proof)** box. The document status is not changed by it.
+- [ ] **L5.** A student cannot mark a document verified (API: `POST /api/documents/{id}/verify` → 403).
+
+## Part M — Round 12: Cleaner layout and list files
+
+- [ ] **M1.** At 1366×768 (and 1280×720) the whole staff menu, down to Help, and **Sign out** are visible without
+  scrolling the menu; the menu has group headings.
+- [ ] **M2.** Staff Dashboard: **Needs your attention** shows 6 cards; the other numbers are under **More numbers**;
+  3 quick actions.
+- [ ] **M3.** Pages opened from the menu have no "← Back" link; detail pages still have it.
+- [ ] **M4.** Applications: Student and ID in one column; *Re-verify* is a small link; *Verify enrollment* is a
+  small button.
+- [ ] **M5.** External Grantees: the upload form is hidden until **Upload a list**; Close hides it again.
+- [ ] **M6.** Approved Lists and Enrollment: upload the sample `.xlsx`, `.pdf` and `.docx` from
+  `storage/app/demo-external-lists/` → the columns appear and the Student ID column is picked. (Needs the AI
+  service running; a CSV works without it.)
+- [ ] **M7.** All Round 12 pages at 390×844: no sideways scrolling.
+
 ---
 
 ## What has and has not been tested
+
+Parts K, L and M (round 12) were tested by Claude on **23 Oct 2026**: K1–K3, K5, L1–L3, L5 and M1–M7 in the
+browser (1366×768; the menu also at 1280×720 and 1440×900; the new pages also at 390×844 with no sideways scrolling);
+K6 through the PHP tests (17 grantees → sheets 1–3); the Word file from K4 opened and
+rendered in **LibreOffice** (not Microsoft Word) and the print page saved as a long bond PDF in Chromium; 5 new PHP
+tests (`php artisan test`: 13 passed); 7 new Python tests (`test_authenticity.py` and one in `test_list_reader.py`;
+22 passed, 1 PyMuPDF test skipped); the new migration rolled back and re-run on SQLite. L4 was tested only with the
+rule tests and a stored sample result, because PyMuPDF cannot be installed here. **Not tested:** K4 in Microsoft
+Word, printing on the OAS printer, L4 with the real AI service, PaddleOCR, MySQL and real Gmail.
+
+Parts I and J (round 11) were tested by Claude on **23 Oct 2026**: I1–I11 and J1–J10 in the browser (1366×900; the
+two new pages and My Profile also at 390×844 with no sideways scrolling), the same flows through the API (students
+get 403 on both pages; the admin can read External Grantees and the log but not use AI Recommendations), 6 new PHP
+tests in `tests/Feature/EligibilityEngineTest.php` (`php artisan test`: 8 passed), 15 new Python tests in
+`ai-service/tests/test_list_reader.py` (run with the same RapidFuzz stand-in; the PyMuPDF PDF test was skipped
+because PyMuPDF cannot be installed here — the PDF sample was read through a poppler-based stand-in instead), and the
+new migrations rolled back and re-run on SQLite. **Not tested:** J11 (PaddleOCR on a photo of a list), MySQL, real
+Gmail, and the real React Router / Vite lint.
 
 Part H (round 10) was tested by Claude on **10 Oct 2026** in the browser (H1–H9; the staff pages also at 390×844),
 and every sample approved list was processed through the API with 0 errors.

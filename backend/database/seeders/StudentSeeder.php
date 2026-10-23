@@ -13,7 +13,12 @@ use Illuminate\Support\Facades\Hash;
  *   Use this account for e-mail tests, login demos and screenshots.
  *   She starts with NO applications so the full flow can be shown live.
  *
- * Plus ten FICTIONAL demo students (no real CSU student data).
+ *   Her GWA and family income are left EMPTY: she types them on My Profile
+ *   during testing (AI Recommendations then shows "Not enough data" until then).
+ *
+ * Plus ten FICTIONAL demo students (no real CSU student data). Their GWA
+ * (1.47) and family income (PHP 96,000) are the values printed on their
+ * sample Grades and ITR files, already verified by the demo OAS staff.
  * Every account uses the password Student@12345.
  * "Demo" as the middle name makes it obvious these are not real people.
  */
@@ -37,6 +42,8 @@ class StudentSeeder extends Seeder
 
     public function run(): void
     {
+        $staffId = User::where('role', 'staff')->value('id');
+
         $wena = User::updateOrCreate(
             ['email' => self::TEST_STUDENT_EMAIL],
             [
@@ -84,6 +91,12 @@ class StudentSeeder extends Seeder
                     'year_level' => $yearLevel,
                     'college' => $college,
                     'contact_number' => sprintf('090000000%02d', $number),
+                    // Same values as their sample Certificate of Grades and Parents' ITR.
+                    'gwa' => 1.47,
+                    'family_income' => 96000,
+                    'eligibility_updated_at' => now()->subDays(30),
+                    'eligibility_verified_at' => now()->subDays(20),
+                    'eligibility_verified_by' => $staffId,
                 ]
             );
         }

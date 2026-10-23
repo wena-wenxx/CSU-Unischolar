@@ -51,37 +51,38 @@ export default function StaffDashboard() {
     <div>
       <DashboardHero title="OAS Staff Dashboard" subtitle="Scholarship management overview. Click any number to open the matching list." />
 
+      {/* What needs work today first; the overall numbers are folded below. */}
+      <h2 className="section-title">Needs your attention</h2>
       <div className="stats-grid">
-        <StatCard title="Total Applicants" value={stats.total_applicants ?? 0} to="/staff/applications" />
-        <StatCard title="Applications" value={stats.total_applications ?? 0} to="/staff/applications" />
-        <StatCard title="Needs Action" value={stats.needs_action ?? 0} to="/staff/applications?filter=needs_action" />
-        <StatCard title="Forwarded to Agency" value={stats.forwarded ?? 0} to="/staff/forwarded" hint="Waiting for the agency" />
-        <StatCard title="Approved" value={stats.approved ?? 0} to="/staff/applications?filter=approved" />
-        <StatCard
-          title="Enrollment to Verify"
-          value={stats.enrollment_to_verify ?? 0}
-          to="/staff/enrollment"
-          hint="Verify all at once"
-        />
-        <StatCard title="Active Scholars" value={stats.active_scholars ?? 0} to="/staff/scholars" />
-        <StatCard title="Payroll Ready" value={stats.payroll_ready ?? 0} to="/staff/payroll?status=ready" />
+        <StatCard title="Needs Action" value={stats.needs_action ?? 0} to="/staff/applications?filter=needs_action" hint="Waiting for students" />
         <StatCard
           title="AI Flags (documents)"
           value={stats.ai_flags ?? 0}
           to="/staff/applications?filter=flagged"
           hint={`In ${stats.applications_with_flags ?? 0} applications`}
         />
+        <StatCard title="Forwarded to Agency" value={stats.forwarded ?? 0} to="/staff/forwarded" hint="Waiting for the agency" />
+        <StatCard title="Enrollment to Verify" value={stats.enrollment_to_verify ?? 0} to="/staff/enrollment" hint="Verify all at once" />
+        <StatCard title="Payroll Ready" value={stats.payroll_ready ?? 0} to="/staff/payroll?status=ready" />
         <StatCard title="Student Messages" value={stats.open_messages ?? 0} to="/staff/messages" hint="Waiting for a reply" />
-        <StatCard title="Scholarship Programs" value={stats.scholarships ?? 0} to="/staff/scholarships" />
       </div>
+
+      <details className="more-numbers">
+        <summary>More numbers</summary>
+        <div className="stats-grid">
+          <StatCard title="Total Applicants" value={stats.total_applicants ?? 0} to="/staff/applications" />
+          <StatCard title="Applications" value={stats.total_applications ?? 0} to="/staff/applications" />
+          <StatCard title="Approved" value={stats.approved ?? 0} to="/staff/applications?filter=approved" />
+          <StatCard title="Active Scholars" value={stats.active_scholars ?? 0} to="/staff/scholars" />
+          <StatCard title="Scholarship Programs" value={stats.scholarships ?? 0} to="/staff/scholarships" />
+        </div>
+      </details>
 
       <QuickActions
         actions={[
           { to: "/staff/auto-review", icon: "📋", label: "Auto-Review", text: "Sort submitted applications in one click" },
           { to: "/staff/enrollment", icon: "🎓", label: "Verify Enrollments", text: "Check against the Registrar's list" },
-          { to: "/staff/scholars", icon: "🏅", label: "Tag Grantees", text: "Verified students ready to tag" },
           { to: "/staff/payroll", icon: "💳", label: "Prepare Payroll", text: "Entries for enrolled grantees" },
-          { to: "/staff/scholarships?new=1", icon: "➕", label: "Create Scholarship", text: "Add a new program" },
         ]}
       />
 

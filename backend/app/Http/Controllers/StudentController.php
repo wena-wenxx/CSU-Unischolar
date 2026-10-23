@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Models\AiRecommendation;
 use App\Models\ApplicationStatusLog;
+use App\Models\ExternalGrantee;
 use App\Models\ProfileChangeRequest;
 use App\Models\ScholarRecord;
+use App\Support\EligibilityEngine;
 use Illuminate\Http\Request;
 
 class StudentController extends Controller
@@ -45,6 +48,15 @@ class StudentController extends Controller
         }
 
         if ($user->role === 'student') {
+            // Scholarships from outside parties (LGU, foundations) read from OAS lists.
+            $user->setAttribute(
+                'external_scholarships',
+                ExternalGrantee::activeFor($user->student->id)
+                    ->latest()
+                    ->get(['id', 'program_name', 'agency', 'school_year', 'created_at'])
+            );
+            $user->setAttribute('eligibility_verified', EligibilityEngine::dataVerified($user->student));
+
             $user->setAttribute(
                 'active_scholar_record',
                 ScholarRecord::with(['scholarship:id,name,provider,amount', 'payrollRecords'])
@@ -90,6 +102,51 @@ class StudentController extends Controller
 
     /*
     |--------------------------------------------------------------------------
+    | STUDENT - GWA AND FAMILY INCOME (scholarship matching)
+    |--------------------------------------------------------------------------
+    | PATCH /profile/eligibility   Body: gwa (1.00-5.00), family_income (pesos)
+    | Used by AI Recommendations. Changing them removes the OAS verification
+    | until OAS checks them again against the Grades and the Parents' ITR.
+    */
+
+    public function updateEligibility(Request $request)
+    {
+        $student = $this->student($request);
+
+        $data = $request->validate([
+            'gwa' => 'required|numeric|min:1|max:5',
+            'family_income' => 'required|numeric|min:0|max:100000000',
+        ], [
+            'gwa.min' => 'GWA is between 1.00 (highest) and 5.00.',
+            'gwa.max' => 'GWA is between 1.00 (highest) and 5.00.',
+        ]);
+
+        $gwa = round((float) $data['gwa'], 2);
+        $income = round((float) $data['family_income'], 2);
+        $changed = $student->gwa === null || (float) $student->gwa !== $gwa
+            || $student->family_income === null || (float) $student->family_income !== $income;
+
+        if ($changed) {
+            $student->update([
+                'gwa' => $gwa,
+                'family_income' => $income,
+                'eligibility_updated_at' => now(),
+                'eligibility_verified_at' => null,
+                'eligibility_verified_by' => null,
+            ]);
+            EligibilityEngine::recalculate([$student->id]);
+            ActivityLog::record($request->user(), 'profile.eligibility_updated', 'Updated their GWA and family income.', $student);
+        }
+
+        return response()->json([
+            'message' => $changed ? 'Saved. The OAS will check them against your Grades and your parents\' ITR.' : 'Nothing changed.',
+            'student' => $student->fresh(),
+        ]);
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
     | STUDENT - MY SCHOLARSHIP HISTORY
     |--------------------------------------------------------------------------
     | Every scholarship this student has been tagged as a grantee for
@@ -126,7 +183,8 @@ class StudentController extends Controller
 
         $logs = ApplicationStatusLog::with('application.scholarship:id,name')
             ->whereHas('application', fn ($q) => $q->where('student_id', $student->id))
-            ->where('to_status', '!=', 'draft')         // the student made the draft themselves
+            // A draft the student made is not news; a draft OAS started for them is.
+            ->where(fn ($q) => $q->where('to_status', '!=', 'draft')->orWhere('changed_by', '!=', $request->user()->id))
             ->latest()
             ->latest('id')
             ->limit(20)
@@ -138,10 +196,20 @@ class StudentController extends Controller
             ->whereNull('reply_read_at')
             ->count();
 
+        // "You may be eligible" invitations from OAS (AI Recommendations), last 60 days.
+        $invitations = AiRecommendation::with('scholarship:id,name')
+            ->where('student_id', $student->id)
+            ->where('staff_status', 'invited')
+            ->where('invited_at', '>=', now()->subDays(60))
+            ->latest('invited_at')
+            ->get(['id', 'scholarship_id', 'invited_at'])
+            ->map(fn ($r) => ['scholarship_id' => $r->scholarship_id, 'scholarship' => $r->scholarship?->name, 'invited_at' => $r->invited_at]);
+
         return response()->json([
             'unread' => $logs->whereNull('read_at')->count(),
             'items' => $logs->values(),
             'unread_replies' => $replies,
+            'invitations' => $invitations->values(),
         ]);
     }
 

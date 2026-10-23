@@ -376,6 +376,7 @@ class AdminController extends Controller
             'values' => Setting::allValues(),
             'labels' => Setting::LABELS,
             'semesters' => Setting::SEMESTERS,
+            'signatory_slots' => Setting::PAYROLL_SIGNATORIES,
             'current_period' => PayrollController::currentPeriod(),
         ]);
     }
@@ -395,7 +396,9 @@ class AdminController extends Controller
             'oas_head' => 'nullable|string|max:255',
             'oas_facebook' => 'nullable|url|max:255',
             'oas_about' => 'nullable|string|max:2000',
-        ], [
+        ] + collect(array_keys(Setting::PAYROLL_SIGNATORIES))
+            ->flatMap(fn ($slot) => ["payroll_{$slot}_name" => 'nullable|string|max:120', "payroll_{$slot}_title" => 'nullable|string|max:120'])
+            ->all(), [
             'current_school_year.regex' => 'Write the school year like 2026-2027.',
         ]);
 

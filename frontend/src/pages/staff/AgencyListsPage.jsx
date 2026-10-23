@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
-import { parseCSV } from "../../lib/csv";
+import { LIST_ACCEPT, readListFile } from "../../lib/listFile";
 import { downloadCSV, formatDateTime } from "../../lib/format";
 import { useToast } from "../../lib/toast";
 import Modal from "../../components/Modal";
@@ -26,7 +26,7 @@ function guessColumn(headers, patterns) {
 
 /*
   Upload the approved list an agency sends back (CHED, DOST, LGU, foundation).
-  1. Choose the program and the CSV file.
+  1. Choose the program and the list file (CSV, Excel, Word, PDF or a photo).
   2. Say which column holds the Student ID (and, optionally, the approval date).
   3. Process: each row is matched to a student; see the summary and details.
 */
@@ -81,34 +81,29 @@ export default function AgencyListsPage() {
     setAgency(program?.provider || "");
   }
 
-  function readFile(event) {
+  // CSV is read here; Excel, Word, PDF and pictures are read by the AI service.
+  async function readFile(event) {
     const file = event.target.files?.[0];
     setResult(null);
 
     if (!file) return;
 
-    if (!/\.csv$/i.test(file.name)) {
-      toast.error("Please choose a .csv file. In Excel: File → Save As → CSV (Comma delimited).");
-      setFileKey((k) => k + 1);
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const parsed = parseCSV(String(reader.result || ""));
-
+    try {
+      const { rows: parsed, warnings } = await readListFile(file);
       if (parsed.length === 0) {
         toast.error("The file is empty.");
         return;
       }
-
+      warnings.forEach((warning) => toast.info(warning));
       setRows(parsed);
       setFileName(file.name);
-      const head = parsed[0].map((h) => h.trim());
+      const head = parsed[0].map((h) => String(h).trim());
       setIdColumn(guessColumn(head, [/student.?(id|no|num)/, /id.?(no|num)/, /^stud/, /^id$/]));
       setDateColumn(guessColumn(head, [/approv.*date/, /date/]));
-    };
-    reader.readAsText(file);
+    } catch (err) {
+      toast.error(errMsg(err, err.message || "The file could not be read."));
+      setFileKey((k) => k + 1);
+    }
   }
 
   function reset() {
@@ -200,11 +195,11 @@ export default function AgencyListsPage() {
           </div>
 
           <div className="full-column">
-            <label htmlFor="agency-file">Approved list (CSV file)</label>
-            <input id="agency-file" key={fileKey} type="file" accept=".csv,text/csv" onChange={readFile} />
+            <label htmlFor="agency-file">Approved list (Excel, CSV, Word or PDF)</label>
+            <input id="agency-file" key={fileKey} type="file" accept={LIST_ACCEPT} onChange={readFile} />
             <p className="muted small">
-              Got an Excel file? Open it in Excel → File → Save As → <strong>CSV (Comma delimited)</strong>. The file
-              needs at least one column with the Student ID. An approval date column is optional.
+              Excel (.xlsx), CSV, Word (.docx), PDF or a photo. Files other than CSV are read by the AI service, so keep it
+              running. The list needs a column with the Student ID; an approval date column is optional.
             </p>
           </div>
         </div>

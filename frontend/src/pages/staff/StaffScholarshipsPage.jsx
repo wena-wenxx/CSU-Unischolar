@@ -9,6 +9,7 @@ import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 import RequirementPicker from "../../components/RequirementPicker";
+import EligibilityRules from "../../components/EligibilityRules";
 
 const EMPTY_FORM = {
   name: "",
@@ -21,7 +22,28 @@ const EMPTY_FORM = {
   application_start: "",
   application_end: "",
   status: "active",
+  // Eligibility rules (AI Recommendations); empty = no rule
+  max_gwa: "",
+  max_family_income: "",
+  year_levels: [],
+  colleges: [],
+  one_scholarship_only: true,
 };
+
+// The rule fields as the API expects them ("" -> null).
+function rulesPayload(form) {
+  return {
+    max_gwa: form.max_gwa === "" ? null : Number(form.max_gwa),
+    max_family_income: form.max_family_income === "" ? null : Number(form.max_family_income),
+    year_levels: form.year_levels || [],
+    colleges: form.colleges || [],
+    one_scholarship_only: Boolean(form.one_scholarship_only),
+  };
+}
+
+const ruleCount = (form) =>
+  [form.max_gwa !== "", form.max_family_income !== "", form.year_levels?.length > 0, form.colleges?.length > 0].filter(Boolean)
+    .length;
 
 // How students apply: through ScholarGuide (OAS) or directly at the agency.
 function ModeSelect({ id, value, onChange }) {
@@ -60,16 +82,22 @@ export default function StaffScholarshipsPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [requirements, setRequirements] = useState([]);
   const [types, setTypes] = useState([]);
+  const [ruleOptions, setRuleOptions] = useState({ year_levels: [], colleges: [] });
   const [saving, setSaving] = useState(false);
 
   // Written with .then() (not await) so React's lint rule can see that the
   // state is set later, when the server answers, not during the effect.
   const load = useCallback(
     () =>
-      Promise.all([api.get("/scholarships"), api.get("/requirement-types")])
-        .then(([response, typesResponse]) => {
+      Promise.all([
+        api.get("/scholarships"),
+        api.get("/requirement-types"),
+        api.get("/eligibility-options").catch(() => ({ data: { year_levels: [], colleges: [] } })),
+      ])
+        .then(([response, typesResponse, optionsResponse]) => {
           setScholarships(response.data);
           setTypes(typesResponse.data);
+          setRuleOptions(optionsResponse.data);
         })
         .catch((err) => toast.error(errMsg(err, "Unable to load scholarships.")))
         .finally(() => setLoading(false)),
@@ -106,6 +134,7 @@ export default function StaffScholarshipsPage() {
         application_start: form.application_start || null,
         application_end: form.application_end || null,
         short_name: form.short_name.trim() || null,
+        ...rulesPayload(form),
         requirements: (form.application_mode === "oas" ? requirements : []).map((item) => ({
           name: item.name,
           is_required: item.is_required,
@@ -194,6 +223,19 @@ export default function StaffScholarshipsPage() {
             <textarea id="new-description" value={form.description} onChange={field("description")} />
           </div>
 
+          <details className="full-column rules-details">
+            <summary>
+              Eligibility rules for AI Recommendations{" "}
+              <span className="muted small">({ruleCount(form) ? `${ruleCount(form)} set` : "optional"})</span>
+            </summary>
+            <EligibilityRules
+              value={form}
+              onChange={(patch) => setForm({ ...form, ...patch })}
+              options={ruleOptions}
+              idPrefix="new-rule"
+            />
+          </details>
+
           {form.application_mode === "oas" ? (
             <fieldset className="full-column req-fieldset">
               <legend>Required documents</legend>
@@ -239,6 +281,7 @@ export default function StaffScholarshipsPage() {
                   <th>Amount</th>
                   <th>Deadline</th>
                   <th>Requirements</th>
+                  <th>Rules</th>
                   <th>Open to students?</th>
                   <th>Action</th>
                 </tr>
@@ -253,6 +296,7 @@ export default function StaffScholarshipsPage() {
                     <td>{formatMoney(scholarship.amount)}</td>
                     <td>{formatDate(scholarship.application_end)}</td>
                     <td>{scholarship.requirements?.length || 0}</td>
+                    <td>{ruleText(scholarship)}</td>
                     <td>
                       <span className={`status status-${availabilityInfo(scholarship).tone}`}>
                         {availabilityInfo(scholarship).label}
@@ -278,6 +322,7 @@ export default function StaffScholarshipsPage() {
         <ManageScholarshipModal
           scholarshipId={managingId}
           types={types}
+          ruleOptions={ruleOptions}
           onClose={() => {
             setManagingId(null);
             load();
@@ -292,7 +337,18 @@ export default function StaffScholarshipsPage() {
   );
 }
 
-function ManageScholarshipModal({ scholarshipId, types, onClose, onDeleted }) {
+// "GWA ≤ 2.50 · ₱300,000" for the program list.
+function ruleText(scholarship) {
+  const parts = [];
+  if (scholarship.max_gwa !== null && scholarship.max_gwa !== undefined) parts.push(`GWA ≤ ${Number(scholarship.max_gwa).toFixed(2)}`);
+  if (scholarship.max_family_income !== null && scholarship.max_family_income !== undefined)
+    parts.push(`≤ ₱${Number(scholarship.max_family_income).toLocaleString("en-PH")}`);
+  if (scholarship.year_levels?.length) parts.push(`${scholarship.year_levels.length} year level(s)`);
+  if (scholarship.colleges?.length) parts.push(`${scholarship.colleges.length} college(s)`);
+  return parts.length ? parts.join(" · ") : <span className="muted">None</span>;
+}
+
+function ManageScholarshipModal({ scholarshipId, types, ruleOptions, onClose, onDeleted }) {
   const toast = useToast();
   const confirm = useConfirm();
 
@@ -321,6 +377,11 @@ function ManageScholarshipModal({ scholarshipId, types, onClose, onDeleted }) {
             application_start: data.application_start ? String(data.application_start).slice(0, 10) : "",
             application_end: data.application_end ? String(data.application_end).slice(0, 10) : "",
             status: data.status || "active",
+            max_gwa: data.max_gwa ?? "",
+            max_family_income: data.max_family_income ?? "",
+            year_levels: data.year_levels || [],
+            colleges: data.colleges || [],
+            one_scholarship_only: data.one_scholarship_only ?? true,
           });
           setRequirements(data.requirements || []);
         })
@@ -344,9 +405,10 @@ function ManageScholarshipModal({ scholarshipId, types, onClose, onDeleted }) {
         application_start: form.application_start || null,
         application_end: form.application_end || null,
         short_name: form.short_name.trim() || null,
+        ...rulesPayload(form),
       });
 
-      toast.success("Scholarship saved.");
+      toast.success("Scholarship saved. Press Recalculate on AI Recommendations to use the new rules.");
     } catch (err) {
       toast.error(errMsg(err, "Unable to save scholarship."));
     } finally {
@@ -487,6 +549,19 @@ function ManageScholarshipModal({ scholarshipId, types, onClose, onDeleted }) {
               <label htmlFor="edit-description">Description</label>
               <textarea id="edit-description" value={form.description} onChange={field("description")} />
             </div>
+
+            <details className="full-column rules-details" open={ruleCount(form) > 0}>
+              <summary>
+                Eligibility rules for AI Recommendations{" "}
+                <span className="muted small">({ruleCount(form) ? `${ruleCount(form)} set` : "none yet"})</span>
+              </summary>
+              <EligibilityRules
+                value={form}
+                onChange={(patch) => setForm({ ...form, ...patch })}
+                options={ruleOptions}
+                idPrefix="edit-rule"
+              />
+            </details>
 
             <div>
               <button className="button button-primary" disabled={saving}>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { downloadCSV, enrollmentText, formatDate, formatMoney, fullName, statusClass, statusLabel } from "../../lib/format";
+import { gwaText, peso } from "../../lib/recommend";
 import { useToast } from "../../lib/toast";
 import PageHeader from "../../components/PageHeader";
 import ProfileItem from "../../components/ProfileItem";
@@ -20,9 +21,10 @@ const STANDING = {
   former: "Held one before (not now)",
   applied: "Applied, never a grantee",
   none: "Never applied",
+  external: "Holds an outside scholarship",
 };
 
-const EMPTY_FILTERS = { college: "", year_level: "", sex: "", standing: "", scholarship_id: "" };
+const EMPTY_FILTERS = { college: "", year_level: "", sex: "", standing: "", scholarship_id: "", external_program: "" };
 const stamp = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
 export default function DataBankPage() {
@@ -34,7 +36,7 @@ export default function DataBankPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  const [options, setOptions] = useState({ colleges: [], year_levels: [] });
+  const [options, setOptions] = useState({ colleges: [], year_levels: [], external_programs: [] });
   const [programs, setPrograms] = useState([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -73,7 +75,15 @@ export default function DataBankPage() {
   }
 
   async function changeFilter(key, value) {
-    const next = { ...filters, [key]: value };
+    // One "program" dropdown: ScholarGuide programs and outside scholarships ("ext:<name>").
+    const next =
+      key === "program"
+        ? {
+            ...filters,
+            scholarship_id: value.startsWith("ext:") ? "" : value,
+            external_program: value.startsWith("ext:") ? value.slice(4) : "",
+          }
+        : { ...filters, [key]: value };
     setFilters(next);
     setLoading(true);
     await fetchStudents(query, next, 1);
@@ -120,6 +130,10 @@ export default function DataBankPage() {
             .filter((r) => r.status !== "active")
             .map((r) => `${r.scholarship?.name} (${r.status})`)
             .join("; "),
+          "Outside scholarship": (s.external_grantees || []).map((g) => g.program_name).join("; "),
+          GWA: s.gwa ?? "",
+          "Family income": s.family_income ?? "",
+          "GWA / income checked by OAS": s.eligibility_verified_at ? "Yes" : "No",
         }))
       );
       if (ok) toast.success(`Exported ${data.data.length} students.`);
@@ -128,6 +142,16 @@ export default function DataBankPage() {
       toast.error(errMsg(err, "Export failed."));
     } finally {
       setExporting(false);
+    }
+  }
+
+  async function verifyData(verified) {
+    try {
+      const { data } = await api.post(`/staff/students/${student.id}/eligibility`, { verified });
+      toast.success(data.message);
+      await openStudent(student.id);
+    } catch (err) {
+      toast.error(errMsg(err, "Unable to change the verification."));
     }
   }
 
@@ -236,15 +260,26 @@ export default function DataBankPage() {
           </label>
           <select
             id="bank-program"
-            value={filters.scholarship_id}
-            onChange={(e) => changeFilter("scholarship_id", e.target.value)}
+            value={filters.external_program ? `ext:${filters.external_program}` : filters.scholarship_id}
+            onChange={(e) => changeFilter("program", e.target.value)}
           >
             <option value="">Any program</option>
-            {programs.map((program) => (
-              <option key={program.id} value={String(program.id)}>
-                {program.name}
-              </option>
-            ))}
+            <optgroup label="ScholarGuide programs">
+              {programs.map((program) => (
+                <option key={program.id} value={String(program.id)}>
+                  {program.name}
+                </option>
+              ))}
+            </optgroup>
+            {options.external_programs?.length > 0 && (
+              <optgroup label="Outside scholarships (External Grantees)">
+                {options.external_programs.map((name) => (
+                  <option key={name} value={`ext:${name}`}>
+                    {name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
 
           {filtered && (
@@ -288,13 +323,20 @@ export default function DataBankPage() {
                     <td>{item.year_level || "—"}</td>
                     <td>{item.applications?.length || 0}</td>
                     <td>
-                      {item.scholar_records?.length ? (
-                        item.scholar_records.map((record) => (
-                          <div key={record.id}>
-                            {record.scholarship?.name}{" "}
-                            <span className={statusClass(record.status)}>{record.status}</span>
-                          </div>
-                        ))
+                      {item.scholar_records?.length || item.external_grantees?.length ? (
+                        <>
+                          {(item.scholar_records || []).map((record) => (
+                            <div key={record.id}>
+                              {record.scholarship?.name}{" "}
+                              <span className={statusClass(record.status)}>{record.status}</span>
+                            </div>
+                          ))}
+                          {(item.external_grantees || []).map((g) => (
+                            <div key={`ext-${g.id}`}>
+                              {g.program_name} <span className="status status-neutral">outside</span>
+                            </div>
+                          ))}
+                        </>
                       ) : (
                         <span className="muted">None</span>
                       )}
@@ -341,7 +383,60 @@ export default function DataBankPage() {
               <ProfileItem label="College" value={student.college} />
               <ProfileItem label="Contact" value={student.contact_number} />
               <ProfileItem label="Email" value={student.user?.email} />
+              <ProfileItem label="GWA" value={gwaText(student.gwa)} />
+              <ProfileItem label="Annual family income" value={peso(student.family_income)} />
             </div>
+
+            {student.gwa !== null && student.family_income !== null && (
+              <div className="data-strip">
+                {student.eligibility_verified ? (
+                  <span className="status status-success">
+                    ✓ GWA and income checked by {student.eligibility_verifier?.name || "OAS"}
+                    {student.eligibility_verified_at ? ` on ${formatDate(student.eligibility_verified_at)}` : ""}
+                  </span>
+                ) : (
+                  <span className="status status-warning">GWA and income typed by the student, not checked yet</span>
+                )}
+                <button className="link-button small" onClick={() => verifyData(!student.eligibility_verified)}>
+                  {student.eligibility_verified ? "Undo check" : "Mark as checked (Grades and ITR seen)"}
+                </button>
+              </div>
+            )}
+
+            {student.external_grantees?.length > 0 && (
+              <>
+                <h3>Outside scholarships (External Grantees)</h3>
+                <div className="table-wrapper">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Scholarship</th>
+                        <th>Given by</th>
+                        <th>School year</th>
+                        <th>From the list</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {student.external_grantees.map((g) => (
+                        <tr key={g.id}>
+                          <td>{g.program_name}</td>
+                          <td>{g.agency || "—"}</td>
+                          <td>{g.school_year || "—"}</td>
+                          <td>
+                            {g.upload?.file_name || "—"}
+                            <small className="muted account-note">saved {formatDate(g.created_at)}</small>
+                          </td>
+                          <td>
+                            <span className={`status status-${g.status === "active" ? "success" : "neutral"}`}>{g.status}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
 
             <h3>Scholarships (grantee records)</h3>
 

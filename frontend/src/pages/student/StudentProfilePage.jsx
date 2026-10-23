@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { formatDate } from "../../lib/format";
+import { gwaText, peso } from "../../lib/recommend";
 import { groupDocuments, loadMyDocuments } from "../../lib/documents";
 import { useToast } from "../../lib/toast";
 import PageHeader from "../../components/PageHeader";
@@ -27,6 +28,8 @@ const CORRECTABLE = {
     read-only. A wrong value is fixed through "Request a correction".
   - E-mail: read-only (it is the university login account).
   - Contact number: the student can change it.
+  - GWA and family income: typed by the student for scholarship matching
+    (AI Recommendations); OAS checks them against the Grades and the ITR.
 */
 export default function StudentProfilePage() {
   const toast = useToast();
@@ -38,6 +41,8 @@ export default function StudentProfilePage() {
   const [correction, setCorrection] = useState({ field: "", requested_value: "", reason: "" });
   const [sending, setSending] = useState(false);
   const [documents, setDocuments] = useState([]);
+  const [matching, setMatching] = useState({ gwa: "", family_income: "" });
+  const [savingMatching, setSavingMatching] = useState(false);
   const correctionRef = useRef(null);
 
   // Written with .then() (not await) so React's lint rule can see that the
@@ -49,6 +54,10 @@ export default function StudentProfilePage() {
           setDocuments(mine ? groupDocuments(mine) : []);
           setProfile(profileResponse.data);
           setContact(profileResponse.data.student?.contact_number || "");
+          setMatching({
+            gwa: profileResponse.data.student?.gwa ?? "",
+            family_income: profileResponse.data.student?.family_income ?? "",
+          });
           setRequests(requestsResponse.data);
         })
         .catch((err) => toast.error(errMsg(err, "Unable to load your profile."))),
@@ -71,6 +80,24 @@ export default function StudentProfilePage() {
       toast.error(errMsg(err, "Unable to update the contact number."));
     } finally {
       setSavingContact(false);
+    }
+  }
+
+  async function saveMatching(event) {
+    event.preventDefault();
+    setSavingMatching(true);
+
+    try {
+      const { data } = await api.patch("/profile/eligibility", {
+        gwa: Number(matching.gwa),
+        family_income: Number(matching.family_income),
+      });
+      toast.success(data.message);
+      await load();
+    } catch (err) {
+      toast.error(errMsg(err, "Unable to save."));
+    } finally {
+      setSavingMatching(false);
     }
   }
 
@@ -153,6 +180,78 @@ export default function StudentProfilePage() {
       </section>
 
       {profile.active_scholar_record && <StipendCard grant={profile.active_scholar_record} />}
+
+      {profile.external_scholarships?.length > 0 && (
+        <section className="card">
+          <div className="card-header">
+            <h2>Outside scholarship</h2>
+            <span className="lock-note">🔒 Recorded by OAS · read-only</span>
+          </div>
+          {profile.external_scholarships.map((item) => (
+            <p key={item.id} className="external-note">
+              You hold <strong>{item.program_name}</strong>
+              {item.agency ? ` from ${item.agency}` : ""}
+              {item.school_year ? ` (school year ${item.school_year})` : ""}.
+            </p>
+          ))}
+          <p className="muted small">
+            OAS recorded this from the list the scholarship giver sent. While it is active, you cannot apply for another
+            scholarship here (one active scholarship per student). If it has ended, tell the OAS through Contact OAS.
+          </p>
+        </section>
+      )}
+
+      <section className="card">
+        <div className="card-header">
+          <h2>Grades and family income</h2>
+          {student.gwa !== null && student.gwa !== undefined && (
+            <span className={`status status-${profile.eligibility_verified ? "success" : "warning"}`}>
+              {profile.eligibility_verified ? "✓ Checked by OAS" : "Waiting for OAS to check"}
+            </span>
+          )}
+        </div>
+        <p className="muted small">
+          OAS uses these to find scholarships you may be eligible for, even ones you have not applied to. Type them exactly as
+          on your latest Certificate of Grades and your parents&apos; Income Tax Return; OAS checks them.
+        </p>
+
+        <form className="form-grid" onSubmit={saveMatching}>
+          <div>
+            <label htmlFor="my-gwa">General Weighted Average (GWA)</label>
+            <input
+              id="my-gwa"
+              type="number"
+              min="1"
+              max="5"
+              step="0.01"
+              value={matching.gwa}
+              onChange={(event) => setMatching({ ...matching, gwa: event.target.value })}
+              placeholder="e.g. 1.75"
+              required
+            />
+            <small className="muted">1.00 is the highest grade. Now: {gwaText(student.gwa)}</small>
+          </div>
+          <div>
+            <label htmlFor="my-income">Annual family income (₱)</label>
+            <input
+              id="my-income"
+              type="number"
+              min="0"
+              step="1"
+              value={matching.family_income}
+              onChange={(event) => setMatching({ ...matching, family_income: event.target.value })}
+              placeholder="e.g. 120000"
+              required
+            />
+            <small className="muted">Total for one year, as on the ITR. Now: {peso(student.family_income)}</small>
+          </div>
+          <div className="full-column">
+            <button className="button button-primary" disabled={savingMatching}>
+              {savingMatching ? "Saving..." : "Save"}
+            </button>
+          </div>
+        </form>
+      </section>
 
       <div className="dashboard-grid">
         <section className="card">

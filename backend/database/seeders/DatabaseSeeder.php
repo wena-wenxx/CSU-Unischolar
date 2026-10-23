@@ -22,6 +22,8 @@ use Illuminate\Database\Seeder;
  *                 documents, AI results, grantees and payroll.
  * StatusLogSeeder: timeline / notifications / "last updated" for every application.
  * PortalDemoSeeder: OAS announcements and one pending correction request.
+ * ExternalGranteeSeeder: one saved outside-scholarship list (External Grantees).
+ * Last: the first run of AI Recommendations (rule-based eligibility scores).
  * Run "php artisan storage:link" once so staff can open the sample files.
  */
 class DatabaseSeeder extends Seeder
@@ -53,5 +55,11 @@ class DatabaseSeeder extends Seeder
 
         // Activity log entries for the staff steps already in the demo history.
         \App\Models\ActivityLog::backfillFromStatusLogs();
+
+        // One saved outside-scholarship list (External Grantees).
+        $this->call(ExternalGranteeSeeder::class);
+
+        // First run of AI Recommendations (staff press "Recalculate" later).
+        \App\Support\EligibilityEngine::recalculate();
     }
 }

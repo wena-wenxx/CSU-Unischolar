@@ -98,6 +98,22 @@ class DemoDataSeeder extends Seeder
         [self::MEKONG, 'Enfants du Mekong', 'Enfants du Mekong', 'private', 'agency_direct', null, null, null, 'active', self::AGENCY_DIRECT_NOTE, []],
     ];
 
+    /*
+     * SAMPLE eligibility rules for AI Recommendations, so the demo shows
+     * eligible and not-eligible students. They are NOT the official criteria
+     * of CHED or CSU: OAS staff replace them on the Scholarships page
+     * (Manage -> Eligibility rules) with the criteria in each program's memo.
+     * [highest GWA allowed, highest annual family income, year levels, colleges]
+     */
+    public const SAMPLE_RULES = [
+        self::CMSP => [1.75, 400000, null, null],
+        self::TDP_TES => [null, 300000, null, null],
+        self::TES => [null, 300000, null, null],
+        self::TDP_SUC => [2.50, 300000, null, null],
+        self::SA => [2.50, 250000, null, null],
+        self::CULTURE => [2.75, null, null, null],
+    ];
+
     public function run(): void
     {
         $this->seedPrograms();
@@ -119,7 +135,7 @@ class DemoDataSeeder extends Seeder
                     'application_start' => $start,
                     'application_end' => $end,
                     'status' => $status,
-                ]
+                ] + $this->sampleRules($name)
             );
 
             foreach ($requirements as $requirementName) {
@@ -129,6 +145,17 @@ class DemoDataSeeder extends Seeder
                 );
             }
         }
+    }
+
+    private function sampleRules(string $name): array
+    {
+        if (!isset(self::SAMPLE_RULES[$name])) {
+            return [];
+        }
+
+        [$gwa, $income, $years, $colleges] = self::SAMPLE_RULES[$name];
+
+        return ['max_gwa' => $gwa, 'max_family_income' => $income, 'year_levels' => $years, 'colleges' => $colleges];
     }
 
     /**

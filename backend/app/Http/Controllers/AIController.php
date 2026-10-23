@@ -142,4 +142,43 @@ class AIController extends Controller
             'document' => $document->fresh()->load('validationResult'),
         ]);
     }
+
+    /*
+    | POST /documents/{documentId}/verify   (OAS staff)
+    | Body: verified (true | false), note (how it was checked, optional)
+    | A person's confirmation that the document is genuine, e.g. the PhilID
+    | QR was checked in PhilSys Check or the barangay confirmed the clearance.
+    | The AI never does this; it only flags.
+    */
+    public function verify(Request $request, $documentId)
+    {
+        if ($request->user()->role !== 'staff') {
+            return response()->json(['message' => 'Only OAS staff can verify documents.'], 403);
+        }
+
+        $data = $request->validate([
+            'verified' => 'required|boolean',
+            'note' => 'nullable|string|max:255',
+        ]);
+
+        $document = Document::with('student')->findOrFail($documentId);
+        $document->update([
+            'staff_verified_at' => $data['verified'] ? now() : null,
+            'staff_verified_by' => $data['verified'] ? $request->user()->id : null,
+            'staff_verify_note' => $data['verified'] ? ($data['note'] ?? null) : null,
+        ]);
+
+        if ($document->student_id) {
+            \App\Support\EligibilityEngine::recalculate([$document->student_id]);
+        }
+        \App\Models\ActivityLog::record($request->user(), $data['verified'] ? 'document.verified' : 'document.unverified',
+            ($data['verified'] ? 'Verified' : 'Removed the verification of')." the {$document->typeName()} of "
+            .($document->student ? trim($document->student->first_name.' '.$document->student->last_name) : 'a student')
+            .(!empty($data['note']) ? " ({$data['note']})" : '').'.', $document);
+
+        return response()->json([
+            'message' => $data['verified'] ? 'Marked as verified by staff.' : 'Verification removed.',
+            'document' => $document->fresh(['validationResult', 'staffVerifier:id,name']),
+        ]);
+    }
 }

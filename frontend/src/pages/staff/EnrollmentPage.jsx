@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
-import { parseCSV } from "../../lib/csv";
+import { LIST_ACCEPT, readListFile } from "../../lib/listFile";
 import { downloadCSV, formatDateTime } from "../../lib/format";
 import { useToast } from "../../lib/toast";
 import { useConfirm } from "../../lib/confirm";
@@ -11,7 +11,7 @@ import Loading from "../../components/Loading";
 
 /*
   Enrollment (staff):
-  1. Upload the Registrar's list of enrolled students (CSV) for the term.
+  1. Upload the Registrar's list of enrolled students (CSV, Excel, Word or PDF) for the term.
   2. Verify All Enrollments: approved applicants (and/or active grantees) are
      matched by Student ID -> Enrolled / Not on the list / Needs manual check.
   3. Record: nothing is saved until staff press a Record button.
@@ -73,24 +73,19 @@ export default function EnrollmentPage() {
   const headers = useMemo(() => (rows.length ? rows[0].map((h, i) => h.trim() || `Column ${i + 1}`) : []), [rows]);
   const dataRows = rows.slice(1);
 
-  function readFile(event) {
+  // CSV is read here; Excel, Word, PDF and pictures are read by the AI service.
+  async function readFile(event) {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!/\.csv$/i.test(file.name)) {
-      toast.error("Please choose a .csv file. In Excel: File → Save As → CSV (Comma delimited).");
-      setFileKey((k) => k + 1);
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const parsed = parseCSV(String(reader.result || ""));
+    try {
+      const { rows: parsed, warnings } = await readListFile(file);
       if (parsed.length < 2) {
         toast.error("The file has no student rows.");
         return;
       }
-      const head = parsed[0].map((h) => h.trim());
+      warnings.forEach((warning) => toast.info(warning));
+      const head = parsed[0].map((h) => String(h).trim());
       setRows(parsed);
       setFileName(file.name);
       setColumns({
@@ -99,8 +94,10 @@ export default function EnrollmentPage() {
         first: guessColumn(head, [/first/, /given/]),
         course: guessColumn(head, [/course/, /program/, /degree/]),
       });
-    };
-    reader.readAsText(file);
+    } catch (err) {
+      toast.error(errMsg(err, err.message || "The file could not be read."));
+      setFileKey((k) => k + 1);
+    }
   }
 
   function resetFile() {
@@ -233,13 +230,13 @@ export default function EnrollmentPage() {
               </select>
             </div>
             <div>
-              <label htmlFor="enr-file">Registrar's list (CSV file)</label>
-              <input id="enr-file" key={fileKey} type="file" accept=".csv,text/csv" onChange={readFile} />
+              <label htmlFor="enr-file">Registrar's list (Excel, CSV, Word or PDF)</label>
+              <input id="enr-file" key={fileKey} type="file" accept={LIST_ACCEPT} onChange={readFile} />
             </div>
           </div>
           <p className="muted small">
-            Ask the Registrar for the enrolled students of the term as Excel, then File → Save As → CSV. Only the Student
-            ID, name and course columns are read.
+            Excel (.xlsx), CSV, Word (.docx) or PDF from the Registrar. Files other than CSV are read by the AI service, so
+            keep it running. Only the Student ID, name and course columns are read.
           </p>
 
           {rows.length > 0 && (

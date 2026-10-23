@@ -135,6 +135,7 @@ export const HELP = {
         "Your name, Student ID, course, year level and college come from the Registrar, so you cannot edit them here.",
         "If something is wrong, use Request a correction on My Profile. OAS will check it with the Registrar.",
         "You can update your contact number yourself.",
+        "Type your GWA and annual family income under Grades and family income. OAS checks them against your Grades and your parents' ITR and uses them to tell you about scholarships you may be eligible for.",
         "To change your password, open My Profile → Change password.",
       ],
     },
@@ -164,6 +165,8 @@ export const HELP = {
         "Validated: no problem found. Flagged: at least one possible problem; read the messages and open \"Text read by the AI\".",
         "Needs review: the file could not be read (for example the AI service is offline). Check it by hand.",
         "The AI never changes an application's status. Staff make every decision.",
+        "Possible edit (not proof): the file's hidden details say it was saved in an editing program or changed later. A real document can show this too, so look closer; it is never a reason to reject by itself.",
+        "The AI cannot prove a document is genuine. Under each document, open How to check it is genuine, follow the steps (for example PhilSys Check for the National ID), then press Mark as verified with a short note.",
       ],
     },
     {
@@ -171,7 +174,8 @@ export const HELP = {
       steps: [
         "First forward the application: press Complete: forward to agency (only possible when every required document is uploaded).",
         "One at a time: when the agency answers, open the application and press Approved by agency or Rejected by agency. A mistake can be undone until the student is tagged as a grantee.",
-        "Many at once: go to Approved Lists, choose the program, upload the agency's list as a CSV file, pick the column with the Student ID, and press Process. A summary shows matched, unmatched and error rows.",
+        "Many at once: go to Approved Lists, choose the program, upload the agency's list (Excel, CSV, Word, PDF or a photo), pick the column with the Student ID, and press Process. A summary shows matched, unmatched and error rows.",
+        "Excel, Word, PDF and photo lists are read by the AI service, so it must be running. Always check the columns it shows before pressing Process.",
       ],
     },
     {
@@ -181,7 +185,9 @@ export const HELP = {
         "Scholar Records → Ready to Tag as Grantee → Tag as Grantee. A student can hold only one active scholarship.",
         "Scholar Records → ATM status: record whether the grantee has an ATM and whether the stipend has reached it (status only; no banking).",
         "Payroll → 1. Prepare: choose one program or all, and the period → Preview → Confirm. Students not enrolled or already in that period are skipped; ATM problems are shown as warnings.",
-        "Payroll → 2. Payroll list: tick entries and press Mark Ready, then Mark Processed after the payout. Export CSV or Print / Save as PDF.",
+        "Payroll → 2. Payroll list: tick entries and press Mark Ready, then Mark Processed after the payout.",
+        "General Payroll (Form 6-A): click one program tab and choose one period, then press General Payroll (Form 6-A). Check the batch, voucher and purpose, then Open form to print / save as PDF, or Download Word (.docx).",
+        "Printing: paper Legal / Long (8.5 x 13 in), Landscape, Headers and footers off. The deduction and witness columns stay empty for writing by hand.",
       ],
     },
     {
@@ -213,7 +219,7 @@ export const HELP = {
     {
       title: "Enrollment: Registrar list",
       steps: [
-        "Enrollment → upload the Registrar's list of enrolled students as a CSV file and choose the Student ID column (names are optional but recommended).",
+        "Enrollment → upload the Registrar's list of enrolled students (Excel, CSV, Word, PDF or a photo) and choose the Student ID column (names are optional but recommended).",
         "Press Verify All Enrollments. Everyone is sorted into Enrolled, Not on the list, and Needs manual check (the Student ID is on the list but the name is different).",
         "Nothing is saved until you press Record. Record the Enrolled group in one click; check the others one by one.",
         "Use “Active grantees” at the start of each semester, so payroll only includes students who are still enrolled.",
@@ -224,6 +230,28 @@ export const HELP = {
       steps: [
         "Students send questions from Contact OAS. Open messages appear on the Dashboard and in Student Messages, oldest first.",
         "Type a reply and press Send reply. The student sees it on their Contact OAS page and their bell shows it.",
+      ],
+    },
+    {
+      title: "AI Recommendations",
+      steps: [
+        "AI Recommendations lists students who may be eligible for each program, even if they have not applied. It only suggests; nothing changes until you act.",
+        "Score = checks met ÷ all checks. The checks are the program's eligibility rules (GWA, family income, year level, college, one scholarship) and its required documents, all with equal weight.",
+        "A must-have rule that is not met shows Fails a rule, even with a high score. A missing GWA or income shows Not enough data. Meets the rules with a low score means the student qualifies but has not uploaded the documents yet.",
+        "Press Why? to see each check, the rule, and the student's data used. Then Send invitation (e-mail), Add to scholarship (starts a draft application), Dismiss, or Mark as wrong (write what is wrong).",
+        "A document counts only after the AI check found no problem, or after you marked it verified. A document that is only uploaded does not count yet.",
+        "Tick “Only GWA/income checked by OAS” to see only students whose GWA and income you have already checked. Others show “GWA/income not checked”.",
+        "Set the rules in Scholarships → Manage → Eligibility rules, then press Recalculate. Mark a student's GWA and income as checked after seeing their Grades and ITR.",
+      ],
+    },
+    {
+      title: "External Grantees",
+      steps: [
+        "Use External Grantees for scholarships from outside parties (LGU, CHED lists, foundations) that are not processed in ScholarGuide.",
+        "Type the scholarship name, choose the file (PDF, Word, Excel, CSV or a photo) and press Upload and read. The AI reads the names and Student IDs and suggests the matching student.",
+        "Check every line: Matched lines are pre-filled; Check lines need you to choose the student; Did not match lines are kept for the record. Untick lines that are not grantees (titles, notes). Then press Save confirmed list.",
+        "Saved students show “holds an outside scholarship” on their profile and in the Data Bank, and cannot apply for another scholarship until you mark it ended.",
+        "Export the matched or unmatched lines, the lines read from any file, or the upload history as CSV.",
       ],
     },
     {
@@ -273,6 +301,7 @@ export const HELP = {
       steps: [
         "School year and semester: the current term. Payroll uses it as the default period. Leave both empty to let the system work it out from today's date.",
         "OAS office hours, location, e-mail and phone: shown to students on Contact OAS and at the bottom of every page. Only enter details confirmed by the OAS.",
+        "Payroll form signatories: type the name of each signatory exactly as the OAS gives it. The positions are filled in already; change them if the OAS uses other titles. Empty names print as a blank line.",
       ],
     },
   ],

@@ -56,7 +56,48 @@ class ScholarshipController extends Controller
             'application_end' => 'nullable|date|after_or_equal:application_start',
             'amount' => 'nullable|numeric|min:0',
             'status' => 'nullable|in:active,inactive,closed',
+            // Eligibility rules for AI Recommendations (empty = no rule)
+            'max_gwa' => 'nullable|numeric|min:1|max:5',
+            'max_family_income' => 'nullable|numeric|min:0|max:100000000',
+            'year_levels' => 'nullable|array|max:10',
+            'year_levels.*' => 'string|max:50',
+            'colleges' => 'nullable|array|max:30',
+            'colleges.*' => 'string|max:255',
+            'one_scholarship_only' => 'nullable|boolean',
         ];
+    }
+
+    /** Empty lists are stored as null ("any year level", "any college"). */
+    private function cleanRules(array $data): array
+    {
+        foreach (['year_levels', 'colleges'] as $key) {
+            if (array_key_exists($key, $data)) {
+                $list = array_values(array_unique(array_filter(array_map('trim', $data[$key] ?? []))));
+                $data[$key] = $list ?: null;
+            }
+        }
+        if (array_key_exists('one_scholarship_only', $data) && $data['one_scholarship_only'] === null) {
+            unset($data['one_scholarship_only']);
+        }
+
+        return $data;
+    }
+
+    /*
+    | GET /eligibility-options   (staff)
+    | Year levels and colleges found in the student records, for the
+    | eligibility rule checkboxes on the Scholarships page.
+    */
+    public function eligibilityOptions(Request $request)
+    {
+        if ($this->notStaff($request)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        return response()->json([
+            'year_levels' => \App\Models\Student::query()->whereNotNull('year_level')->distinct()->orderBy('year_level')->pluck('year_level'),
+            'colleges' => \App\Models\Student::query()->whereNotNull('college')->distinct()->orderBy('college')->pluck('college'),
+        ]);
     }
 
     /*
@@ -92,6 +133,7 @@ class ScholarshipController extends Controller
         ]);
         $data['status'] = $data['status'] ?? 'active';
         $data['application_mode'] = $data['application_mode'] ?? 'oas';
+        $data = $this->cleanRules($data);
 
         $requirements = $data['requirements'] ?? [];
         unset($data['requirements']);
@@ -122,7 +164,7 @@ class ScholarshipController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $data = $request->validate($this->rules(false));
+        $data = $this->cleanRules($request->validate($this->rules(false)));
 
         $scholarship = Scholarship::findOrFail($id);
         $scholarship->fill($data);

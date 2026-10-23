@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { enrollmentText, fileUrl, flaggedCount, formatDate, fullName, missingRequirements, stepLabel, timeAgo } from "../../lib/format";
+import { verifySteps } from "../../lib/verifyGuide";
 import { byLastName, lastFirst, programTabs } from "../../lib/programs";
 import { useToast } from "../../lib/toast";
 import Modal from "../../components/Modal";
@@ -238,7 +239,6 @@ export default function StaffApplicationsPage() {
               <thead>
                 <tr>
                   <th>Student</th>
-                  <th>Student ID</th>
                   {activeProgram === "all" && <th>Program</th>}
                   <th>Submitted</th>
                   <th>Status</th>
@@ -252,8 +252,10 @@ export default function StaffApplicationsPage() {
               <tbody>
                 {shown.map((application) => (
                   <tr key={application.id}>
-                    <td>{lastFirst(application.student)}</td>
-                    <td>{application.student?.student_id}</td>
+                    <td>
+                      <strong>{lastFirst(application.student)}</strong>
+                      <small className="muted account-note">{application.student?.student_id}</small>
+                    </td>
                     {activeProgram === "all" && (
                       <td title={application.scholarship?.name}>
                         {application.scholarship?.short_name || application.scholarship?.name}
@@ -280,14 +282,16 @@ export default function StaffApplicationsPage() {
                           Review
                         </button>
 
-                        {application.status === "approved" && (
-                          <button
-                            className="button button-small button-success"
-                            onClick={() => setVerifying(application)}
-                          >
-                            {application.enrollment_verified ? "Re-verify" : "Verify enrollment"}
-                          </button>
-                        )}
+                        {application.status === "approved" &&
+                          (application.enrollment_verified ? (
+                            <button className="link-button small" onClick={() => setVerifying(application)}>
+                              Re-verify
+                            </button>
+                          ) : (
+                            <button className="button button-small button-secondary" onClick={() => setVerifying(application)}>
+                              Verify enrollment
+                            </button>
+                          ))}
                       </div>
                     </td>
                   </tr>
@@ -358,6 +362,7 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
   const [remarks, setRemarks] = useState(application.remarks || "");
   const [busy, setBusy] = useState(false);
   const [busyDocumentId, setBusyDocumentId] = useState(null);
+  const [verifyNotes, setVerifyNotes] = useState({});
 
   async function review(status) {
     if (status === "needs_action" && !remarks.trim()) {
@@ -405,6 +410,21 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
       setBusyDocumentId(null);
     }
 
+    await onChanged();
+  }
+
+  // A person's confirmation that the document is genuine (the AI cannot prove this).
+  async function verifyDocument(document, verified) {
+    const note = verified ? (verifyNotes[document.id] || "").trim() : "";
+    setBusyDocumentId(document.id);
+    try {
+      const { data } = await api.post(`/documents/${document.id}/verify`, { verified, note: note || null });
+      toast.success(data.message);
+    } catch (err) {
+      toast.error(errMsg(err, "Unable to change the verification."));
+    } finally {
+      setBusyDocumentId(null);
+    }
     await onChanged();
   }
 
@@ -486,6 +506,44 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
               </p>
 
               <AiResult result={document.validation_result} />
+
+              {document.staff_verified_at ? (
+                <p className="verified-note">
+                  ✓ Verified by {document.staff_verifier?.name || "OAS staff"} on {formatDate(document.staff_verified_at)}
+                  {document.staff_verify_note ? ` · ${document.staff_verify_note}` : ""}{" "}
+                  <button className="link-button small" onClick={() => verifyDocument(document, false)} disabled={busyDocumentId === document.id}>
+                    Undo
+                  </button>
+                </p>
+              ) : (
+                <details className="verify-guide">
+                  <summary>How to check it is genuine</summary>
+                  <ul>
+                    {verifySteps(document.requirement?.name || document.document_type).map((step) => (
+                      <li key={step}>{step}</li>
+                    ))}
+                  </ul>
+                  <div className="verify-row">
+                    <label className="sr-only" htmlFor={`verify-note-${document.id}`}>
+                      How you checked it
+                    </label>
+                    <input
+                      id={`verify-note-${document.id}`}
+                      value={verifyNotes[document.id] || ""}
+                      onChange={(event) => setVerifyNotes({ ...verifyNotes, [document.id]: event.target.value })}
+                      maxLength={255}
+                      placeholder="How you checked it (e.g. PhilSys Check QR, called the barangay)"
+                    />
+                    <button
+                      className="button button-small button-secondary"
+                      onClick={() => verifyDocument(document, true)}
+                      disabled={busyDocumentId === document.id}
+                    >
+                      Mark as verified
+                    </button>
+                  </div>
+                </details>
+              )}
             </div>
 
             <div className="button-row">
@@ -691,6 +749,17 @@ function AiResult({ result }) {
         </ul>
       ) : (
         <p className="ai-ok">No issues flagged.</p>
+      )}
+
+      {result.extracted_data?.authenticity_notes?.length > 0 && (
+        <div className="caution-box">
+          <strong>Possible edit (not proof)</strong>
+          <ul>
+            {result.extracted_data.authenticity_notes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {result.extracted_text && (

@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
-import { downloadCSV, formatDate, formatMoney, fullName } from "../../lib/format";
+import { formatDate, formatMoney, fullName } from "../../lib/format";
+import { downloadPayrollWord, formAddress } from "../../lib/payrollForm";
+import { useAuth } from "../../lib/auth";
+import Modal from "../../components/Modal";
 import { useToast } from "../../lib/toast";
 import { useConfirm } from "../../lib/confirm";
 import PageHeader from "../../components/PageHeader";
@@ -15,8 +18,9 @@ import { byLastName, lastFirst, programTabs } from "../../lib/programs";
   Payroll (status tracking only; no money is moved by this system).
   1. Prepare: choose the program and the period, preview who is included
      (each scholar gets their own program's amount), then confirm.
-  2. Payroll list: filter, select, mark Ready / Processed, export CSV,
-     print or save as PDF.
+  2. Payroll list: filter, select, mark Ready / Processed, and make the
+     official General Payroll (General Form No. 6-A) for one program and one
+     period: print / save as PDF, or download it as Word.
   3. History: totals per period and program.
 */
 
@@ -34,7 +38,6 @@ const ATM_FILTERS = {
   none: "No ATM yet",
 };
 
-const stamp = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 const same = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 
 function atmGroup(record) {
@@ -66,6 +69,7 @@ export default function StaffPayrollPage() {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState([]);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
 
   // Written with .then() (not await) so React's lint rule can see that the
   // state is set later, when the server answers, not during the effect.
@@ -141,27 +145,6 @@ export default function StaffPayrollPage() {
     }
   }
 
-  function exportCSV() {
-    const ok = downloadCSV(
-      `payroll-${periodFilter === "all" ? "all-periods" : periodFilter.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${stamp()}.csv`,
-      shown.map((item) => ({
-        "Student ID": item.scholar_record?.student?.student_id,
-        "Last name": item.scholar_record?.student?.last_name,
-        "First name": item.scholar_record?.student?.first_name,
-        "Middle name": item.scholar_record?.student?.middle_name,
-        Course: item.scholar_record?.student?.course,
-        "Year level": item.scholar_record?.student?.year_level,
-        Scholarship: item.scholar_record?.scholarship?.name,
-        Period: item.period,
-        Amount: Number(item.amount || 0).toFixed(2),
-        "ATM status": item.scholar_record?.atm_label || item.bank_atm_status,
-        Status: item.status,
-        "Prepared by": item.preparer?.name || "",
-      }))
-    );
-    if (!ok) toast.info("Nothing to export in this list.");
-  }
-
   function openFromHistory(row) {
     setStatusFilter("all");
     setPeriodFilter(row.period);
@@ -196,11 +179,8 @@ export default function StaffPayrollPage() {
         <div className="card-header">
           <h2>2. Payroll list</h2>
           <div className="button-row">
-            <button className="button button-small button-secondary" onClick={exportCSV}>
-              Export CSV
-            </button>
-            <button className="button button-small button-secondary" onClick={() => window.print()}>
-              Print / Save as PDF
+            <button className="button button-small button-primary" onClick={() => setFormOpen(true)} disabled={!shown.length}>
+              General Payroll (Form 6-A)
             </button>
           </div>
         </div>
@@ -368,6 +348,14 @@ export default function StaffPayrollPage() {
         )}
       </section>
 
+      {formOpen && (
+        <PayrollFormDialog
+          entries={selectedShown.length ? shown.filter((item) => selectedShown.includes(item.id)) : shown}
+          usingSelection={selectedShown.length > 0}
+          onClose={() => setFormOpen(false)}
+        />
+      )}
+
       <section className="card print-hide">
         <h2>3. Payroll history</h2>
 
@@ -412,6 +400,133 @@ export default function StaffPayrollPage() {
         )}
       </section>
     </div>
+  );
+}
+
+/*
+  General Payroll (General Form No. 6-A) for the entries in the list (or the
+  selected ones): ONE program and ONE period per form. Opens the printable
+  form (Print / Save as PDF) or downloads it as Word.
+*/
+function PayrollFormDialog({ entries, usingSelection, onClose }) {
+  const toast = useToast();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const programs = [...new Set(entries.map((item) => item.scholar_record?.scholarship_id))];
+  const periods = [...new Set(entries.map((item) => String(item.period || "").trim().toLowerCase()))];
+  const program = entries[0]?.scholar_record?.scholarship;
+  const period = entries[0]?.period || "";
+  const problem =
+    programs.length > 1
+      ? "Click one program tab first: one form is for one program."
+      : periods.length > 1
+        ? "Choose one period in the Period dropdown first: one form is for one period."
+        : "";
+
+  const [options, setOptions] = useState(() => ({
+    batch: `${String(program?.short_name || program?.name || "").toUpperCase()} GRANTEES BATCH 1`,
+    voucher: "",
+    purpose: `${period} Stipend`,
+    sheet_start: 1,
+    per_sheet: 15,
+    split_atm: true,
+    prepared_name: user?.name || "",
+    prepared_title: "OAS Staff",
+  }));
+  const [busy, setBusy] = useState(false);
+  const field = (key) => (event) => setOptions({ ...options, [key]: event.target.value });
+  const ids = entries.map((item) => item.id);
+  const total = entries.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  async function word() {
+    setBusy(true);
+    try {
+      const name = await downloadPayrollWord({ ids, ...options });
+      toast.success(`Downloaded ${name}`);
+    } catch (err) {
+      toast.error(errMsg(err, "Unable to make the Word file."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal
+      size="large"
+      title="General Payroll (General Form No. 6-A)"
+      subtitle={
+        <span className="muted">
+          {entries.length} {usingSelection ? "selected" : ""} grantee{entries.length === 1 ? "" : "s"} · {formatMoney(total)}
+          {!problem && ` · ${program?.name} · ${period}`}
+        </span>
+      }
+      onClose={onClose}
+      footer={
+        <div className="button-row">
+          <button
+            className="button button-primary"
+            disabled={Boolean(problem)}
+            onClick={() => navigate(formAddress(ids, options))}
+          >
+            Open form to print / save as PDF
+          </button>
+          <button className="button button-secondary" disabled={Boolean(problem) || busy} onClick={word}>
+            {busy ? "Making..." : "Download Word (.docx)"}
+          </button>
+        </div>
+      }
+    >
+      {problem ? (
+        <p className="alert alert-warning">{problem}</p>
+      ) : (
+        <>
+          <p className="muted small">
+            Fills in the OAS General Payroll form: Student ID, name and amount for each grantee, A to Z, 15 per sheet.
+            The deduction and witness columns stay empty for writing by hand. Signatory names come from System Settings
+            (admin).
+          </p>
+          <div className="form-grid">
+            <div>
+              <label htmlFor="gp-batch">Release of (batch name)</label>
+              <input id="gp-batch" value={options.batch} onChange={field("batch")} maxLength={120} />
+            </div>
+            <div>
+              <label htmlFor="gp-voucher">Journal Voucher / OR No. (optional)</label>
+              <input id="gp-voucher" value={options.voucher} onChange={field("voucher")} maxLength={60} placeholder="e.g. OR#0146829" />
+            </div>
+            <div className="full-column">
+              <label htmlFor="gp-purpose">For (line under the batch)</label>
+              <input id="gp-purpose" value={options.purpose} onChange={field("purpose")} maxLength={200} />
+            </div>
+            <div>
+              <label htmlFor="gp-prepared">Prepared by</label>
+              <input id="gp-prepared" value={options.prepared_name} onChange={field("prepared_name")} maxLength={120} />
+            </div>
+            <div>
+              <label htmlFor="gp-prepared-title">Position</label>
+              <input id="gp-prepared-title" value={options.prepared_title} onChange={field("prepared_title")} maxLength={120} />
+            </div>
+            <div>
+              <label htmlFor="gp-sheet">First sheet number</label>
+              <input id="gp-sheet" type="number" min="1" value={options.sheet_start} onChange={field("sheet_start")} />
+            </div>
+            <div>
+              <label htmlFor="gp-per">Grantees per sheet</label>
+              <input id="gp-per" type="number" min="5" max="40" value={options.per_sheet} onChange={field("per_sheet")} />
+            </div>
+            <label className="choice full-column">
+              <input
+                type="checkbox"
+                checked={options.split_atm}
+                onChange={(event) => setOptions({ ...options, split_atm: event.target.checked })}
+              />
+              Separate sheets for grantees WITH ATM and WITHOUT ATM (like the OAS form)
+            </label>
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }
 

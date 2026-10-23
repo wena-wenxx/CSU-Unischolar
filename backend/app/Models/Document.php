@@ -29,7 +29,10 @@ class Document extends Model
 
     protected $fillable = [
         'student_id', 'application_id', 'scholarship_requirement_id', 'original_filename', 'file_path', 'document_type', 'status',
+        'staff_verified_at', 'staff_verified_by', 'staff_verify_note',
     ];
+
+    protected $casts = ['staff_verified_at' => 'datetime'];
 
     protected static function booted(): void
     {
@@ -46,6 +49,7 @@ class Document extends Model
     public function student() { return $this->belongsTo(Student::class); }
     public function requirement() { return $this->belongsTo(ScholarshipRequirement::class, 'scholarship_requirement_id'); }
     public function validationResult() { return $this->hasOne(ValidationResult::class); }
+    public function staffVerifier() { return $this->belongsTo(User::class, 'staff_verified_by'); }
 
     // "Certificate of Grades", taken from the requirement or the saved type.
     public function typeName(): string

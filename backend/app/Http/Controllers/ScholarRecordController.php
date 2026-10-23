@@ -112,22 +112,13 @@ class ScholarRecordController extends Controller
             ], 422);
         }
 
-        // Hard rule: one active scholarship per student.
-        $alreadyActive = ScholarRecord::where(
-            'student_id',
-            $application->student_id
-        )
-            ->where('status', 'active')
-            ->where(
-                'scholarship_id',
-                '!=',
-                $application->scholarship_id
-            )
-            ->exists();
+        // Hard rule: one active scholarship per student (including scholarships
+        // from outside parties recorded in External Grantees).
+        $holding = $application->student?->otherActiveScholarship($application->scholarship_id);
 
-        if ($alreadyActive) {
+        if ($holding) {
             return response()->json([
-                'message' => 'Student already has another active scholarship.'
+                'message' => "Student already has another active scholarship: {$holding}."
             ], 422);
         }
 

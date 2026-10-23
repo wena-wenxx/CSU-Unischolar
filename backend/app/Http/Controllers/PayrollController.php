@@ -6,6 +6,7 @@ use App\Models\ActivityLog;
 use App\Models\PayrollRecord;
 use App\Models\ScholarRecord;
 use App\Models\Setting;
+use App\Support\GeneralPayrollForm;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -433,6 +434,63 @@ class PayrollController extends Controller
                     'scholarRecord.student',
                     'scholarRecord.scholarship'
                 ])
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | GENERAL PAYROLL (General Form No. 6-A)
+    |--------------------------------------------------------------------------
+    | POST /payroll/form        the sheets as data (printable page / PDF)
+    | POST /payroll/form/docx   the same sheets as a Word document
+    | Body: ids [..] (payroll entries of ONE program and ONE period),
+    |       batch, voucher, purpose, sheet_start, per_sheet, split_atm,
+    |       prepared_name, prepared_title
+    */
+    private function formOptions(Request $request): array
+    {
+        return $request->validate([
+            'ids' => 'required|array|min:1|max:2000',
+            'ids.*' => 'integer',
+            'batch' => 'nullable|string|max:120',
+            'voucher' => 'nullable|string|max:60',
+            'purpose' => 'nullable|string|max:200',
+            'sheet_start' => 'nullable|integer|min:1|max:9999',
+            'per_sheet' => 'nullable|integer|min:5|max:40',
+            'split_atm' => 'nullable|boolean',
+            'prepared_name' => 'nullable|string|max:120',
+            'prepared_title' => 'nullable|string|max:120',
+        ]);
+    }
+
+    public function form(Request $request)
+    {
+        $this->staffOnly($request);
+        $data = $this->formOptions($request);
+
+        return response()->json(GeneralPayrollForm::build($data['ids'], $data, $request->user()));
+    }
+
+    public function formDocx(Request $request)
+    {
+        $this->staffOnly($request);
+        $data = $this->formOptions($request);
+        $form = GeneralPayrollForm::build($data['ids'], $data, $request->user());
+
+        try {
+            $bytes = GeneralPayrollForm::docx($form);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+
+        ActivityLog::record($request->user(), 'payroll.form_exported',
+            "Exported the General Payroll (Form 6-A) for {$form['program']}, {$form['period']}: {$form['count']} grantee(s), ".count($form['sheets']).' sheet(s).');
+
+        $name = 'general-payroll-'.preg_replace('/[^a-z0-9]+/', '-', mb_strtolower($form['batch'])).'.docx';
+
+        return response($bytes, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Disposition' => 'attachment; filename="'.$name.'"',
         ]);
     }
 }

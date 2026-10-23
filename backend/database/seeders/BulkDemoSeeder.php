@@ -93,6 +93,7 @@ class BulkDemoSeeder extends Seeder
     ];
 
     private array $programs = [];
+    private ?int $staffId = null;
     private string $password;
     private int $files = 0;
 
@@ -106,6 +107,7 @@ class BulkDemoSeeder extends Seeder
         mt_srand(20261006); // fixed seed: same data every time
 
         $this->password = Hash::make('Student@12345');
+        $this->staffId = DB::table('users')->where('role', 'staff')->value('id');
         $this->loadPrograms();
 
         DB::transaction(function () {
@@ -225,6 +227,14 @@ class BulkDemoSeeder extends Seeder
             'year_level' => $p['year_level'],
             'college' => $p['college'],
             'contact_number' => $p['contact'],
+            // Same values as printed on their sample Grades and ITR. About 7 in 10
+            // were already checked by OAS (fixed by the Student ID, so the random
+            // data above stays exactly the same).
+            'gwa' => $p['gwa'],
+            'family_income' => $p['family_income'],
+            'eligibility_updated_at' => $joined,
+            'eligibility_verified_at' => crc32($p['student_id']) % 10 < 7 ? $joined->copy()->addDays(20) : null,
+            'eligibility_verified_by' => crc32($p['student_id']) % 10 < 7 ? $this->staffId : null,
             'created_at' => $joined, 'updated_at' => $joined,
         ]);
 
