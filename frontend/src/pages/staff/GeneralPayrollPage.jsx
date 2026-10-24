@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
-import { downloadPayrollWord, peso, readFormAddress } from "../../lib/payrollForm";
+import { downloadPayrollFile, peso, readFormAddress } from "../../lib/payrollForm";
 import { useToast } from "../../lib/toast";
 import Loading from "../../components/Loading";
 
@@ -9,7 +9,7 @@ import Loading from "../../components/Loading";
   General Payroll (General Form No. 6-A, revised July 1, 1995): the OAS's
   official payroll sheet, filled in from ScholarGuide. Opens on its own page
   (no menu) so it prints like the paper form: long bond (8.5 x 13 in),
-  landscape. Print / Save as PDF, or download the same form as Word.
+  landscape. Download it as PDF or Word, or print it from here.
 */
 export default function GeneralPayrollPage() {
   const toast = useToast();
@@ -17,7 +17,7 @@ export default function GeneralPayrollPage() {
   const [body] = useState(() => readFormAddress(location.search));
   const [form, setForm] = useState(null);
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState("");
 
   // .then() (not await) so React's lint rule sees the state is set later.
   useEffect(() => {
@@ -27,15 +27,15 @@ export default function GeneralPayrollPage() {
       .catch((err) => setError(errMsg(err, "Unable to make the payroll form.")));
   }, [body]);
 
-  async function word() {
-    setBusy(true);
+  async function download(kind) {
+    setBusy(kind);
     try {
-      const name = await downloadPayrollWord(body);
+      const name = await downloadPayrollFile(kind, body);
       toast.success(`Downloaded ${name}`);
     } catch (err) {
-      toast.error(errMsg(err, "Unable to make the Word file."));
+      toast.error(errMsg(err, `Unable to make the ${kind === "pdf" ? "PDF" : "Word"} file.`));
     } finally {
-      setBusy(false);
+      setBusy("");
     }
   }
 
@@ -45,15 +45,17 @@ export default function GeneralPayrollPage() {
         <Link className="button button-secondary" to="/staff/payroll">
           ← Payroll
         </Link>
-        <button className="button button-primary" onClick={() => window.print()} disabled={!form}>
-          Print / Save as PDF
+        <button className="button button-primary" onClick={() => download("pdf")} disabled={!form || Boolean(busy)}>
+          {busy === "pdf" ? "Making..." : "Download PDF"}
         </button>
-        <button className="button button-secondary" onClick={word} disabled={!form || busy}>
-          {busy ? "Making..." : "Download Word (.docx)"}
+        <button className="button button-secondary" onClick={() => download("docx")} disabled={!form || Boolean(busy)}>
+          {busy === "docx" ? "Making..." : "Download Word (.docx)"}
+        </button>
+        <button className="button button-secondary" onClick={() => window.print()} disabled={!form}>
+          Print
         </button>
         <span className="muted small">
-          In the print window: paper <strong>Legal / Long (8.5 × 13 in)</strong>, <strong>Landscape</strong>, and turn off
-          <em> Headers and footers</em>. Choose “Save as PDF” to keep a PDF.
+          Print: paper <strong>Legal / Long (8.5 × 13 in)</strong>, <strong>Landscape</strong>, <em>Headers and footers</em> off.
         </span>
       </div>
 
@@ -115,30 +117,38 @@ function Sheet({ form, sheet }) {
           ))}
         </colgroup>
         <thead>
+          {/* Two header rows, like the OAS form: "Less: Miscellaneous / CHED Grants" sits over two empty sub-columns. */}
           <tr>
-            <th>No.</th>
-            <th>ID NO.</th>
-            <th>NAME</th>
-            <th>Position</th>
-            <th>
+            <th rowSpan={2}>No.</th>
+            <th rowSpan={2}>ID NO.</th>
+            <th rowSpan={2}>NAME</th>
+            <th rowSpan={2}>Position</th>
+            <th rowSpan={2}>
               {form.first_sem_label}
               <small>{peso(form.rate)}</small>
             </th>
-            <th>
+            <th rowSpan={2}>
               {form.second_sem_label}
               <small>{peso(form.rate)}</small>
             </th>
+            <th rowSpan={2} />
+            <th rowSpan={2} />
+            <th rowSpan={2}>TOTAL</th>
+            <th rowSpan={2} />
+            <th colSpan={2} className="gp-small-head">
+              Less: Miscellaneous
+              <br />
+              CHED Grants
+            </th>
+            <th rowSpan={2} />
+            <th rowSpan={2} />
+            <th rowSpan={2}>TOTAL DEDUCTIONS</th>
+            <th rowSpan={2}>Net Amount Received</th>
+            <th rowSpan={2}>Initial of Witness to Payment</th>
+          </tr>
+          <tr className="gp-subhead">
             <th />
             <th />
-            <th>TOTAL</th>
-            <th />
-            <th className="gp-small-head">Less: Miscellaneous</th>
-            <th className="gp-small-head">CHED Grants</th>
-            <th />
-            <th />
-            <th>TOTAL DEDUCTIONS</th>
-            <th>Net Amount Received</th>
-            <th>Initial of Witness to Payment</th>
           </tr>
         </thead>
         <tbody>
@@ -198,58 +208,72 @@ function Sheet({ form, sheet }) {
         </tbody>
       </table>
 
-      <div className="gp-signs">
-        <div>
-          <p className="gp-cert">(1.) I certify on my oath above Payroll is correct and that the services have been duly rendered as stated.</p>
-          <p className="gp-label">Prepared By:</p>
-          <Person person={s.prepared} />
-        </div>
-        <div>
-          <p className="gp-cert">&nbsp;</p>
-          <p className="gp-label">Noted by:</p>
-          <Person person={s.coordinator} />
-        </div>
-        <div>
-          <p className="gp-cert">&nbsp;</p>
-          <p className="gp-label">&nbsp;</p>
-          <Person person={s.director} />
-        </div>
-        <div>
-          <p className="gp-cert">
-            (3.) I certify on my oath that I have paid to each employee whose name appears on the roll the amount set
-            opposite his name, he having presented his Residence Certificate.
-          </p>
-          <p className="gp-label">As to correctness of enrollment data:</p>
-          <Person person={s.registrar} />
-        </div>
-        <div>
-          <p className="gp-cert">(2.) Approved from appropriate for</p>
-          <p className="gp-label">Funds Available:</p>
-          <Person person={s.accountant} />
-        </div>
-        <div>
-          <p className="gp-cert">&nbsp;</p>
-          <p className="gp-label">&nbsp;</p>
-          <Person person={s.president} />
-        </div>
-        <div>
-          <p className="gp-cert">&nbsp;</p>
-          <p className="gp-label">&nbsp;</p>
-          <Person person={s.vp} />
-        </div>
-        <div>
-          <p className="gp-cert">
-            (4.) I certify on my oath that I have witnessed payment to each person whose name appears hereon, of the amount
-            set opposite his name my initials.
-          </p>
-          <p className="gp-label">&nbsp;</p>
-          <Person person={s.cashier} />
-          <div className="gp-witness-lines">
-            <span />
-            <span />
-          </div>
-        </div>
-      </div>
+      {/* Signatures in the OAS layout: 5 across, a line, then 3 + the witness lines. */}
+      <table className="gp-signs">
+        <tbody>
+          <tr className="gp-cert-row">
+            <td colSpan={2}>(1.) I certify on my oath above Payroll is correct and that the services have been duly rendered as stated.</td>
+            <td />
+            <td colSpan={2}>
+              (3.) I certify on my oath that I have paid to each employee whose name appears on the roll the amount set
+              opposite his name, he having presented his Residence Certificate.
+            </td>
+          </tr>
+          <tr className="gp-label-row">
+            <td>Prepared By:</td>
+            <td>Noted by:</td>
+            <td />
+            <td>As to correctness of enrollment data:</td>
+            <td />
+          </tr>
+          <tr className="gp-people gp-rule">
+            <td>
+              <Person person={s.prepared} />
+            </td>
+            <td>
+              <Person person={s.coordinator} />
+            </td>
+            <td>
+              <Person person={s.director} />
+            </td>
+            <td>
+              <Person person={s.registrar} />
+            </td>
+            <td>
+              <Person person={s.vp} />
+            </td>
+          </tr>
+          <tr className="gp-cert-row">
+            <td colSpan={3}>(2.) Approved from appropriate for</td>
+            <td colSpan={2}>
+              (4.) I certify on my oath that I have witnessed payment to each person whose name appears hereon, of the
+              amount set opposite his name my initials.
+            </td>
+          </tr>
+          <tr className="gp-label-row">
+            <td colSpan={3}>Funds Available:</td>
+            <td colSpan={2} />
+          </tr>
+          <tr className="gp-people">
+            <td>
+              <Person person={s.accountant} />
+            </td>
+            <td>
+              <Person person={s.president} />
+            </td>
+            <td />
+            <td>
+              <Person person={s.cashier} />
+            </td>
+            <td>
+              <div className="gp-witness-lines">
+                <span />
+                <span />
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
 
       <p className="gp-foot">
         Prepared in ScholarGuide · {form.program} · {form.period} · sheet {sheet.sheet_no}

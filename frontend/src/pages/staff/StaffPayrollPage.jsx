@@ -2,11 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { formatDate, formatMoney, fullName } from "../../lib/format";
-import { downloadPayrollWord, formAddress } from "../../lib/payrollForm";
+import { downloadPayrollFile, formAddress } from "../../lib/payrollForm";
 import { useAuth } from "../../lib/auth";
 import Modal from "../../components/Modal";
 import { useToast } from "../../lib/toast";
 import { useConfirm } from "../../lib/confirm";
+import { usePaged } from "../../lib/paging";
+import ShowMore from "../../components/ShowMore";
 import PageHeader from "../../components/PageHeader";
 import StatusBadge from "../../components/StatusBadge";
 import EmptyState from "../../components/EmptyState";
@@ -107,6 +109,9 @@ export default function StaffPayrollPage() {
   const shown = filtered
     .filter((item) => activeProgram === "all" || String(item.scholar_record?.scholarship_id) === activeProgram)
     .sort((a, b) => byLastName(a.scholar_record?.student, b.scholar_record?.student));
+
+  // Long lists: 25 rows first, then Show more (resets on another tab, filter or search).
+  const page = usePaged(shown, `${activeProgram}|${shown.length}|${shown[0]?.id}`);
 
   const shownIds = shown.map((item) => item.id);
   const selectedShown = selected.filter((id) => shownIds.includes(id));
@@ -301,7 +306,7 @@ export default function StaffPayrollPage() {
               </thead>
 
               <tbody>
-                {shown.map((item) => (
+                {page.visible.map((item) => (
                   <tr key={item.id} className={selected.includes(item.id) ? "row-selected" : ""}>
                     <td className="print-hide">
                       <label className="sr-only" htmlFor={`payroll-${item.id}`}>
@@ -346,6 +351,7 @@ export default function StaffPayrollPage() {
             </table>
           </div>
         )}
+        <ShowMore paged={page} />
       </section>
 
       {formOpen && (
@@ -406,7 +412,7 @@ export default function StaffPayrollPage() {
 /*
   General Payroll (General Form No. 6-A) for the entries in the list (or the
   selected ones): ONE program and ONE period per form. Opens the printable
-  form (Print / Save as PDF) or downloads it as Word.
+  form as a PDF or Word file, or opens it on screen to print.
 */
 function PayrollFormDialog({ entries, usingSelection, onClose }) {
   const toast = useToast();
@@ -434,20 +440,20 @@ function PayrollFormDialog({ entries, usingSelection, onClose }) {
     prepared_name: user?.name || "",
     prepared_title: "OAS Staff",
   }));
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState("");
   const field = (key) => (event) => setOptions({ ...options, [key]: event.target.value });
   const ids = entries.map((item) => item.id);
   const total = entries.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
-  async function word() {
-    setBusy(true);
+  async function download(kind) {
+    setBusy(kind);
     try {
-      const name = await downloadPayrollWord({ ids, ...options });
+      const name = await downloadPayrollFile(kind, { ids, ...options });
       toast.success(`Downloaded ${name}`);
     } catch (err) {
-      toast.error(errMsg(err, "Unable to make the Word file."));
+      toast.error(errMsg(err, `Unable to make the ${kind === "pdf" ? "PDF" : "Word"} file.`));
     } finally {
-      setBusy(false);
+      setBusy("");
     }
   }
 
@@ -464,15 +470,14 @@ function PayrollFormDialog({ entries, usingSelection, onClose }) {
       onClose={onClose}
       footer={
         <div className="button-row">
-          <button
-            className="button button-primary"
-            disabled={Boolean(problem)}
-            onClick={() => navigate(formAddress(ids, options))}
-          >
-            Open form to print / save as PDF
+          <button className="button button-primary" disabled={Boolean(problem) || Boolean(busy)} onClick={() => download("pdf")}>
+            {busy === "pdf" ? "Making..." : "Download PDF"}
           </button>
-          <button className="button button-secondary" disabled={Boolean(problem) || busy} onClick={word}>
-            {busy ? "Making..." : "Download Word (.docx)"}
+          <button className="button button-secondary" disabled={Boolean(problem) || Boolean(busy)} onClick={() => download("docx")}>
+            {busy === "docx" ? "Making..." : "Download Word (.docx)"}
+          </button>
+          <button className="button button-secondary" disabled={Boolean(problem)} onClick={() => navigate(formAddress(ids, options))}>
+            Preview and print
           </button>
         </div>
       }

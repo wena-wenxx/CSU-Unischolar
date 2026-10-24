@@ -151,11 +151,15 @@ class EligibilityEngine
                 ->each(fn ($r) => $r->delete());
         });
 
+        // AI field fit (ranks and explains only; skipped quietly when the AI service is off).
+        $fit = FitScorer::refresh($studentIds);
+
         return [
             'students' => $students->count(),
             'scholarships' => $scholarships->count(),
             'rows' => count($rows),
             'eligible' => count(array_filter($rows, fn ($r) => $r['verdict'] === 'eligible')),
+            'fit' => $fit,
         ];
     }
 

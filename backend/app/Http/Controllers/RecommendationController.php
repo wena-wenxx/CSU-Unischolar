@@ -11,6 +11,9 @@ use App\Models\Scholarship;
 use App\Models\Student;
 use App\Support\ApplicationNotifier;
 use App\Support\EligibilityEngine;
+use App\Support\NextSteps;
+use App\Support\FitScorer;
+use App\Models\ProgramFit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -144,8 +147,10 @@ class RecommendationController extends Controller
             ->orderBy('name')
             ->pluck('name');
 
+        $fits = FitScorer::lookup($rows->map(fn ($r) => [$r->student_id, $r->scholarship_id]));
+
         return response()->json([
-            'data' => $rows->map(fn ($r) => $this->present($r))->values(),
+            'data' => $rows->map(fn ($r) => $this->present($r) + ['fit' => $fits[$r->student_id.'-'.$r->scholarship_id] ?? null])->values(),
             'total' => $total,
             'page' => $page,
             'has_more' => !$export && $page * $perPage < $total,
@@ -158,6 +163,9 @@ class RecommendationController extends Controller
             'unscored' => $unscored,
         ]);
     }
+
+    // Best matches first: meets the rules, then not enough data, then fails a rule.
+    private const VERDICT_ORDER = ['eligible' => 0, 'no_data' => 1, 'not_eligible' => 2];
 
     private function present(AiRecommendation $r): array
     {
@@ -229,6 +237,33 @@ class RecommendationController extends Controller
             ]),
             'application_id' => Application::where('student_id', $r->student_id)
                 ->where('scholarship_id', $r->scholarship_id)->value('id'),
+            // Round 12: what to do next, and the student's other programs (best first).
+            'next_steps' => NextSteps::forStaff($r),
+            // AI field fit for this program, and agency-direct programs that match the student's field.
+            'fit' => ProgramFit::where('student_id', $r->student_id)->where('scholarship_id', $r->scholarship_id)->first()?->summary(),
+            'field_matches' => ProgramFit::with('scholarship:id,name,short_name,application_mode')
+                ->where('student_id', $r->student_id)->where('level', 'high')->where('scholarship_id', '!=', $r->scholarship_id)
+                ->get()
+                ->map(fn ($f) => ['program' => $f->scholarship?->name, 'agency_direct' => $f->scholarship?->isAgencyDirect(), 'fields' => $f->fields ?? []])
+                ->values(),
+            'other_matches' => AiRecommendation::with('scholarship:id,name,short_name')
+                ->where('student_id', $r->student_id)
+                ->where('id', '!=', $r->id)
+                ->get()
+                ->sortBy([
+                    fn ($a, $b) => self::VERDICT_ORDER[$a->verdict] <=> self::VERDICT_ORDER[$b->verdict],
+                    fn ($a, $b) => $b->score <=> $a->score,
+                ])
+                ->values()
+                ->map(fn ($o) => [
+                    'id' => $o->id,
+                    'program' => $o->scholarship?->name,
+                    'short_name' => $o->scholarship?->short_name,
+                    'score' => $o->score,
+                    'verdict' => $o->verdict,
+                    'staff_status' => $o->staff_status,
+                    'applied_status' => $o->applied_status,
+                ]),
         ]);
     }
 
@@ -242,8 +277,13 @@ class RecommendationController extends Controller
         ActivityLog::record($request->user(), 'recommendations.recalculated',
             "Recalculated AI Recommendations: {$result['rows']} scores, {$result['eligible']} eligible.");
 
+        $fit = $result['fit'] ?? [];
+        $fitNote = !empty($fit['ok'])
+            ? ' Field fit updated by the AI ('.(($fit['method'] ?? '') === 'embeddings' ? 'embedding model' : 'word matching').').'
+            : ' Field fit not updated: '.($fit['error'] ?? 'AI service off').'.';
+
         return response()->json([
-            'message' => "Recalculated {$result['rows']} recommendations ({$result['students']} students x {$result['scholarships']} programs). {$result['eligible']} are eligible.",
+            'message' => "Recalculated {$result['rows']} recommendations ({$result['students']} students x {$result['scholarships']} programs). {$result['eligible']} are eligible.".$fitNote,
             'result' => $result,
         ]);
     }

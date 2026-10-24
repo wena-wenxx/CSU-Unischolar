@@ -12,6 +12,9 @@ use App\Http\Controllers\DataBankController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\EnrollmentListController;
 use App\Http\Controllers\ExternalGranteeController;
+use App\Http\Controllers\ForwardedExportController;
+use App\Http\Controllers\ProfilePhotoController;
+use App\Http\Controllers\AiRulesController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\ProfileChangeRequestController;
 use App\Http\Controllers\RecommendationController;
@@ -46,6 +49,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/user', [AuthController::class, 'me']);
     Route::post('/change-password', [AuthController::class, 'changePassword']);
+    Route::post('/profile/photo', [ProfilePhotoController::class, 'store']);      // any role: photo in the sidebar
+    Route::delete('/profile/photo', [ProfilePhotoController::class, 'destroy']);
     Route::get('/settings/public', [SettingController::class, 'publicSettings']);
     Route::get('/search', [SearchController::class, 'search']);   // top-bar search box
 
@@ -57,8 +62,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/profile', [StudentController::class, 'profile']);
     Route::get('/student/history', [StudentController::class, 'history']);
+    Route::get('/student/matches', [StudentController::class, 'matches']);   // scholarships that fit the student
     Route::patch('/profile', [StudentController::class, 'updateProfile']);
     Route::patch('/profile/eligibility', [StudentController::class, 'updateEligibility']);   // GWA + family income
+    Route::patch('/profile/interests', [StudentController::class, 'updateInterests']);       // optional field and goals (AI field fit)
     Route::get('/student/notifications', [StudentController::class, 'notifications']);
     Route::post('/student/notifications/read', [StudentController::class, 'markNotificationsRead']);
     Route::get('/student/change-requests', [StudentController::class, 'changeRequests']);
@@ -174,6 +181,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/staff/external-grantees/uploads/{id}/save', [ExternalGranteeController::class, 'save']);
     Route::post('/staff/external-grantees/uploads/{id}/discard', [ExternalGranteeController::class, 'discard']);
     Route::post('/staff/read-table', [ExternalGranteeController::class, 'readTable']);   // Approved Lists / Enrollment: Excel, Word, PDF
+    Route::post('/staff/forwarded/export', [ForwardedExportController::class, 'export']);   // Forwarded to Agency as Excel or PDF
+    Route::post('/staff/ai/suggest-rules', [AiRulesController::class, 'suggest']);          // AI reads a memo, suggests eligibility rules
 
     /*
     |--------------------------------------------------------------------------
@@ -222,6 +231,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/payroll/bulk-status', [PayrollController::class, 'bulkStatus']);
     Route::post('/payroll/form', [PayrollController::class, 'form']);            // General Form No. 6-A (print / PDF)
     Route::post('/payroll/form/docx', [PayrollController::class, 'formDocx']);   // the same form as Word
+    Route::post('/payroll/form/pdf', [PayrollController::class, 'formPdf']);     // the same form as PDF
     Route::post('/scholar-records/{scholarRecordId}/payroll', [PayrollController::class, 'store']);
     Route::patch('/payroll/{id}', [PayrollController::class, 'update']);
 

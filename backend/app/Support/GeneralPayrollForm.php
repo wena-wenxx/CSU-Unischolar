@@ -176,14 +176,35 @@ class GeneralPayrollForm
     }
 
     /** A paragraph. $align: left|center|right. */
-    private static function p(string $runs, string $align = 'left', int $after = 0): string
+    private static function p(string $runs, string $align = 'left', int $after = 0, string $look = ''): string
     {
         $jc = ['left' => 'left', 'center' => 'center', 'right' => 'right'][$align];
+        // $look: 'yellow' (shaded band), 'box' (yellow box with a border), 'underline' (line under the paragraph)
+        $extra = match ($look) {
+            'yellow' => '<w:shd w:val="clear" w:color="auto" w:fill="FFEB3B"/>',
+            'box' => '<w:pBdr><w:top w:val="single" w:sz="8" w:space="1" w:color="333333"/><w:left w:val="single" w:sz="8" w:space="4" w:color="333333"/>'
+                .'<w:bottom w:val="single" w:sz="8" w:space="1" w:color="333333"/><w:right w:val="single" w:sz="8" w:space="4" w:color="333333"/></w:pBdr>'
+                .'<w:shd w:val="clear" w:color="auto" w:fill="FFEB3B"/><w:ind w:left="3000"/>',
+            'underline' => '<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="333333"/></w:pBdr>',
+            default => '',
+        };
 
-        return '<w:p><w:pPr><w:spacing w:before="0" w:after="'.$after.'" w:line="220" w:lineRule="auto"/><w:jc w:val="'.$jc.'"/></w:pPr>'.$runs.'</w:p>';
+        return '<w:p><w:pPr>'.self::pprOrder($extra).'<w:spacing w:before="0" w:after="'.$after.'" w:line="220" w:lineRule="auto"/>'
+            .self::indOf($extra).'<w:jc w:val="'.$jc.'"/></w:pPr>'.$runs.'</w:p>';
     }
 
-    /** A table cell. $o: w (twips), fill, span, align, vmerge, noborder. */
+    // Word wants pPr children in order: pBdr, shd, spacing, ind, jc.
+    private static function pprOrder(string $extra): string
+    {
+        return preg_replace('#<w:ind [^>]*/>#', '', $extra);
+    }
+
+    private static function indOf(string $extra): string
+    {
+        return preg_match('#<w:ind [^>]*/>#', $extra, $m) ? $m[0] : '';
+    }
+
+    /** A table cell. $o: w (twips), fill, span, align, vmerge, noborder, rule (line under a borderless cell). */
     private static function cell(string $content, array $o = []): string
     {
         $pr = '<w:tcW w:w="'.($o['w'] ?? 600).'" w:type="dxa"/>'
@@ -191,12 +212,37 @@ class GeneralPayrollForm
             .(isset($o['vmerge']) ? '<w:vMerge'.($o['vmerge'] === 'restart' ? ' w:val="restart"' : '').'/>' : '')
             // Borders on every cell of the main table (some Word viewers ignore table-level borders).
             .(!empty($o['noborder'])
-                ? '<w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/></w:tcBorders>'
+                ? '<w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/>'
+                    .(!empty($o['rule']) ? '<w:bottom w:val="single" w:sz="8" w:space="0" w:color="333333"/>' : '<w:bottom w:val="nil"/>')
+                    .'<w:right w:val="nil"/></w:tcBorders>'
                 : '<w:tcBorders>'.implode('', array_map(fn ($side) => "<w:{$side} w:val=\"single\" w:sz=\"6\" w:space=\"0\" w:color=\"333333\"/>", ['top', 'left', 'bottom', 'right'])).'</w:tcBorders>')
             .(!empty($o['fill']) ? '<w:shd w:val="clear" w:color="auto" w:fill="'.$o['fill'].'"/>' : '')
             .'<w:vAlign w:val="'.($o['valign'] ?? 'center').'"/>';
 
         return '<w:tc><w:tcPr>'.$pr.'</w:tcPr>'.($content !== '' ? $content : self::p('')).'</w:tc>';
+    }
+
+    /**
+     * PDF with every sheet on its own landscape long-bond page (8.5 x 13 in).
+     * Uses dompdf (install once: composer require dompdf/dompdf).
+     */
+    public static function pdf(array $form): string
+    {
+        if (!class_exists(\Dompdf\Dompdf::class)) {
+            throw new \RuntimeException('The PDF library is not installed. In the backend folder run: composer require dompdf/dompdf');
+        }
+
+        $options = new \Dompdf\Options();
+        $options->set('isRemoteEnabled', false);      // never fetch files from the internet
+        $options->set('defaultFont', 'Helvetica');
+        $options->set('tempDir', sys_get_temp_dir());
+
+        $dompdf = new \Dompdf\Dompdf($options);
+        $dompdf->loadHtml(view('pdf.general-payroll', ['form' => $form])->render());
+        $dompdf->setPaper([0, 0, 936, 612]);         // 13 x 8.5 in in points (72 per inch): landscape long bond
+        $dompdf->render();
+
+        return $dompdf->output();
     }
 
     /** Word document (.docx) with every sheet on its own landscape long-bond page. */
@@ -216,8 +262,9 @@ class GeneralPayrollForm
         $money = fn ($v) => self::money($v);
         $red = 'C0392B';
         $sig = $form['signatories'];
-        $person = fn (string $slot, int $sz = 16) => self::p(self::run(mb_strtoupper($sig[$slot]['name'] ?: '______________________________'), ['b' => true, 'sz' => $sz]))
-            .self::p(self::run((string) $sig[$slot]['title'], ['sz' => 15]));
+        // Name in bold capitals with the position below it, like the OAS form (no line: they sign over the name).
+        $person = fn (string $slot) => self::p(self::run(mb_strtoupper((string) $sig[$slot]['name']) ?: ' ', ['b' => true, 'sz' => 17]))
+            .self::p(self::run((string) $sig[$slot]['title'], ['sz' => 16]), 'left', 40);
 
         $body = '';
         foreach ($form['sheets'] as $i => $sheet) {
@@ -226,28 +273,43 @@ class GeneralPayrollForm
                 .self::p(self::run('(Revised July 1,1995)', ['sz' => 15]), 'left', 80)
                 .self::p(self::run('GENERAL PAYROLL', ['b' => true, 'sz' => 28]), 'center', 80)
                 .self::p(self::run('We hereby acknowledge to have received of the sum herein specified opposite our respective names being full compensation for our services for the period', ['sz' => 15]));
-            $right = self::p(self::run('Sheet No: '.$sheet['sheet_no'], ['sz' => 15]))
-                .self::p(self::run('Journal Voucher: ', ['sz' => 15]).self::run($form['voucher'] ?: '__________', ['b' => true, 'sz' => 20, 'color' => 'D35400']), 'left', 60)
-                .self::p(self::run('Release of ', ['sz' => 16]).self::run($form['batch'], ['b' => true, 'u' => true, 'sz' => 22, 'color' => 'D35400']).self::run(' balance for the sum herein specified', ['sz' => 16]))
-                .self::p(self::run($form['purpose'], ['sz' => 16]))
+            // Like the OAS form: only the voucher box and the "Release of" band are yellow.
+            $right = self::p(self::run('Sheet No: '.$sheet['sheet_no'], ['sz' => 15]), 'left', 40)
+                .self::p(self::run('Journal Voucher:', ['sz' => 15]), 'left', 0)
+                .self::p(self::run($form['voucher'] ?: ' ', ['b' => true, 'sz' => 22, 'color' => 'D35400']), 'center', 100, 'box')
+                .self::p(self::run('Release of ', ['sz' => 16]).self::run($form['batch'], ['b' => true, 'u' => true, 'sz' => 24, 'color' => 'D35400']).self::run(' balance for the sum herein specified', ['sz' => 16]), 'left', 0, 'yellow')
+                .self::p(self::run($form['purpose'], ['sz' => 16]), 'left', 40, 'underline')
                 .($sheet['atm_label'] ? self::p(self::run($sheet['atm_label'], ['b' => true, 'sz' => 16, 'color' => $red]), 'right') : '');
             $body .= '<w:tbl><w:tblPr><w:tblW w:w="18000" w:type="dxa"/>'.$noBorder.'<w:tblLayout w:type="fixed"/></w:tblPr>'
                 .'<w:tblGrid><w:gridCol w:w="9600"/><w:gridCol w:w="8400"/></w:tblGrid><w:tr>'
                 .self::cell($left, ['w' => 9600, 'valign' => 'top', 'noborder' => true])
-                .self::cell($right, ['w' => 8400, 'valign' => 'top', 'fill' => 'FFF3B0', 'noborder' => true])
+                .self::cell($right, ['w' => 8400, 'valign' => 'top', 'noborder' => true])
                 .'</w:tr></w:tbl>';
 
             // ---- the table
-            $h = fn (string $t, int $wi, array $o = []) => self::cell(self::p(self::run($t, ['b' => true, 'sz' => 14]), 'center'), ['w' => $wi] + $o);
-            $rows = '<w:tr><w:trPr><w:tblHeader/></w:trPr>'
-                .$h('No.', $w[0]).$h('ID NO.', $w[1]).$h('NAME', $w[2]).$h('Position', $w[3])
-                .self::cell(self::p(self::run($form['first_sem_label'], ['b' => true, 'sz' => 14]), 'center').self::p(self::run($money($form['rate']), ['sz' => 14]), 'center'), ['w' => $w[4]])
-                .self::cell(self::p(self::run($form['second_sem_label'], ['b' => true, 'sz' => 14]), 'center').self::p(self::run($money($form['rate']), ['sz' => 14]), 'center'), ['w' => $w[5]])
-                .$h('', $w[6]).$h('', $w[7]).$h('TOTAL', $w[8]).$h('', $w[9])
-                .self::cell(self::p(self::run('Less: Miscellaneous', ['b' => true, 'sz' => 12])), ['w' => $w[10]])
-                .self::cell(self::p(self::run('CHED Grants', ['b' => true, 'sz' => 12])), ['w' => $w[11]])
-                .$h('', $w[12]).$h('', $w[13]).$h('TOTAL DEDUCTIONS', $w[14]).$h('Net Amount Received', $w[15]).$h('Initial of Witness to Payment', $w[16])
-                .'</w:tr>';
+            // Two header rows, like the OAS form: "Less: Miscellaneous / CHED Grants" sits over two
+            // empty sub-columns; every other heading fills both rows.
+            $h = fn (string $content, int $wi) => self::cell($content, ['w' => $wi, 'vmerge' => 'restart']);
+            $t = fn (string $text) => self::p(self::run($text, ['b' => true, 'sz' => 14]), 'center');
+            $sem = fn (string $label) => $t($label).self::p(self::run($money($form['rate']), ['sz' => 14]), 'center');
+            $heads = [$t('No.'), $t('ID NO.'), $t('NAME'), $t('Position'), $sem($form['first_sem_label']), $sem($form['second_sem_label']),
+                '', '', $t('TOTAL'), '', null, null, '', '', $t('TOTAL DEDUCTIONS'), $t('Net Amount Received'), $t('Initial of Witness to Payment')];
+            $top = '<w:tr><w:trPr><w:tblHeader/></w:trPr>';
+            $bottom = '<w:tr><w:trPr><w:tblHeader/><w:trHeight w:val="260"/></w:trPr>';
+            foreach ($heads as $k => $content) {
+                if ($k === 10) {
+                    $top .= self::cell(self::p(self::run('Less: Miscellaneous', ['b' => true, 'sz' => 12]))
+                        .self::p(self::run('CHED Grants', ['b' => true, 'sz' => 12])), ['w' => $w[10] + $w[11], 'span' => 2, 'valign' => 'top']);
+                    $bottom .= self::cell('', ['w' => $w[10]]).self::cell('', ['w' => $w[11]]);
+                    continue;
+                }
+                if ($k === 11) {
+                    continue;
+                }
+                $top .= $h($content, $w[$k]);
+                $bottom .= self::cell('', ['w' => $w[$k], 'vmerge' => 'continue']);
+            }
+            $rows = $top.'</w:tr>'.$bottom.'</w:tr>';
 
             $num = fn ($v, array $o = []) => self::p(self::run($money($v), ['sz' => 17] + $o), 'right');
             foreach ($sheet['rows'] as $r) {
@@ -295,24 +357,30 @@ class GeneralPayrollForm
 
             $body .= self::p('', 'left', 120);
 
-            // ---- certifications and signatures (borderless table, 4 columns)
-            $c = fn (string $content, int $wi) => self::cell($content, ['w' => $wi, 'valign' => 'top', 'noborder' => true]);
-            $small = fn (string $t) => self::p(self::run($t, ['sz' => 14]), 'left', 40);
-            $label = fn (string $t) => self::p(self::run($t, ['b' => true, 'sz' => 15]), 'left', 120);
+            // ---- certifications and signatures, in the OAS layout (5 columns):
+            //   row 1: OAS staff | Scholarship Coordinator | OAS Director | Registrar | VP, then a line across
+            //   row 2: Chief Accountant | University President | (gap) | Cashier | two witness lines
+            $cw = 3600;
+            $c = fn (string $content, int $span = 1, array $o = []) => self::cell($content === '' ? self::p('') : $content,
+                ['w' => $cw * $span, 'span' => $span > 1 ? $span : null, 'valign' => 'bottom', 'noborder' => true] + $o);
+            $small = fn (string $t) => self::p(self::run($t, ['sz' => 15]));
+            $label = fn (string $t) => self::p(self::run($t, ['b' => true, 'sz' => 16]), 'left', 60);
+            $line = self::p('', 'left', 0);
             $body .= '<w:tbl><w:tblPr><w:tblW w:w="18000" w:type="dxa"/>'.$noBorder.'<w:tblLayout w:type="fixed"/></w:tblPr>'
-                .'<w:tblGrid><w:gridCol w:w="4300"/><w:gridCol w:w="4300"/><w:gridCol w:w="4300"/><w:gridCol w:w="5100"/></w:tblGrid>'
-                .'<w:tr>'
-                .$c($small('(1.) I certify on my oath above Payroll is correct and that the services have been duly rendered as stated.').$label('Prepared By:').$person('prepared'), 4300)
-                .$c($small(' ').$label('Noted by:').$person('coordinator'), 4300)
-                .$c($small(' ').$label(' ').$person('director'), 4300)
-                .$c($small('(3.) I certify on my oath that I have paid to each employee whose name appears on the roll the amount set opposite his name, he having presented his Residence Certificate.')
-                    .$label('As to correctness of enrollment data:').$person('registrar'), 5100)
-                .'</w:tr><w:tr>'
-                .$c($small('(2.) Approved from appropriate for').$label('Funds Available:').$person('accountant'), 4300)
-                .$c($small(' ').$label(' ').$person('president'), 4300)
-                .$c($small(' ').$label(' ').$person('vp'), 4300)
-                .$c($small('(4.) I certify on my oath that I have witnessed payment to each person whose name appears hereon, of the amount set opposite his name my initials.')
-                    .$label(' ').$person('cashier').$small('______________________________   ______________________________'), 5100)
+                .'<w:tblGrid>'.str_repeat('<w:gridCol w:w="'.$cw.'"/>', 5).'</w:tblGrid>'
+                .'<w:tr>'.$c($small('(1.) I certify on my oath above Payroll is correct and that the services have been duly rendered as stated.'), 2)
+                .$c('').$c($small('(3.) I certify on my oath that I have paid to each employee whose name appears on the roll the amount set opposite his name, he having presented his Residence Certificate.'), 2).'</w:tr>'
+                .'<w:tr>'.$c($label('Prepared By:')).$c($label('Noted by:')).$c('').$c($label('As to correctness of enrollment data:')).$c('').'</w:tr>'
+                .'<w:tr><w:trPr><w:trHeight w:val="560"/></w:trPr>'
+                .$c($person('prepared'), 1, ['rule' => true]).$c($person('coordinator'), 1, ['rule' => true]).$c($person('director'), 1, ['rule' => true])
+                .$c($person('registrar'), 1, ['rule' => true]).$c($person('vp'), 1, ['rule' => true]).'</w:tr>'
+                .'<w:tr>'.$c($small('(2.) Approved from appropriate for'), 3)
+                .$c($small('(4.) I certify on my oath that I have witnessed payment to each person whose name appears hereon, of the amount set opposite his name my initials.'), 2).'</w:tr>'
+                .'<w:tr>'.$c($label('Funds Available:'), 3).$c('', 2).'</w:tr>'
+                .'<w:tr><w:trPr><w:trHeight w:val="560"/></w:trPr>'
+                .$c($person('accountant')).$c($person('president')).$c('').$c($person('cashier'))
+                .self::cell($line.self::p(self::run('____________________________________', ['sz' => 16]), 'left', 80)
+                    .self::p(self::run('____________________________________', ['sz' => 16])), ['w' => $cw, 'valign' => 'bottom', 'noborder' => true])
                 .'</w:tr></w:tbl>';
 
             $body .= self::p(self::run('Prepared in ScholarGuide · '.$form['program'].' · '.$form['period'].' · sheet '.$sheet['sheet_no'], ['sz' => 12, 'color' => '888888']), 'right');
@@ -328,7 +396,9 @@ class GeneralPayrollForm
 
         $path = tempnam(sys_get_temp_dir(), 'payroll');
         $zip = new ZipArchive();
-        $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+        if ($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            throw new \RuntimeException('Could not create the Word file in the temporary folder ('.sys_get_temp_dir().').');
+        }
         $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
             .'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'

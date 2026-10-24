@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
-import { availabilityInfo, deadlineText, formatDate, formatMoney, preview, timeAgo } from "../../lib/format";
+import { availabilityInfo, deadlineText, formatDate, formatMoney, timeAgo } from "../../lib/format";
 import DashboardHero from "../../components/DashboardHero";
-import QuickActions from "../../components/QuickActions";
-import StatCard from "../../components/StatCard";
 import StatusBadge from "../../components/StatusBadge";
 import EmptyState from "../../components/EmptyState";
-import AnnouncementImage from "../../components/AnnouncementImage";
+import AnnouncementCarousel from "../../components/AnnouncementCarousel";
 import Loading from "../../components/Loading";
+import MatchesCard from "../../components/MatchesCard";
 
 export default function StudentDashboard() {
   const [applications, setApplications] = useState([]);
@@ -22,7 +21,7 @@ export default function StudentDashboard() {
       api.get("/my-applications"),
       api.get("/scholarships"),
       api.get("/profile"),
-      api.get("/announcements", { params: { limit: 3 } }),
+      api.get("/announcements", { params: { limit: 5 } }),
     ])
       .then(([apps, scholarshipsResponse, profileResponse, announcementsResponse]) => {
         setApplications(apps.data);
@@ -36,7 +35,6 @@ export default function StudentDashboard() {
 
   if (loading) return <Loading />;
 
-  const count = (...statuses) => applications.filter((a) => statuses.includes(a.status)).length;
   const grant = profile?.active_scholar_record;
   const openCount = scholarships.filter((s) => s.availability === "open").length;
   const needsAction = applications.filter((a) => a.status === "needs_action");
@@ -80,25 +78,7 @@ export default function StudentDashboard() {
         </div>
       ))}
 
-      <div className="stats-grid">
-        <StatCard title="Open Scholarships" value={openCount} to="/student/scholarships" hint="Browse" />
-        <StatCard title="My Applications" value={applications.length} to="/student/applications" />
-        <StatCard
-          title="Being Processed"
-          value={count("submitted", "under_review", "complete")}
-          to="/student/applications?status=processing"
-        />
-        <StatCard title="Approved" value={count("approved")} to="/student/applications?status=approved" />
-      </div>
-
-      <QuickActions
-        actions={[
-          { to: "/student/scholarships", icon: "🎓", label: "Browse Scholarships", text: "See open programs and deadlines" },
-          { to: "/student/applications", icon: "📋", label: "My Applications", text: "Follow each step" },
-          { to: "/student/documents", icon: "📁", label: "My Documents", text: "Upload once, reuse later" },
-          { to: "/student/help", icon: "❓", label: "Help", text: "How to apply" },
-        ]}
-      />
+      {!grant && <MatchesCard />}
 
       {applications.length === 0 && !grant && (
         <section className="card how-to-apply">
@@ -108,39 +88,26 @@ export default function StudentDashboard() {
             <li>Press <strong>Apply</strong>. A checklist of the required documents appears.</li>
             <li>Upload one file for each document (PDF, JPG or PNG).</li>
             <li>When all are uploaded, <strong>Submit application</strong> turns green. Press it.</li>
-            <li>Follow your status in My Applications. The 🔔 bell tells you when it changes.</li>
+            <li>Follow your status in My Applications. The bell at the top tells you when it changes.</li>
           </ol>
         </section>
       )}
 
-      <section className="card">
-        <div className="card-header">
-          <h2>Latest Announcements</h2>
-        </div>
-
-        {announcements.length === 0 ? (
-          <EmptyState message="No announcements right now." />
-        ) : (
-          <div className="announcement-cards">
-            {announcements.map((item) => (
-              <Link className="announcement-card" key={item.id} to={`/student/announcements/${item.id}`}>
-                <AnnouncementImage item={item} />
-                <div className="announcement-card-text">
-                  <small className="muted">{formatDate(item.posted_at)}</small>
-                  <strong>{item.title}</strong>
-                  <p>{preview(item.body, 120)}</p>
-                  <span className="read-more">Read more →</span>
-                </div>
-              </Link>
-            ))}
+      {announcements.length > 0 && (
+        <section className="card">
+          <div className="card-header">
+            <h2>Announcements</h2>
           </div>
-        )}
-      </section>
+          <AnnouncementCarousel items={announcements} basePath="/student/announcements" />
+        </section>
+      )}
 
       <div className="dashboard-grid">
         <section className="card">
           <div className="card-header">
-            <h2>Open Scholarships</h2>
+            <h2>
+              Open Scholarships <span className="count-pill">{openCount}</span>
+            </h2>
 
             <Link className="button button-secondary" to="/student/scholarships">
               View all
@@ -174,7 +141,9 @@ export default function StudentDashboard() {
 
         <section className="card">
           <div className="card-header">
-            <h2>My Recent Applications</h2>
+            <h2>
+              My Applications <span className="count-pill">{applications.length}</span>
+            </h2>
 
             <Link className="button button-secondary" to="/student/applications">
               View all

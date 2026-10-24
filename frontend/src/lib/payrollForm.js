@@ -1,4 +1,4 @@
-import api from "../services/api";
+import { downloadFile } from "./download";
 
 /*
   General Payroll (General Form No. 6-A): the choices made in the Payroll
@@ -32,18 +32,9 @@ export function readFormAddress(search) {
   return body;
 }
 
-// Downloads the Word (.docx) copy of the form.
-export async function downloadPayrollWord(body) {
-  const response = await api.post("/payroll/form/docx", body, { responseType: "blob" });
-  const disposition = response.headers?.["content-disposition"] || "";
-  const name = disposition.match(/filename="?([^";]+)"?/)?.[1] || "general-payroll.docx";
-  const url = URL.createObjectURL(response.data);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = name;
-  link.click();
-  URL.revokeObjectURL(url);
-  return name;
+// Downloads the form as a file: kind "pdf" or "docx". Returns the file name.
+export function downloadPayrollFile(kind, body) {
+  return downloadFile(`/payroll/form/${kind}`, body, `general-payroll.${kind}`);
 }
 
 export function peso(value) {

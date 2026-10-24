@@ -5,6 +5,8 @@ import { enrollmentText, formatDate, fullName } from "../../lib/format";
 import { useToast } from "../../lib/toast";
 import Modal from "../../components/Modal";
 import { useConfirm } from "../../lib/confirm";
+import { usePaged } from "../../lib/paging";
+import ShowMore from "../../components/ShowMore";
 import PageHeader from "../../components/PageHeader";
 import StatusBadge from "../../components/StatusBadge";
 import EmptyState from "../../components/EmptyState";
@@ -83,6 +85,9 @@ export default function StaffScholarRecordsPage() {
   const shownRecords = filtered
     .filter((record) => activeProgram === "all" || String(record.scholarship_id) === activeProgram)
     .sort((a, b) => byLastName(a.student, b.student));
+
+  // Long lists: 25 rows first, then Show more (resets on another tab, filter or search).
+  const page = usePaged(shownRecords, `${activeProgram}|${shownRecords.length}|${shownRecords[0]?.id}`);
 
   if (loading) return <Loading />;
 
@@ -189,7 +194,7 @@ export default function StaffScholarRecordsPage() {
               </thead>
 
               <tbody>
-                {shownRecords.map((record) => (
+                {page.visible.map((record) => (
                   <tr key={record.id}>
                     <td>{lastFirst(record.student)}</td>
                     <td>{record.student?.student_id}</td>
@@ -264,6 +269,7 @@ export default function StaffScholarRecordsPage() {
             </table>
           </div>
         )}
+        <ShowMore paged={page} />
       </section>
 
       {editingAtm && (

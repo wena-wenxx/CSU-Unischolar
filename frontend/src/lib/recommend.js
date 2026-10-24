@@ -39,6 +39,18 @@ export const SCORE_RANGES = {
   low: ["Below 50%", 0, 49],
 };
 
+// AI field fit (round 12): ranks and explains only; the rules decide eligibility.
+export const FIT_LEVELS = {
+  high: ["Matches the field", "success"],
+  medium: ["Close to the field", "neutral"],
+  low: ["Other fields", "neutral"],
+  any: ["Open to all fields", "neutral"],
+};
+
+export function fitMethod(method) {
+  return method === "embeddings" ? "AI embedding model" : "AI word matching";
+}
+
 export const CHECK_RESULT = {
   met: ["✓", "Met", "success"],
   not_met: ["✗", "Not met", "danger"],

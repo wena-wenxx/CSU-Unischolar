@@ -18,6 +18,7 @@ class Student extends Model
         'college',
         'contact_number',
         // Scholarship matching data (typed in by the student, checked by OAS)
+        'interests',   // optional "My field and goals" (AI field fit)
         'gwa',
         'family_income',
         'eligibility_updated_at',

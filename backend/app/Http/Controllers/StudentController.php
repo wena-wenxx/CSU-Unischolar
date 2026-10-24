@@ -9,6 +9,10 @@ use App\Models\ExternalGrantee;
 use App\Models\ProfileChangeRequest;
 use App\Models\ScholarRecord;
 use App\Support\EligibilityEngine;
+use App\Support\NextSteps;
+use App\Support\FitScorer;
+use App\Models\ProgramFit;
+use App\Models\Scholarship;
 use Illuminate\Http\Request;
 
 class StudentController extends Controller
@@ -272,5 +276,90 @@ class StudentController extends Controller
             'message' => 'Request sent to OAS.',
             'request' => $changeRequest,
         ], 201);
+    }
+
+    /*
+    | GET /student/matches  (round 12)
+    | "Scholarships that fit you": programs whose rules the student meets
+    | (or that only need their GWA / income), with what is left to do.
+    | Only programs students can see now; failed rules, programs already
+    | applied for and matches OAS marked wrong are left out. No percentage
+    | is shown to students: it could be read as a chance of approval.
+    */
+    public function matches(Request $request)
+    {
+        $student = $this->student($request);
+        EligibilityEngine::recalculate([$student->id]);   // fresh after a new upload or profile change
+
+        $fits = ProgramFit::where('student_id', $student->id)->get()->keyBy('scholarship_id');
+
+        $rows = AiRecommendation::with('scholarship')
+            ->where('student_id', $student->id)
+            ->whereIn('verdict', ['eligible', 'no_data'])
+            ->whereNull('applied_status')
+            ->where('staff_status', '!=', 'wrong')
+            ->whereHas('scholarship', fn ($q) => $q->visibleToStudents())
+            ->get()
+            ->map(function (AiRecommendation $r) use ($fits) {
+                $todo = NextSteps::forStudent($r);
+                $toDo = count(array_filter($todo, fn ($t) => $t['kind'] !== 'wait'));
+                $program = $r->scholarship;
+
+                return [
+                    'scholarship_id' => $program->id,
+                    'name' => $program->name,
+                    'short_name' => $program->short_name,
+                    'provider' => $program->provider,
+                    'deadline' => $program->application_end,
+                    'availability' => $program->availability,
+                    'closed_reason' => $program->closedReason(),
+                    'agency_direct' => $program->isAgencyDirect(),
+                    'status' => $r->verdict === 'no_data' ? 'need_info' : ($todo ? 'almost' : 'ready'),
+                    'todo' => $todo,
+                    'to_do_count' => $toDo,
+                    'fit' => $fits[$program->id]?->summary(),
+                ];
+            })
+            ->sortBy([
+                fn ($a, $b) => ['ready' => 0, 'almost' => 1, 'need_info' => 2][$a['status']] <=> ['ready' => 0, 'almost' => 1, 'need_info' => 2][$b['status']],
+                // AI field fit: programs for the student's field first (then open-to-all, then others).
+                fn ($a, $b) => (['high' => 0, 'medium' => 1, 'any' => 2][$a['fit']['level'] ?? ''] ?? 3) <=> (['high' => 0, 'medium' => 1, 'any' => 2][$b['fit']['level'] ?? ''] ?? 3),
+                fn ($a, $b) => $a['to_do_count'] <=> $b['to_do_count'],
+                fn ($a, $b) => strcmp((string) $a['deadline'] ?: '9999', (string) $b['deadline'] ?: '9999'),
+            ])
+            ->values();
+
+        // Programs the student applies for at the agency (no rules here), that match their field.
+        $listed = $rows->pluck('scholarship_id')->all();
+        $applied = $student->applications()->pluck('scholarship_id')->all();
+        $alsoFits = $fits->filter(fn ($f) => $f->level === 'high' && !in_array($f->scholarship_id, $listed, true) && !in_array($f->scholarship_id, $applied, true))
+            ->map(fn ($f) => $f->scholarship_id)->values();
+        $agency = Scholarship::visibleToStudents()->whereIn('id', $alsoFits)->get()
+            ->filter(fn ($p) => $p->isAgencyDirect())
+            ->take(3)
+            ->map(fn ($p) => ['scholarship_id' => $p->id, 'name' => $p->name, 'provider' => $p->provider, 'fields' => $fits[$p->id]->fields ?? []])
+            ->values();
+
+        return response()->json([
+            'matches' => $rows,
+            'also_fits' => $agency,
+            'data_checked' => EligibilityEngine::dataVerified($student),
+            'has_interests' => (bool) $student->interests,
+        ]);
+    }
+
+    /*
+    | PATCH /profile/interests  (round 12)  Body: interests (optional, max 300)
+    | "My field and goals": helps the AI find scholarships for the student's field.
+    | It never affects eligibility.
+    */
+    public function updateInterests(Request $request)
+    {
+        $student = $this->student($request);
+        $data = $request->validate(['interests' => 'nullable|string|max:300']);
+        $student->update(['interests' => trim((string) ($data['interests'] ?? '')) ?: null]);
+        FitScorer::refresh([$student->id]);
+
+        return response()->json(['message' => 'Saved. Your scholarship matches are updated.', 'student' => $student->fresh()]);
     }
 }

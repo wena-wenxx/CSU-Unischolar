@@ -6,6 +6,8 @@ import { verifySteps } from "../../lib/verifyGuide";
 import { byLastName, lastFirst, programTabs } from "../../lib/programs";
 import { useToast } from "../../lib/toast";
 import Modal from "../../components/Modal";
+import { usePaged } from "../../lib/paging";
+import ShowMore from "../../components/ShowMore";
 import PageHeader from "../../components/PageHeader";
 import ProfileItem from "../../components/ProfileItem";
 import SheetTabs from "../../components/SheetTabs";
@@ -168,6 +170,9 @@ export default function StaffApplicationsPage() {
       if (sort === "name") return byLastName(a.student, b.student);
       return time(b.updated_at) - time(a.updated_at); // the backend's default order
     });
+  // Long lists: 25 rows first, then Show more (resets on another tab, filter or search).
+  const page = usePaged(shown, `${activeProgram}|${shown.length}|${shown[0]?.id}`);
+
 
   const statusCount = (key) =>
     applications
@@ -250,7 +255,7 @@ export default function StaffApplicationsPage() {
               </thead>
 
               <tbody>
-                {shown.map((application) => (
+                {page.visible.map((application) => (
                   <tr key={application.id}>
                     <td>
                       <strong>{lastFirst(application.student)}</strong>
@@ -300,6 +305,7 @@ export default function StaffApplicationsPage() {
             </table>
           </div>
         )}
+        <ShowMore paged={page} />
       </div>
 
       {selected && (

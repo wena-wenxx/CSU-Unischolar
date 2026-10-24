@@ -3,16 +3,20 @@ import { Link } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { downloadCSV, formatDate } from "../../lib/format";
 import { useToast } from "../../lib/toast";
+import { usePaged } from "../../lib/paging";
+import ShowMore from "../../components/ShowMore";
 import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 import SheetTabs from "../../components/SheetTabs";
+import ExportMenu from "../../components/ExportMenu";
+import { downloadFile } from "../../lib/download";
 import { byLastName, lastFirst, programTabs } from "../../lib/programs";
 
 /*
   Forwarded to Agency (staff): every application OAS has sent to an agency
   (status "complete") and is still waiting for the agency's answer.
-  Export a CSV per program to send to the agency. When the agency answers,
+  Export the list per program (Excel, PDF or CSV) to send to the agency. When the agency answers,
   record it in Approved Lists (or per application in Applications).
   The CSV is a plain list of the student details OAS keeps; it is NOT any
   agency's official template.
@@ -55,11 +59,10 @@ export default function ForwardedPage() {
     load();
   }, [load]);
 
-  if (!rows) return <Loading />;
-
-  const programs = [...new Map(rows.map((a) => [a.scholarship_id, a.scholarship])).values()];
+  const list = rows || [];
+  const programs = [...new Map(list.map((a) => [a.scholarship_id, a.scholarship])).values()];
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  const searched = rows.filter((a) => {
+  const searched = list.filter((a) => {
     const haystack = `${lastFirst(a.student)} ${a.student?.student_id || ""}`.toLowerCase();
     return words.every((word) => haystack.includes(word));
   });
@@ -69,6 +72,11 @@ export default function ForwardedPage() {
   const shown = searched
     .filter((a) => active === "all" || String(a.scholarship_id) === active)
     .sort((a, b) => (active === "all" ? 0 : byLastName(a.student, b.student)));
+
+  // Long lists: 25 rows first, then Show more (resets on another tab or search).
+  const page = usePaged(shown, `${active}|${shown.length}|${shown[0]?.id}`);
+
+  if (!rows) return <Loading />;
 
   function exportCSV() {
     const program = programs.find((p) => String(p?.id) === active);
@@ -94,6 +102,25 @@ export default function ForwardedPage() {
     if (!ok) toast.info("Nothing to export.");
   }
 
+  // Excel and PDF are made by the server (same details as the CSV).
+  async function exportFile(format) {
+    const program = programs.find((p) => String(p?.id) === active);
+    try {
+      const name = await downloadFile(
+        "/staff/forwarded/export",
+        {
+          format,
+          ids: shown.map((a) => a.id),
+          title: program ? `Forwarded to ${program.provider || "the agency"}: ${program.name}` : null,
+        },
+        `forwarded.${format}`
+      );
+      toast.success(`Downloaded ${name}`);
+    } catch (err) {
+      toast.error(errMsg(err, `Unable to make the ${format === "pdf" ? "PDF" : "Excel"} file.`));
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -101,9 +128,15 @@ export default function ForwardedPage() {
         subtitle="Complete applications OAS sent to the agencies, waiting for their decision"
         actions={
           <div className="button-row">
-            <button className="button button-secondary" onClick={exportCSV} disabled={!shown.length}>
-              Export CSV ({shown.length})
-            </button>
+            <ExportMenu
+              count={shown.length}
+              disabled={!shown.length}
+              options={[
+                { label: "Excel (.xlsx)", hint: "all details, opens in Excel", onClick: () => exportFile("xlsx") },
+                { label: "PDF", hint: "to print or e-mail", onClick: () => exportFile("pdf") },
+                { label: "CSV", hint: "plain text for any program", onClick: exportCSV },
+              ]}
+            />
             <Link className="button button-primary" to="/staff/agency-lists">
               Record an agency's answer
             </Link>
@@ -154,7 +187,7 @@ export default function ForwardedPage() {
                 </tr>
               </thead>
               <tbody>
-                {shown.map((a) => (
+                {page.visible.map((a) => (
                   <tr key={a.id}>
                     <td>{lastFirst(a.student)}</td>
                     <td>{a.student?.student_id}</td>
@@ -176,9 +209,10 @@ export default function ForwardedPage() {
             </table>
           </div>
         )}
+        <ShowMore paged={page} />
 
         <p className="muted small">
-          The CSV is a plain list of the student details OAS keeps, not an agency's official form. Over 30 days waiting
+          The export is a plain list of the student details OAS keeps, not an agency's official form. Over 30 days waiting
           is shown in orange so OAS can follow up.
         </p>
       </section>

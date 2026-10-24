@@ -82,25 +82,25 @@ export default function ContactPage() {
           <dl className="contact-list">
             {office?.oas_head && (
               <div>
-                <dt>👤 Head</dt>
+                <dt>Head</dt>
                 <dd>{office.oas_head}</dd>
               </div>
             )}
             {office?.oas_location && (
               <div>
-                <dt>📍 Location</dt>
+                <dt>Location</dt>
                 <dd>{office.oas_location}</dd>
               </div>
             )}
             {office?.oas_office_hours && (
               <div>
-                <dt>🕘 Office hours</dt>
+                <dt>Office hours</dt>
                 <dd>{office.oas_office_hours}</dd>
               </div>
             )}
             {office?.oas_email && (
               <div>
-                <dt>✉️ E-mail</dt>
+                <dt>E-mail</dt>
                 <dd>
                   <a href={`mailto:${office.oas_email}`}>{office.oas_email}</a>
                 </dd>
@@ -108,7 +108,7 @@ export default function ContactPage() {
             )}
             {office?.oas_facebook && (
               <div>
-                <dt>📣 Facebook</dt>
+                <dt>Facebook</dt>
                 <dd>
                   <a href={office.oas_facebook} target="_blank" rel="noreferrer">
                     {office.oas_facebook.replace(/^https?:\/\/(www\.)?/, "")}
@@ -118,7 +118,7 @@ export default function ContactPage() {
             )}
             {office?.oas_phone && (
               <div>
-                <dt>📞 Phone</dt>
+                <dt>Phone</dt>
                 <dd>
                   <a href={`tel:${office.oas_phone.replace(/[^\d+]/g, "")}`}>{office.oas_phone}</a>
                 </dd>

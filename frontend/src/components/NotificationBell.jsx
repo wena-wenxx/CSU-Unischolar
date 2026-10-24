@@ -63,7 +63,10 @@ export default function NotificationBell() {
             : "Notifications"
         }
       >
-        <span aria-hidden="true">🔔</span>
+        <svg className="bell-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+          <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+        </svg>
         {data.unread + (data.unread_replies || 0) > 0 && (
           <span className="bell-count">{data.unread + (data.unread_replies || 0)}</span>
         )}
@@ -73,7 +76,7 @@ export default function NotificationBell() {
         <div className="bell-panel" role="dialog" aria-label="Notifications">
           {data.unread_replies > 0 && (
             <Link className="bell-reply" to="/student/contact" onClick={() => setOpen(false)}>
-              ✉️ OAS replied to {data.unread_replies === 1 ? "your message" : `${data.unread_replies} of your messages`}. Open Contact OAS →
+              OAS replied to {data.unread_replies === 1 ? "your message" : `${data.unread_replies} of your messages`}. Open Contact OAS →
             </Link>
           )}
 
@@ -87,7 +90,7 @@ export default function NotificationBell() {
                   to={`/student/scholarships/${item.scholarship_id}`}
                   onClick={() => setOpen(false)}
                 >
-                  🎓 {item.scholarship} <small className="muted">· {timeAgo(item.invited_at)}</small>
+                  {item.scholarship} <small className="muted">· {timeAgo(item.invited_at)}</small>
                 </Link>
               ))}
             </div>

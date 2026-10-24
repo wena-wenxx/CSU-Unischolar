@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ROLE_LABELS, useAuth } from "../../lib/auth";
-import { formatDateTime, initials } from "../../lib/format";
+import { formatDateTime } from "../../lib/format";
+import ProfilePhoto from "../../components/ProfilePhoto";
 import PageHeader from "../../components/PageHeader";
 import ProfileItem from "../../components/ProfileItem";
 
@@ -14,9 +15,7 @@ export default function StaffProfilePage() {
       <PageHeader title="My Profile" subtitle={admin ? "Your administrator account" : "Your OAS staff account"} />
 
       <section className="card profile-hero">
-        <span className="avatar avatar-large" aria-hidden="true">
-          {initials(user.name)}
-        </span>
+        <ProfilePhoto name={user.name} />
 
         <div className="profile-grid">
           <ProfileItem label="Name" value={user.name} />

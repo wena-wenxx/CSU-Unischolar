@@ -31,7 +31,7 @@ class DemoListFiles
     }
 
     /** Excel workbook with one sheet: title lines, then the header and rows. */
-    public static function xlsx(string $path, array $titles, array $header, array $rows): void
+    public static function xlsx(string $path, array $titles, array $header, array $rows, string $sheet = 'Grantees'): void
     {
         $lines = array_merge(array_map(fn ($t) => [$t], $titles), [[]], [$header], $rows);
         $xmlRows = '';
@@ -64,7 +64,7 @@ class DemoListFiles
             .'</Relationships>');
         $zip->addFromString('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
-            .'<sheets><sheet name="Grantees" sheetId="1" r:id="rId1"/></sheets></workbook>');
+            .'<sheets><sheet name="'.self::esc(mb_substr($sheet, 0, 31)).'" sheetId="1" r:id="rId1"/></sheets></workbook>');
         $zip->addFromString('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
             .'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'

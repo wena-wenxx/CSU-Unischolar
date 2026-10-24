@@ -9,6 +9,11 @@ It never approves or rejects anyone.
     list_reader.py -> reads an outside party's list of grantees (PDF, Word,
                       Excel, CSV, picture) and suggests which ScholarGuide
                       student each line is (staff confirm every match)
+    fit_matcher.py -> how well each scholarship fits a student's field
+                      (pretrained sentence embeddings, or TF-IDF without them)
+    rule_reader.py -> reads a scholarship memo and suggests its eligibility
+                      rules (local LLM through Ollama, or simple patterns);
+                      staff confirm every value
 
 Run (inside ai-service/, with the virtual environment active):
     uvicorn main:app --reload --port 8001
@@ -18,10 +23,12 @@ import os
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from authenticity import file_notes
+import fit_matcher
+import rule_reader
 from list_reader import LIST_EXTENSIONS, extract_and_match, table_rows
 from ocr_engine import extract_text, ocr_status
 from validation import validate_text
@@ -223,3 +230,68 @@ async def read_table_endpoint(file: UploadFile = File(...)):
         except OSError:
             pass
     return {"success": True, **result}
+
+
+@app.get("/fit-status")
+def fit_status():
+    """Which text-matching method is used: the embedding model, or TF-IDF when it is not installed."""
+    return fit_matcher.status()
+
+
+@app.post("/fit-scores")
+def fit_scores(payload: dict = Body(...)):
+    """
+    Field fit of every student to every scholarship (AI Recommendations).
+    Body: {"students": [{"id", "text"}], "programs": [{"id", "text"}]}
+    It only ranks and explains; the eligibility rules stay in Laravel.
+    """
+    students = payload.get("students") or []
+    programs = payload.get("programs") or []
+    if not students or not programs:
+        raise HTTPException(status_code=422, detail="Send at least one student and one program.")
+    if len(students) * len(programs) > 200000:
+        raise HTTPException(status_code=422, detail="Too many pairs in one request; send fewer students.")
+    return {"success": True, **fit_matcher.score(students, programs)}
+
+
+@app.post("/suggest-rules")
+async def suggest_rules(
+    file: UploadFile | None = File(None),
+    text: str = Form(""),
+    options: str = Form("{}"),
+    use_llm: bool = Form(True),
+):
+    """
+    Reads a scholarship memo (pasted text, or a PDF / Word / TXT / picture file)
+    and suggests its eligibility rules, each with the sentence it came from.
+    Staff check and apply them; nothing is saved here.
+    """
+    try:
+        choices = json.loads(options or "{}")
+    except json.JSONDecodeError:
+        choices = {}
+
+    memo = text or ""
+    if file is not None and file.filename:
+        suffix = Path(file.filename).suffix.lower()
+        if suffix not in {".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg"}:
+            raise HTTPException(status_code=422, detail="Use a PDF, Word (.docx), TXT, PNG or JPG file.")
+        file_bytes = await file.read()
+        with NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+            temp_file.write(file_bytes)
+            temp_path = temp_file.name
+        try:
+            memo = (memo + "\n" + rule_reader.read_file_text(temp_path, file.filename)).strip()
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"The file could not be read ({type(e).__name__}: {e}).")
+        finally:
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+
+    try:
+        result = rule_reader.suggest(memo, choices, use_llm=use_llm)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return {"success": True, "characters": len(memo), **result}

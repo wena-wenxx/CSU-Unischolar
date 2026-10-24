@@ -1,4 +1,4 @@
-# AI Recommendations (round 11)
+# AI Recommendations (rounds 11–12)
 
 ScholarGuide tells OAS staff which students **may be eligible** for each scholarship, with a score from 0% to
 100%. This includes students who have **not applied**. It only recommends: staff decide, and the agency still makes
@@ -13,6 +13,48 @@ the final decision.
 | C. A combination of both | Not used | The ML half would have the same problem as B. |
 
 In the paper, call it a **rule-based recommender** (a decision-support system), not machine learning.
+
+**Round 12 adds two real AI parts that need no training data** (both pretrained, free, and run on the OAS
+computer, so no student data leaves it). The rules above still decide **eligibility**; the AI only **ranks,
+explains and suggests**. Nothing is approved by the AI.
+
+| AI part | Model | What it does | Without it |
+|---|---|---|---|
+| **Field fit** (`ai-service/fit_matcher.py`) | Sentence embeddings, **BAAI/bge-small-en-v1.5** through **fastembed** (pretrained, ~70 MB, CPU) | Compares each student (course, college, year, and their optional *My field and goals*) with each program's description, and tags both with fields of study (Agriculture, Engineering, Computing, …). Programs for the student's field are listed first, and agency-direct programs for their field are shown as *Also for your field*. | TF-IDF word matching (built in). Same fields, rougher similarity. |
+| **Memo reader** (`ai-service/rule_reader.py`) | A local large language model through **Ollama** (default **llama3.2:3b**) | Staff paste or upload a scholarship memo; the model suggests the GWA, income ceiling, year levels, colleges, one-scholarship rule, documents, deadline and amount, **each with the sentence it came from**. Values whose sentence is not in the memo are marked *check*. Staff tick what is right; it goes into the form; staff press Save. | Simple pattern reading (GWA 2.25, ₱300,000, "first year", document names…). |
+
+Fit levels: **Matches the field** (a shared field), **Close to the field** (similar text, no shared field), **Other
+fields**, **Open to all fields** (the program names no field, e.g. TES: this is not a "low fit"). The similarity
+number is relative (compare programs for one student); it is **not** a chance of approval.
+
+Why not a model that predicts approval? It would need many real past decisions to learn from. ScholarGuide has none
+(the demo data is fictional), so any accuracy figure would be made up.
+
+**Honest limits of the AI parts**
+- The fit is only as good as the program descriptions. Before round 12 the demo descriptions were generic, so the
+  agency-direct programs now say who they are for, taken from the agencies' own pages (DOST-SEI, ACEF, Landbank,
+  NGCP; sources in `DemoDataSeeder::FOCUS`). OAS should update them from each new memo (the memo reader adds a
+  *For students in: …* line).
+- A field match does not check the program's other conditions (e.g. Iskolar ng Landbank is for children and
+  grandchildren of agrarian reform beneficiaries, farmers and fishers). Students are told to check each program.
+- A language model can misread a memo. That is why every value shows its sentence, unverified values are marked,
+  documents are never ticked automatically, and nothing is saved without staff.
+- Tested here with the built-in fallbacks (TF-IDF and patterns): the embedding model and Ollama could not be
+  installed in Claude's environment, so check them once on the OAS computer (TEST_PLAN Part P).
+
+### Setting up the two models (once, with internet)
+
+```
+cd ai-service
+pip install -r requirements-ai.txt        # fastembed; the model downloads on first use (~70 MB)
+```
+Ollama: install it from https://ollama.com (Windows installer), then in PowerShell:
+```
+ollama pull llama3.2:3b                   # about 2 GB; needs about 8 GB of RAM to run
+```
+Keep Ollama running (it starts with Windows after install). Optional settings in the AI service environment:
+`OLLAMA_URL` (default `http://127.0.0.1:11434`), `OLLAMA_MODEL` (default `llama3.2:3b`), `FIT_MODEL`.
+Check: `http://127.0.0.1:8001/fit-status` says `"method": "embeddings"` when the model is in use.
 
 The existing AI parts keep their jobs:
 - **PaddleOCR** reads scanned documents and lists.
@@ -85,6 +127,29 @@ ScholarGuide*. It does **not** mean the AI is 100% accurate, and it does not mea
 
 **What is never checked:** sex, name, or anything the scholarship does not ask for. Two students with the same data
 always get the same score.
+
+## 3b. What to do next (round 12)
+
+`backend/app/Support/NextSteps.php` turns the checks into advice. It is plain rules, nothing is predicted.
+
+**A low % with "Meets the rules" usually means documents are missing**, not that the student is unlikely. So the
+advice lists the actual missing items instead of only a number.
+
+| Result | Staff (Why? window, *What to do next*) | Student (dashboard, *Scholarships that fit you*) |
+|---|---|---|
+| Fails a must-have rule | Which rule failed; do not invite; Dismiss, or Mark as wrong if the data is wrong | Not shown |
+| Not enough data | Ask the student to enter the GWA / income; then Recalculate | "Needs your profile info" + *Enter your GWA on My Profile* |
+| Meets the rules, 90–100% | Check GWA/income → Send invitation or Add to scholarship | "Ready to apply" + Apply |
+| Meets the rules, 50–89% | Invite and name the missing documents | "N things left" + the checklist |
+| Meets the rules, below 50% | Qualifies, most documents missing; an invitation is optional | "N things left" + the checklist |
+
+Staff also see **Other programs for this student** in the Why? window (best first; click one to open it).
+
+**Students never see a percentage.** A % could be read as a chance of approval, and it could tempt a student to
+type a better GWA. They see a checklist (upload this, press Check with AI, enter your income), and the note that it
+is a suggestion, not an approval. Programs they fail, programs they already applied for, and matches OAS marked
+*wrong* are not listed. The card is hidden when there is nothing to show and for students who already hold a
+scholarship. `GET /api/student/matches` recalculates that one student first, so a new upload counts at once.
 
 ## 4. Where it appears
 

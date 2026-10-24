@@ -178,4 +178,54 @@ class EligibilityEngineTest extends TestCase
         $this->assertDatabaseMissing('scholar_records', ['student_id' => $student->id]);
         $this->assertDatabaseHas('recommendation_logs', ['ai_recommendation_id' => $rec->id, 'action' => 'added']);
     }
+
+    public function test_staff_get_next_steps_and_the_students_other_programs(): void
+    {
+        $staff = User::factory()->create(['role' => 'staff']);
+        $student = $this->student();
+        $program = $this->scholarship();
+        $strict = $this->scholarship(['name' => 'Strict Program', 'short_name' => 'SP', 'max_gwa' => 1.25]);
+        EligibilityEngine::recalculate();
+
+        Sanctum::actingAs($staff);
+        $data = $this->getJson('/api/staff/recommendations/'.$this->recommendation($student, $program)->id)->assertOk()->json();
+
+        // 75%: meets the rules, the COR is missing.
+        $this->assertSame('Qualifies, a few documents left', $data['next_steps']['title']);
+        $this->assertStringContainsString('COR', implode(' ', $data['next_steps']['steps']));
+        $this->assertSame('Strict Program', $data['other_matches'][0]['program']);
+        $this->assertSame('not_eligible', $data['other_matches'][0]['verdict']);
+
+        $failed = $this->getJson('/api/staff/recommendations/'.$this->recommendation($student, $strict)->id)->json();
+        $this->assertSame('Not eligible for this program', $failed['next_steps']['title']);
+        $this->assertStringContainsString('1.25', $failed['next_steps']['steps'][0]);
+    }
+
+    public function test_students_see_a_checklist_without_a_percentage_and_never_failed_programs(): void
+    {
+        $student = $this->student(['family_income' => null]);
+        $this->scholarship(['max_family_income' => null]);   // only the GWA rule + COR
+        $this->scholarship(['name' => 'Strict Program', 'short_name' => 'SP', 'max_gwa' => 1.25, 'max_family_income' => null]);
+        $this->scholarship(['name' => 'Income Program', 'short_name' => 'IP']);   // needs the income
+
+        Sanctum::actingAs($student->user);
+        $matches = $this->getJson('/api/student/matches')->assertOk()->json('matches');
+
+        $this->assertSame(['Test Program', 'Income Program'], array_column($matches, 'name'));   // best first; Strict hidden
+        $this->assertSame('almost', $matches[0]['status']);
+        $this->assertSame('Upload your Certificate of Registration (COR)', $matches[0]['todo'][0]['text']);
+        $this->assertSame('need_info', $matches[1]['status']);
+        $this->assertSame("Enter your family's yearly income on My Profile", $matches[1]['todo'][0]['text']);
+        $this->assertArrayNotHasKey('score', $matches[0]);
+
+        // An uploaded but unchecked COR: the student is told to press Check with AI.
+        Document::create(['student_id' => $student->id, 'document_type' => 'Certificate of Registration (COR)',
+            'original_filename' => 'cor.pdf', 'file_path' => 'x/cor.pdf', 'status' => 'uploaded']);
+        $first = $this->getJson('/api/student/matches')->json('matches.0');
+        $this->assertSame('check', $first['todo'][0]['kind']);
+
+        // Validated: ready to apply.
+        Document::where('student_id', $student->id)->update(['status' => 'validated']);
+        $this->assertSame('ready', $this->getJson('/api/student/matches')->json('matches.0.status'));
+    }
 }

@@ -471,25 +471,44 @@ class PayrollController extends Controller
         return response()->json(GeneralPayrollForm::build($data['ids'], $data, $request->user()));
     }
 
+    /** POST /payroll/form/docx: the form as a Word file. */
     public function formDocx(Request $request)
+    {
+        return $this->formFile($request, 'docx');
+    }
+
+    /** POST /payroll/form/pdf: the form as a PDF file (no print window needed). */
+    public function formPdf(Request $request)
+    {
+        return $this->formFile($request, 'pdf');
+    }
+
+    private function formFile(Request $request, string $kind)
     {
         $this->staffOnly($request);
         $data = $this->formOptions($request);
         $form = GeneralPayrollForm::build($data['ids'], $data, $request->user());
 
         try {
-            $bytes = GeneralPayrollForm::docx($form);
-        } catch (\RuntimeException $e) {
-            return response()->json(['message' => $e->getMessage()], 500);
+            $bytes = $kind === 'pdf' ? GeneralPayrollForm::pdf($form) : GeneralPayrollForm::docx($form);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json(['message' => $e instanceof \RuntimeException
+                ? $e->getMessage()
+                : 'Unable to make the '.($kind === 'pdf' ? 'PDF' : 'Word').' file: '.$e->getMessage()], 500);
         }
 
         ActivityLog::record($request->user(), 'payroll.form_exported',
-            "Exported the General Payroll (Form 6-A) for {$form['program']}, {$form['period']}: {$form['count']} grantee(s), ".count($form['sheets']).' sheet(s).');
+            'Exported the General Payroll (Form 6-A) as '.($kind === 'pdf' ? 'PDF' : 'Word')
+            ." for {$form['program']}, {$form['period']}: {$form['count']} grantee(s), ".count($form['sheets']).' sheet(s).');
 
-        $name = 'general-payroll-'.preg_replace('/[^a-z0-9]+/', '-', mb_strtolower($form['batch'])).'.docx';
+        $name = 'general-payroll-'.trim(preg_replace('/[^a-z0-9]+/', '-', mb_strtolower($form['batch'])), '-').'.'.$kind;
 
         return response($bytes, 200, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Type' => $kind === 'pdf'
+                ? 'application/pdf'
+                : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'Content-Disposition' => 'attachment; filename="'.$name.'"',
         ]);
     }

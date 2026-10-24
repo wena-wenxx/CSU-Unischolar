@@ -79,6 +79,22 @@ class GeneralPayrollFormTest extends TestCase
         $this->assertStringStartsWith('PK', $response->getContent());   // a .docx is a zip file
     }
 
+    public function test_pdf_downloads_on_long_bond_landscape(): void
+    {
+        if (!class_exists(\Dompdf\Dompdf::class)) {
+            $this->markTestSkipped('dompdf is not installed: composer require dompdf/dompdf');
+        }
+        $staff = User::factory()->create(['role' => 'staff']);
+        $ids = $this->payroll(2, 1);
+
+        Sanctum::actingAs($staff);
+        $response = $this->post('/api/payroll/form/pdf', ['ids' => $ids]);
+        $response->assertOk();
+        $this->assertSame('application/pdf', $response->headers->get('Content-Type'));
+        $this->assertStringStartsWith('%PDF', $response->getContent());
+        $this->assertStringContainsString('MediaBox [0.000 0.000 936.000 612.000]', $response->getContent());   // 13 x 8.5 in, landscape
+    }
+
     public function test_one_form_is_for_one_program_and_one_period(): void
     {
         $staff = User::factory()->create(['role' => 'staff']);

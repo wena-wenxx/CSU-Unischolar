@@ -1,5 +1,10 @@
+import { useState } from "react";
+import MemoReader from "./MemoReader";
+
 /*
   Eligibility rules of one scholarship, used by AI Recommendations.
+  "Read the program memo with AI" fills them in from a memo (round 12);
+  staff check every value and press Save.
   Empty = no rule. Students are checked against every rule that is set;
   each rule is a "must-have".
 
@@ -12,8 +17,18 @@ export default function EligibilityRules({ value, onChange, options, idPrefix })
     onChange({ [key]: list.includes(item) ? list.filter((x) => x !== item) : [...list, item] });
   };
 
+  const [reading, setReading] = useState(false);
+
   return (
     <div className="rules-grid">
+      <div className="full-column memo-launch">
+        <button type="button" className="button button-small button-secondary" onClick={() => setReading(true)}>
+          Read the program memo with AI
+        </button>
+        <small className="muted">The AI suggests the rules from the memo; you check them.</small>
+      </div>
+      {reading && <MemoReader form={value} onApply={onChange} onClose={() => setReading(false)} />}
+
       <div>
         <label htmlFor={`${idPrefix}-gwa`}>Highest GWA allowed</label>
         <input

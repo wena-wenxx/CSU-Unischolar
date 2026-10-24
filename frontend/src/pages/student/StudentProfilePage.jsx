@@ -6,6 +6,7 @@ import { gwaText, peso } from "../../lib/recommend";
 import { groupDocuments, loadMyDocuments } from "../../lib/documents";
 import { useToast } from "../../lib/toast";
 import PageHeader from "../../components/PageHeader";
+import ProfilePhoto from "../../components/ProfilePhoto";
 import ProfileItem from "../../components/ProfileItem";
 import StatusBadge from "../../components/StatusBadge";
 import Loading from "../../components/Loading";
@@ -147,10 +148,24 @@ export default function StudentProfilePage() {
     <div>
       <PageHeader title="My Profile" subtitle="Your student information" />
 
+      <section className="card profile-hero">
+        <ProfilePhoto name={`${student.first_name} ${student.last_name}`} />
+        <div>
+          <h2 className="profile-name">
+            {student.first_name} {student.middle_name && student.middle_name !== "Demo" ? `${student.middle_name[0]}. ` : ""}
+            {student.last_name}
+          </h2>
+          <p className="muted">
+            {student.student_id} · {student.course}
+            {student.year_level ? ` · ${student.year_level}` : ""}
+          </p>
+        </div>
+      </section>
+
       <section className="card">
         <div className="card-header">
           <h2>Student information</h2>
-          <span className="lock-note">🔒 From the Registrar · read-only</span>
+          <span className="lock-note">From the Registrar · read-only</span>
         </div>
 
         <div className="locked-fields">
@@ -185,7 +200,7 @@ export default function StudentProfilePage() {
         <section className="card">
           <div className="card-header">
             <h2>Outside scholarship</h2>
-            <span className="lock-note">🔒 Recorded by OAS · read-only</span>
+            <span className="lock-note">Recorded by OAS · read-only</span>
           </div>
           {profile.external_scholarships.map((item) => (
             <p key={item.id} className="external-note">
@@ -200,6 +215,8 @@ export default function StudentProfilePage() {
           </p>
         </section>
       )}
+
+      <FieldGoals initial={student.interests || ""} />
 
       <section className="card">
         <div className="card-header">
@@ -408,6 +425,58 @@ export default function StudentProfilePage() {
 }
 
 // Read-only: OAS keeps the ATM status up to date. No banking is done here.
+/*
+  "My field and goals" (round 12, optional): helps the AI field fit find
+  scholarships for the student's field. It never affects eligibility.
+*/
+function FieldGoals({ initial }) {
+  const toast = useToast();
+  const [text, setText] = useState(initial);
+  const [saved, setSaved] = useState(initial);
+  const [busy, setBusy] = useState(false);
+
+  async function save(event) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      const { data } = await api.patch("/profile/interests", { interests: text });
+      setSaved(text);
+      toast.success(data.message);
+    } catch (err) {
+      toast.error(errMsg(err, "Unable to save."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card">
+      <h2>My field and goals</h2>
+      <p className="muted small">
+        Optional. In one or two sentences, what you study or want to work in, e.g. “I want to work in crop research” or
+        “I plan to teach mathematics”. The AI uses it to find scholarships for your field. It does not change whether
+        you are eligible.
+      </p>
+      <form className="inline-form field-goals" onSubmit={save}>
+        <label htmlFor="my-goals" className="sr-only">
+          My field and goals
+        </label>
+        <textarea
+          id="my-goals"
+          rows={2}
+          maxLength={300}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          placeholder="e.g. I want to work in agriculture research."
+        />
+        <button className="button button-secondary" disabled={busy || text === saved}>
+          {busy ? "Saving..." : "Save"}
+        </button>
+      </form>
+    </section>
+  );
+}
+
 function StipendCard({ grant }) {
   const paid = (grant.payroll_records || []).filter((p) => p.status === "processed").length;
   const funds = { yes: "The stipend has reached your ATM.", no: "No funds on your ATM yet.", pending: "Funds are being processed." };
@@ -416,7 +485,7 @@ function StipendCard({ grant }) {
     <section className="card">
       <div className="card-header">
         <h2>My stipend</h2>
-        <span className="lock-note">🔒 Updated by OAS · read-only</span>
+        <span className="lock-note">Updated by OAS · read-only</span>
       </div>
 
       <div className="detail-grid">

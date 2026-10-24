@@ -306,3 +306,26 @@ export function initials(name) {
     .map((part) => part[0].toUpperCase())
     .join("");
 }
+
+// Profile photo address, or null when the user has none (initials are shown).
+export function photoUrl(user) {
+  return user?.photo_path ? `${FILES_URL}/${user.photo_path}` : null;
+}
+
+// "BS Information Technology" -> "BSIT", "Bachelor of Science in Nursing" -> "BSN" (sidebar).
+export function courseShort(course) {
+  const text = String(course || "").trim();
+  if (!text) return "";
+  const rest = text.replace(/^Bachelor of Science in\s+/i, "BS ").replace(/^Bachelor of Arts in\s+/i, "AB ");
+  const [first, ...words] = rest.split(/\s+/);
+  if (!["BS", "AB", "BSED", "BEED"].includes(first.toUpperCase())) return text.length <= 14 ? text : initialsOf(text);
+  return first.toUpperCase() + initialsOf(words.join(" "));
+}
+
+function initialsOf(text) {
+  return text
+    .split(/[\s-]+/)
+    .filter((word) => word && !["of", "in", "and", "the", "major"].includes(word.toLowerCase()))
+    .map((word) => word[0].toUpperCase())
+    .join("");
+}

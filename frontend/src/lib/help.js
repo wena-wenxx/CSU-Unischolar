@@ -93,6 +93,25 @@ export const HELP = {
       ],
     },
     {
+      title: "Your profile photo",
+      steps: [
+        "Open My Profile and press Upload photo. Use a clear photo of your face (JPG, PNG or WebP, up to 2 MB).",
+        "It is shown at the top of the menu, like on the CSU student portal. Press Remove to go back to your initials.",
+      ],
+    },
+    {
+      title: "Scholarships that fit you",
+      steps: [
+        "Your dashboard lists the open programs whose rules you meet, based on My Profile (GWA, family income, year level, college) and My Documents. Programs you already applied for are not listed.",
+        "Ready to apply: every required document is uploaded and checked. Press Apply.",
+        "Things left: the checklist says what to do, for example Upload your Certificate of Grades, or press Check with AI in My Documents.",
+        "Needs your profile info: enter your GWA and family income on My Profile first. Type them truthfully; OAS checks them against your grades and your parents' income tax return.",
+        "This is a suggestion, not an approval. OAS reviews your documents and the agency makes the final decision.",
+        "Also for your field: programs for your course that you apply for at the agency. Read each program's page: some have other conditions.",
+        "Add a short My field and goals on My Profile (e.g. \"I want to work in crop research\") so the AI finds programs for your field.",
+      ],
+    },
+    {
       title: "My Documents: upload once, reuse",
       steps: [
         "My Documents lists every file you have uploaded, by type (COR, grades, valid ID, and so on).",
@@ -186,8 +205,8 @@ export const HELP = {
         "Scholar Records → ATM status: record whether the grantee has an ATM and whether the stipend has reached it (status only; no banking).",
         "Payroll → 1. Prepare: choose one program or all, and the period → Preview → Confirm. Students not enrolled or already in that period are skipped; ATM problems are shown as warnings.",
         "Payroll → 2. Payroll list: tick entries and press Mark Ready, then Mark Processed after the payout.",
-        "General Payroll (Form 6-A): click one program tab and choose one period, then press General Payroll (Form 6-A). Check the batch, voucher and purpose, then Open form to print / save as PDF, or Download Word (.docx).",
-        "Printing: paper Legal / Long (8.5 x 13 in), Landscape, Headers and footers off. The deduction and witness columns stay empty for writing by hand.",
+        "General Payroll (Form 6-A): click one program tab and choose one period, then press General Payroll (Form 6-A). Check the batch, voucher and purpose, then press Download PDF or Download Word (.docx). Preview and print opens the form on screen.",
+        "The PDF is already long bond (8.5 x 13 in), landscape: open it and print at Actual size. The deduction and witness columns stay empty for writing by hand.",
       ],
     },
     {
@@ -204,6 +223,7 @@ export const HELP = {
         "Use the search box at the top of every page: type part of a student's name or Student ID, a program name, or a page name such as \"payroll\".",
         "Click a number on the Dashboard to open the matching list (for example Needs Action or Payroll Ready).",
         "Click your name at the top of the menu for View Profile, Help and Sign Out.",
+        "Add your photo on My Profile (Upload photo). It is shown at the top of the menu; without one, your initials are shown.",
       ],
     },
     {
@@ -213,7 +233,7 @@ export const HELP = {
         "Ready to forward: every required document is uploaded and checked by the AI with no flag. Tick them and press Forward selected to the agency.",
         "Needs manual review: open each one (an AI flag, a file the AI could not read, a file not checked yet, or an expired document).",
         "Probably incomplete: a required document is missing, or the student already holds another scholarship. Edit the remark if needed and press Send back (Needs action).",
-        "Forwarded to Agency lists everything sent to agencies, by program, with the days waiting. Export a CSV for each agency. When the agency answers, record it in Approved Lists.",
+        "Forwarded to Agency lists everything sent to agencies, by program, with the days waiting. Press Export and choose Excel, PDF or CSV for each agency. When the agency answers, record it in Approved Lists.",
       ],
     },
     {
@@ -239,9 +259,13 @@ export const HELP = {
         "Score = checks met ÷ all checks. The checks are the program's eligibility rules (GWA, family income, year level, college, one scholarship) and its required documents, all with equal weight.",
         "A must-have rule that is not met shows Fails a rule, even with a high score. A missing GWA or income shows Not enough data. Meets the rules with a low score means the student qualifies but has not uploaded the documents yet.",
         "Press Why? to see each check, the rule, and the student's data used. Then Send invitation (e-mail), Add to scholarship (starts a draft application), Dismiss, or Mark as wrong (write what is wrong).",
+        "The Why? window starts with What to do next (for example: ready to invite, or which documents are missing). Open Other programs for this student to see every program they match, best first.",
+        "A low % with Meets the rules usually means documents are missing, not that the student is unlikely. Students see the same programs on their dashboard (Scholarships that fit you) as a checklist, without the %.",
         "A document counts only after the AI check found no problem, or after you marked it verified. A document that is only uploaded does not count yet.",
         "Tick “Only GWA/income checked by OAS” to see only students whose GWA and income you have already checked. Others show “GWA/income not checked”.",
         "Set the rules in Scholarships → Manage → Eligibility rules, then press Recalculate. Mark a student's GWA and income as checked after seeing their Grades and ITR.",
+        "Read the program memo with AI (in Eligibility rules): paste the memo or choose its file. The AI suggests each rule with the sentence it came from; tick the right ones, then press Save. Values marked ⚠ were not found in the memo: check them.",
+        "AI field fit: \"Field: Agriculture\" under a score means the program is for the student's field. The Why? window also lists agency-direct programs for the student's field. It only ranks; the rules decide eligibility.",
       ],
     },
     {

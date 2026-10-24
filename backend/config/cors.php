@@ -29,7 +29,7 @@ return [
 
     'allowed_headers' => ['*'],
 
-    'exposed_headers' => [],
+    'exposed_headers' => ['Content-Disposition'],   // lets the app read the file name of downloads
 
     'max_age' => 3600,
 

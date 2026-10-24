@@ -4082,7 +4082,7 @@ tbody tr:nth-child(even) {
   min-width: 170px;
   padding: 3px 12px;
   border: 1px solid #333;
-  background: #fff3b0;
+  background: #ffeb3b;
   color: #d35400;
   font-size: 15px;
   font-weight: 700;
@@ -4091,7 +4091,7 @@ tbody tr:nth-child(even) {
 .gp-banner {
   margin-top: 4px !important;
   padding: 3px 6px;
-  background: #fff3b0;
+  background: #ffeb3b;
 }
 
 .gp-batch {
@@ -4176,32 +4176,60 @@ tbody tr:nth-child(even) {
   text-align: center;
 }
 
-.gp-signs {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1.2fr;
-  gap: 8px 18px;
-  margin-top: 8px;
+/* Second header row: the two empty columns under "Less: Miscellaneous / CHED Grants" */
+.gp-sheet .gp-table .gp-subhead th {
+  height: 12px;
+  padding: 0;
 }
 
-.gp-cert {
-  min-height: 26px;
+/* Signatures (OAS layout): a borderless 5-column table, no stripes */
+.gp-sheet .gp-signs tr,
+.gp-sheet .gp-signs tr:nth-child(even),
+.gp-sheet .gp-signs tr:hover {
+  background: transparent !important;
+}
+
+.gp-sheet .gp-signs {
+  width: 100%;
+  margin-top: 10px;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.gp-sheet .gp-signs td {
+  padding: 2px 10px 2px 0;
+  border: 0;
+  background: none;
+  vertical-align: bottom;
+  font-size: 10px;
+}
+
+.gp-sheet .gp-signs .gp-cert-row td {
+  padding-top: 6px;
   font-size: 9.5px;
 }
 
-.gp-label {
-  margin: 4px 0 18px !important;
+.gp-sheet .gp-signs .gp-label-row td {
   font-weight: 700;
+  font-size: 11px;
+}
+
+.gp-sheet .gp-signs .gp-people td {
+  height: 46px;
+}
+
+.gp-sheet .gp-signs .gp-rule td {
+  border-bottom: 1px solid #333;
+  padding-bottom: 4px;
 }
 
 .gp-person {
   display: flex;
   flex-direction: column;
-  min-width: 200px;
 }
 
 .gp-person strong {
   min-height: 14px;
-  border-bottom: 1px solid #333;
   font-size: 11.5px;
 }
 
@@ -4211,12 +4239,12 @@ tbody tr:nth-child(even) {
 
 .gp-witness-lines {
   display: flex;
-  gap: 12px;
-  margin-top: 16px;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .gp-witness-lines span {
-  flex: 1;
+  display: block;
   border-bottom: 1px solid #333;
 }
 
@@ -4451,4 +4479,594 @@ tbody tr:nth-child(even) {
   color: var(--primary-color);
   font-weight: 600;
   margin-bottom: 12px;
+}
+
+/* =====================================================================
+   ROUND 12: "Scholarships that fit you" (student) and "What to do next" (staff)
+   ===================================================================== */
+.matches-card .card-header {
+  margin-bottom: 4px;
+}
+
+.match-first {
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  border-left: 4px solid var(--accent-color);
+  border-radius: var(--radius-system);
+  background: var(--csu-gold-tint);
+}
+
+.match-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.match-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.match-row:last-child {
+  border-bottom: 0;
+}
+
+.match-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.match-todo {
+  grid-column: 1;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.match-todo li {
+  margin: 2px 0;
+}
+
+.match-action {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  max-width: 260px;
+  text-align: right;
+}
+
+@media (max-width: 600px) {
+  .match-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .match-action {
+    grid-column: 1;
+    grid-row: auto;
+    max-width: none;
+    text-align: left;
+  }
+}
+
+/* Why? window: next steps + the student's other programs */
+.next-box {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border-left: 4px solid var(--border);
+  border-radius: var(--radius-system);
+  background: var(--bg-app);
+}
+
+.next-box.tone-success {
+  border-left-color: var(--csu-emerald);
+}
+
+.next-box.tone-warning {
+  border-left-color: var(--accent-color);
+}
+
+.next-box.tone-danger {
+  border-left-color: var(--csu-red);
+}
+
+.next-box ol {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+
+.other-matches {
+  margin: 4px 0 12px;
+}
+
+.other-matches summary {
+  cursor: pointer;
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.other-matches ul {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.other-matches li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Export menu: one button, a short list of formats */
+.export-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.export-menu summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.export-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.export-menu-list {
+  position: absolute;
+  right: 0;
+  z-index: 30;
+  min-width: 230px;
+  margin-top: 6px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-system);
+  background: var(--bg-surface);
+  box-shadow: 0 10px 30px rgba(var(--shadow-rgb), 0.14);
+  animation: menu-in 0.14s ease-out;
+}
+
+.export-menu-list button {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-main);
+  text-align: left;
+  cursor: pointer;
+}
+
+.export-menu-list button:hover,
+.export-menu-list button:focus-visible {
+  background: var(--csu-green-tint);
+}
+
+.export-menu-list small {
+  color: var(--csu-gray);
+  font-size: 12px;
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* Profile photo (round 12) */
+.avatar-photo {
+  overflow: hidden;
+  padding: 0;
+  background: var(--csu-green-tint);
+}
+
+.avatar-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.avatar-xl {
+  flex: 0 0 96px;
+  width: 96px;
+  height: 96px;
+  font-size: 32px;
+}
+
+.profile-photo {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.profile-photo-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 220px;
+}
+
+.profile-name {
+  margin: 0 0 4px;
+}
+
+/* Tall screens: the sidebar card looks like the CSU student portal (photo on top, centred). */
+@media (min-height: 921px) and (min-width: 901px) {
+  .sidebar-profile .profile-trigger {
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 10px;
+    text-align: center;
+  }
+
+  .sidebar-profile .profile-trigger .avatar {
+    flex-basis: 64px;
+    width: 64px;
+    height: 64px;
+    font-size: 22px;
+  }
+
+  .sidebar-profile .profile-text {
+    align-items: center;
+  }
+
+  .sidebar-profile .profile-caret {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+  }
+}
+
+/* =====================================================================
+   ROUND 12: calmer dashboards, carousel, gentle motion
+   ===================================================================== */
+
+/* Smaller dashboard header: more of the useful content fits on the first screen. */
+.dashboard-hero {
+  padding: 24px 28px;
+}
+
+.dashboard-hero h1 {
+  font-size: clamp(24px, 3vw, 32px);
+}
+
+/* Staff "Needs your attention": 3 x 2 instead of 4 + 2. */
+.stats-grid.attention-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .stats-grid.attention-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* A small grey number next to a card title: "Open Scholarships 12" */
+.count-pill {
+  display: inline-block;
+  min-width: 26px;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--csu-green-tint);
+  color: var(--primary-color);
+  font-family: var(--font-body, inherit);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* Line-style bell (instead of the emoji) */
+.bell-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: var(--primary-color);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- Announcements carousel ---------- */
+.carousel {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-system);
+}
+
+.carousel-track {
+  display: flex;
+  transition: transform 0.55s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.carousel-slide {
+  display: grid;
+  flex: 0 0 100%;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+  color: inherit;
+  text-decoration: none;
+}
+
+.carousel-slide .carousel-image {
+  width: 100%;
+  height: 230px;
+  object-fit: cover;
+  border-radius: var(--radius-system);
+}
+
+.carousel-slide .announcement-image.placeholder.carousel-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.carousel-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 8px;
+}
+
+.carousel-text strong {
+  color: var(--primary-color);
+  font-family: var(--font-heading);
+  font-size: 22px;
+  line-height: 1.25;
+}
+
+.carousel-text p {
+  margin: 0;
+}
+
+.carousel-slide:hover .read-more {
+  text-decoration: underline;
+}
+
+.carousel-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.carousel-arrow {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg-surface);
+  color: var(--primary-color);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.carousel-arrow:hover {
+  border-color: var(--primary-color);
+}
+
+.carousel-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.carousel-dots button {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(var(--primary-rgb), 0.25);
+  cursor: pointer;
+  transition:
+    width 0.25s,
+    background 0.25s;
+}
+
+.carousel-dots button.active {
+  width: 24px;
+  background: var(--primary-color);
+}
+
+@media (max-width: 700px) {
+  .carousel-slide {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .carousel-slide .carousel-image {
+    height: 170px;
+  }
+
+  .carousel-text strong {
+    font-size: 18px;
+  }
+}
+
+/* ---------- Gentle motion ---------- */
+/* Each page slides up a little when it opens. */
+.content > div > * {
+  /* "backwards": nothing is left on the element after the animation ends, so
+     menus that open over the next card (Export, profile) still show on top. */
+  animation: rise-in 0.35s ease-out backwards;
+}
+
+/* The page title row (with its menus) stays above the cards below it. */
+.page-header-wrap {
+  position: relative;
+  z-index: 20;
+}
+
+.content > div > *:nth-child(2) {
+  animation-delay: 0.04s;
+}
+
+.content > div > *:nth-child(3) {
+  animation-delay: 0.08s;
+}
+
+.content > div > *:nth-child(n + 4) {
+  animation-delay: 0.12s;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* Cards that are links lift a little under the mouse. */
+.stat-card,
+.match-row,
+.announcement-card {
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+a.stat-card:hover,
+.stat-card:has(a):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(var(--primary-rgb), 0.08);
+}
+
+/* Toasts and windows open smoothly. */
+.modal {
+  animation: pop-in 0.18s ease-out;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+/* People who turned on "reduce motion" in their device settings get none of this. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media print {
+  .content > div > * {
+    animation: none !important;
+  }
+}
+
+/* =====================================================================
+   ROUND 12: AI field fit and the memo reader
+   ===================================================================== */
+.fit-tag {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--csu-green-tint);
+  color: var(--primary-color);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fit-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-system);
+}
+
+.match-also {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.match-also ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.match-hint {
+  margin: 10px 0 0;
+}
+
+.field-goals {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.field-goals textarea {
+  flex: 1;
+}
+
+.memo-launch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.memo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.memo-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.memo-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.memo-list li.memo-check {
+  background: var(--csu-gold-tint);
+}
+
+.memo-quote {
+  margin-left: 28px;
+  color: var(--csu-gray);
+  font-size: 13px;
+  font-style: italic;
+}
+
+@media (max-width: 600px) {
+  .field-goals {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }

@@ -472,7 +472,8 @@ the AI service running with `openpyxl` and `python-docx` installed (`pip install
 
 ## Part K — Round 12: General Payroll (Form 6-A)
 
-Before: `php artisan migrate` (adds the document-verification columns), and `extension=zip` on in `php.ini`.
+Before: `php artisan migrate` (adds the document-verification columns), `composer require dompdf/dompdf` (for the
+PDF), and `extension=zip` on in `php.ini` (for Word).
 
 - [ ] **K1.** Log in as the admin → System Settings → **Payroll form signatories**: the positions are filled in,
   the names are empty. Type sample names (e.g. the OAS Director and the Cashier) → Save → "Settings saved."
@@ -483,9 +484,11 @@ Before: `php artisan migrate` (adds the document-verification columns), and `ext
 - [ ] **K4.** **Download Word (.docx)** → open it in Microsoft Word: landscape long bond, one sheet per page, the
   table borders and the yellow boxes show, names A to Z, the amount in the right semester column, red totals,
   ***NOTHING FOLLOWS***, and the signatory names from K1.
-- [ ] **K5.** **Open form to print / save as PDF** → the same form on screen. **Print / Save as PDF** with paper
-  Legal / Long, Landscape, Headers and footers off, Background graphics on → each sheet fits one page; WITH ATM and
-  WITHOUT ATM grantees are on separate sheets. **← Payroll** goes back.
+- [ ] **K5.** **Download PDF** → a file `general-payroll-….pdf` downloads at once (no print window). Open it: long bond
+  landscape, one sheet per page; WITH ATM and WITHOUT ATM grantees on separate sheets. **Preview and print** → the
+  same form on screen with Download PDF, Download Word and Print; **← Payroll** goes back.
+- [ ] **K5b.** If dompdf is not installed (or `extension=zip` is off for Word), the message says exactly what to
+  install — not just "Unable to…".
 - [ ] **K6.** With more than 15 grantees: the sheets continue (Sheet No. 1, 2, …), "continued on the next sheet",
   and the GRAND TOTAL on the last sheet of the group. Change *Rows per sheet* and *First sheet no.* → applied.
 - [ ] **K7.** Activity Logs (admin) → "payroll.form_exported" after a Word download.
@@ -502,6 +505,60 @@ Before: `php artisan migrate` (adds the document-verification columns), and `ext
 - [ ] **L4.** Upload a PDF that was edited with an online PDF editor (or saved again in another program) and run the
   AI check → a yellow **Possible edit (not proof)** box. The document status is not changed by it.
 - [ ] **L5.** A student cannot mark a document verified (API: `POST /api/documents/{id}/verify` → 403).
+
+## Part N — Round 12: Which scholarships fit, and what to do next
+
+- [ ] **N1.** Staff → AI Recommendations → **Why?** → the window starts with **What to do next** (e.g. *Ready to
+  invite*, *Qualifies, a few documents left* with the missing documents, *Missing student data*, or *Not eligible*
+  with the failed rule).
+- [ ] **N2.** **Other programs for this student** → every other program, best first, with the % and label. Click
+  one → the window switches to that program.
+- [ ] **N3.** Log in as a student who meets some rules (e.g. `student1@carsu.edu.ph`) → Dashboard → **Scholarships
+  that fit you**: open programs only, **no %**, labels *Ready to apply* / *N things left* / *Needs your profile
+  info*, one checklist line per kind of task (Upload: …, Press Check with AI for: …). *Show all* lists the rest.
+- [ ] **N4.** A student without GWA / income → **First: Enter your GWA … on My Profile** shown once at the top.
+- [ ] **N5.** Programs the student fails (e.g. GWA too low), already applied for, or that staff marked wrong are not
+  listed. A student who already holds a scholarship does not see the card.
+- [ ] **N6.** Upload a missing document, press Check with AI, go back to the Dashboard → that line is gone.
+
+## Part P — Round 12: the two AI models (field fit and memo reader)
+
+Before: `pip install -r requirements-ai.txt` in `ai-service` (fastembed), install Ollama and run
+`ollama pull llama3.2:3b`, restart the AI service, then AI Recommendations → **Recalculate**.
+
+- [ ] **P1.** `http://127.0.0.1:8001/fit-status` → `"method": "embeddings"`. Recalculate → the message says *Field fit
+  updated by the AI (embedding model)*. Without fastembed it says *(word matching)*.
+- [ ] **P2.** Log in as an Agriculture student → Dashboard → *Scholarships that fit you*: **Also for your field** lists
+  Landbank, DA-ACEF and ACEF-GIAHEP; programs for all fields (TES) are not called a low fit.
+- [ ] **P3.** My Profile → **My field and goals** → type "I plan to teach mathematics" → Save → (an Education student)
+  DOST appears under *Also for your field*.
+- [ ] **P4.** Staff → AI Recommendations → a row shows *Field: …* under the score when the program is for the student's
+  field; **Why?** → *AI field fit* box with the fields, shared words and agency programs for the field.
+- [ ] **P5.** Scholarships → Manage → Eligibility rules → **Read the program memo with AI** → paste
+  `documentation/samples/sample-scholarship-memo.txt` → *Read by the local AI model (llama3.2:3b)*: GWA 2.25,
+  ₱300,000, 1st and 2nd Year, agriculture colleges, no other scholarship, deadline 2026-11-20, ₱20,000, each with its
+  sentence → **Put ticked values in the form** → the form is filled but **not saved** until Save.
+- [ ] **P6.** Stop Ollama and read the memo again → a warning says pattern reading was used; the values still come.
+- [ ] **P7.** Stop the AI service → Recalculate still works (scores unchanged), the fit is simply not updated.
+
+## Part O — Round 12: photos, exports, sample lists, calmer screens
+
+- [ ] **O1.** Payroll → Form 6-A (PDF, Word and the screen page) next to the OAS photos: two-row header with *Less:
+  Miscellaneous / CHED Grants* over two sub-columns; yellow only on the voucher box and the *Release of* band;
+  signatures 5 across, a line, then Accountant · President · Cashier · two witness lines.
+- [ ] **O2.** `php artisan demo:approved-lists` → Approved Lists: upload the `.pdf`, `.docx`, `.xlsx` and `.csv`
+  for the program in README.txt → columns *Student No.* and *Date Approved* are picked; Process → the free students
+  approved, one error (other scholarship), `2026-99999` unmatched.
+- [ ] **O3.** Forwarded to Agency → **Export** → Excel (.xlsx), PDF and CSV download; the menu opens over the table.
+- [ ] **O4.** My Profile (student and staff) → **Upload photo** (JPG/PNG/WebP ≤ 2 MB) → the photo shows in the
+  sidebar; a .txt or a 5 MB file is refused; **Remove** → initials again. Students' sidebar shows *ID* and *course -
+  year* (e.g. BSIT - 4). On a tall screen the photo is shown larger, centred.
+- [ ] **O5.** Student Dashboard: no repeated number cards or emoji tiles; **Announcements** carousel moves every 7
+  seconds, stops under the mouse, arrows and dots work; with "reduce motion" on in Windows it does not move by
+  itself.
+- [ ] **O6.** Applications, Payroll, Scholar Records, Forwarded: 25 rows, then **Show 25 more** / **Show all**;
+  changing tab or search starts at 25 again.
+- [ ] **O7.** Staff Dashboard: *Needs your attention* is 3 × 2; quick tiles without emoji; the bell is a line icon.
 
 ## Part M — Round 12: Cleaner layout and list files
 
@@ -522,12 +579,12 @@ Before: `php artisan migrate` (adds the document-verification columns), and `ext
 
 ## What has and has not been tested
 
-Parts K, L and M (round 12) were tested by Claude on **23 Oct 2026**: K1–K3, K5, L1–L3, L5 and M1–M7 in the
+Parts K, L and M (round 12) were tested by Claude on **23 Oct 2026**: K1–K3, K5, K5b, N1–N5, O1–O4, O5 (not the "reduce motion" part), O6, O7, P2, P4, P5 and P6 with the fallbacks (TF-IDF and patterns; P1, P3 and P5 with the real models not tested), L1–L3, L5 and M1–M7 in the
 browser (1366×768; the menu also at 1280×720 and 1440×900; the new pages also at 390×844 with no sideways scrolling);
 K6 through the PHP tests (17 grantees → sheets 1–3); the Word file from K4 opened and
-rendered in **LibreOffice** (not Microsoft Word) and the print page saved as a long bond PDF in Chromium; 5 new PHP
-tests (`php artisan test`: 13 passed); 7 new Python tests (`test_authenticity.py` and one in `test_list_reader.py`;
-22 passed, 1 PyMuPDF test skipped); the new migration rolled back and re-run on SQLite. L4 was tested only with the
+rendered in **LibreOffice** (not Microsoft Word) and the print page saved as a long bond PDF in Chromium; 15 new PHP
+tests (`php artisan test`: 23 passed; the PDF made with dompdf 3.1.6); 14 new Python tests (`test_authenticity.py`, `test_fit_matcher.py`, `test_rule_reader.py` and one in `test_list_reader.py`;
+29 passed, 1 PyMuPDF test skipped); the new migrations rolled back and re-run on SQLite. L4 was tested only with the
 rule tests and a stored sample result, because PyMuPDF cannot be installed here. **Not tested:** K4 in Microsoft
 Word, printing on the OAS printer, L4 with the real AI service, PaddleOCR, MySQL and real Gmail.
 

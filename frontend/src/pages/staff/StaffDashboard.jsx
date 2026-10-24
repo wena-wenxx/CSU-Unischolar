@@ -53,7 +53,7 @@ export default function StaffDashboard() {
 
       {/* What needs work today first; the overall numbers are folded below. */}
       <h2 className="section-title">Needs your attention</h2>
-      <div className="stats-grid">
+      <div className="stats-grid attention-grid">
         <StatCard title="Needs Action" value={stats.needs_action ?? 0} to="/staff/applications?filter=needs_action" hint="Waiting for students" />
         <StatCard
           title="AI Flags (documents)"
@@ -80,9 +80,9 @@ export default function StaffDashboard() {
 
       <QuickActions
         actions={[
-          { to: "/staff/auto-review", icon: "📋", label: "Auto-Review", text: "Sort submitted applications in one click" },
-          { to: "/staff/enrollment", icon: "🎓", label: "Verify Enrollments", text: "Check against the Registrar's list" },
-          { to: "/staff/payroll", icon: "💳", label: "Prepare Payroll", text: "Entries for enrolled grantees" },
+          { to: "/staff/auto-review", label: "Auto-Review", text: "Sort submitted applications in one click" },
+          { to: "/staff/enrollment", label: "Verify Enrollments", text: "Check against the Registrar's list" },
+          { to: "/staff/payroll", label: "Prepare Payroll", text: "Entries for enrolled grantees" },
         ]}
       />
 

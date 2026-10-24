@@ -59,6 +59,23 @@ class DemoDataSeeder extends Seeder
 
     private const AGENCY_DIRECT_NOTE = 'Apply directly to the scholarship-giving agency; requirements and allowances are handled by its office. The OAS posts announcements and updates when the agency requests it.';
 
+    /*
+     * Who each agency-direct program is for, from the agencies' own pages
+     * (checked 24 Oct 2026), so the AI field fit has something to match:
+     *   DOST-SEI   region6.dost.gov.ph/?p=5123
+     *   ACEF       acef.da.gov.ph/index.php/grant-in-aid/ (RA 10848)
+     *   Landbank   landbank.com/news/landbank-launches-scholarship-program-for-dependents-of-arbs-farmers-fishers
+     *   NGCP       sorsu.edu.ph/attention-engineering-students-call-for-ngcp-scholarship-program-application/
+     * OAS staff should keep these up to date from each new memo.
+     */
+    public const FOCUS = [
+        self::DOST => 'For students in priority science and technology fields: basic sciences, engineering, applied sciences, and science and mathematics education.',
+        self::DA_ACEF => 'For students taking agriculture, forestry, fisheries, veterinary medicine and related agricultural programs.',
+        self::GIAHEP => 'For students taking agriculture, forestry, fisheries, veterinary medicine and related agricultural programs.',
+        self::LANDBANK => 'For children and grandchildren of agrarian reform beneficiaries and small farmers and fishers, in courses such as horticulture, animal science, food technology, agribusiness management, accounting, data analytics, information technology, and agricultural, IT, industrial, civil and mechanical engineering.',
+        self::NGCP => 'For engineering students, with priority to BS Electrical Engineering.',
+    ];
+
     /**
      * [name, short name, provider, category, mode, amount, start, end, status, description, requirements]
      * mode: oas = apply in ScholarGuide; agency_direct = apply at the agency (no requirements here).
@@ -130,7 +147,7 @@ class DemoDataSeeder extends Seeder
                     'provider' => $provider,
                     'category' => $category,
                     'application_mode' => $mode,
-                    'description' => $description,
+                    'description' => isset(self::FOCUS[$name]) ? self::FOCUS[$name].' '.$description : $description,
                     'amount' => $amount, // demo amount per semester
                     'application_start' => $start,
                     'application_end' => $end,

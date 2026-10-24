@@ -4,7 +4,9 @@ import api, { errMsg } from "../../services/api";
 import { downloadCSV, formatDateTime } from "../../lib/format";
 import {
   CHECK_RESULT,
+  FIT_LEVELS,
   SCORE_RANGES,
+  fitMethod,
   STAFF_STATUS,
   VERDICTS,
   VIEWS,
@@ -333,6 +335,11 @@ export default function RecommendationsPage() {
                           </small>
                         </div>
                         {row.verdict !== "eligible" && <Badge map={VERDICTS} value={row.verdict} />}
+                        {row.fit?.level === "high" && (
+                          <small className="fit-tag" title="AI field fit: this program is for the student's field of study">
+                            Field: {row.fit.fields.join(", ")}
+                          </small>
+                        )}
                       </td>
                       <td className="check-cell" title={met.map((c) => c.label).join(", ")}>
                         <span className="text-success-soft">
@@ -392,7 +399,9 @@ export default function RecommendationsPage() {
 }
 
 /* "Why?": every check, the student's data, the decision buttons and the history. */
-function RecommendationWindow({ id, onClose, onChanged }) {
+function RecommendationWindow({ id: firstId, onClose, onChanged }) {
+  // "Other programs" can switch the window to another program for the same student.
+  const [id, setId] = useState(firstId);
   const toast = useToast();
   const confirm = useConfirm();
 
@@ -485,6 +494,61 @@ function RecommendationWindow({ id, onClose, onChanged }) {
       }
       onClose={onClose}
     >
+      {rec.next_steps && (
+        <div className={`next-box tone-${rec.next_steps.tone}`}>
+          <span className="field-label">What to do next</span>
+          <strong>{rec.next_steps.title}</strong>
+          <ol>
+            {rec.next_steps.steps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {rec.fit && (
+        <div className="fit-box">
+          <span className="field-label">AI field fit ({fitMethod(rec.fit.method)})</span>
+          <span>
+            <span className={`status status-${(FIT_LEVELS[rec.fit.level] || [])[1] || "neutral"}`}>{rec.fit.label}</span>
+            {rec.fit.fields.length > 0 && <> · {rec.fit.fields.join(", ")}</>}
+            {rec.fit.words.length > 0 && <span className="muted"> · shared words: {rec.fit.words.join(", ")}</span>}
+          </span>
+          {rec.field_matches?.filter((m) => m.agency_direct).length > 0 && (
+            <small className="muted">
+              Also for this student&apos;s field (apply at the agency):{" "}
+              {rec.field_matches
+                .filter((m) => m.agency_direct)
+                .map((m) => m.program)
+                .join(", ")}
+            </small>
+          )}
+          <small className="muted">It only ranks and explains; the rules above decide eligibility.</small>
+        </div>
+      )}
+
+      {rec.other_matches?.length > 0 && (
+        <details className="other-matches">
+          <summary>
+            Other programs for this student ({rec.other_matches.filter((o) => o.verdict === "eligible").length} meet the
+            rules)
+          </summary>
+          <ul>
+            {rec.other_matches.map((other) => (
+              <li key={other.id}>
+                <button className="link-button" onClick={() => setId(other.id)}>
+                  {other.program}
+                </button>
+                <strong>{other.score}%</strong>
+                <Badge map={VERDICTS} value={other.verdict} />
+                {other.staff_status !== "new" && <Badge map={STAFF_STATUS} value={other.staff_status} />}
+                {other.applied_status && <span className="muted small">Applied: {appliedLabel(other.applied_status)}</span>}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
       <div className="calc-box">
         <span className="field-label">How the score was calculated</span>
         <strong>{rec.calculation}</strong>

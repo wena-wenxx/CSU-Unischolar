@@ -174,6 +174,22 @@ Their AI results were computed by the seeder with a PHP copy of the same `valida
 identical results on every seeded file). A few are deliberately wrong (another person's file, the wrong document,
 a missing ID, an unreadable blank page) so the Needs Action, Flagged and Needs Review lists are not empty.
 
+## Sample approved lists (round 12)
+
+To test **Staff → Approved Lists** with every file type, run in `backend`:
+
+```
+php artisan demo:approved-lists
+```
+
+It writes `approved-<program>.pdf`, `.docx`, `.xlsx` and `.csv` to `backend/storage/app/demo-approved-lists/`,
+plus a `README.txt` that says which program to choose for each file and what result to expect. The students are the
+applications **forwarded to the agency** in *your* database, so the Student IDs always match. Each list has:
+the free students (they become *approved*), **one** student who already holds another scholarship (an *error*:
+the one-scholarship rule), and `2026-99999` (*unmatched*). One forwarded student is left out (stays forwarded).
+After you process a list, run the command again to get lists for the next programs. The layouts are made up for
+testing; they are **not** any agency's official form. PDF, Word and Excel are read by the AI service (keep it running).
+
 ## Known limits (say these honestly to the panel)
 
 - **Grades uploaded as a COR is not caught.** Both documents genuinely contain *SUBJECT, UNITS, SEMESTER*,

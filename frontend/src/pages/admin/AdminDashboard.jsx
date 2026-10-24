@@ -65,10 +65,10 @@ export default function AdminDashboard() {
 
       <QuickActions
         actions={[
-          { to: "/admin/staff?new=1", icon: "👤", label: "New Staff Account", text: "Create an OAS staff or admin login" },
-          { to: "/admin/students?new=1", icon: "🎓", label: "New Student Account", text: "Create a student login" },
-          { to: "/admin/activity", icon: "🕘", label: "Activity Logs", text: "Who did what and when" },
-          { to: "/admin/settings", icon: "⚙️", label: "System Settings", text: "School year, semester, OAS contact" },
+          { to: "/admin/staff?new=1", label: "New Staff Account", text: "Create an OAS staff or admin login" },
+          { to: "/admin/students?new=1", label: "New Student Account", text: "Create a student login" },
+          { to: "/admin/activity", label: "Activity Logs", text: "Who did what and when" },
+          { to: "/admin/settings", label: "System Settings", text: "School year, semester, OAS contact" },
         ]}
       />
 

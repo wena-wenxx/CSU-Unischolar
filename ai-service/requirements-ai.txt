@@ -1,0 +1,6 @@
+# OPTIONAL: the pretrained text-matching model for AI Recommendations (field fit).
+# Without it the AI service still works and uses TF-IDF word matching.
+#   pip install -r requirements-ai.txt
+# The first run downloads the model BAAI/bge-small-en-v1.5 (about 70 MB, free, MIT licence) once;
+# after that it runs offline on the CPU.
+fastembed
