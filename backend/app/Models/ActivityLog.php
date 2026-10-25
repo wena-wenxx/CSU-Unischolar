@@ -20,7 +20,7 @@ class ActivityLog extends Model
     }
 
     /*
-    | ActivityLog::record($user, 'application.approved', 'Approved by agency: Juan Student (TES)', $application)
+    | ActivityLog::record($user, 'application.approved', 'Approved by agency: Juan Navarro (TES)', $application)
     | Never stops the action it describes: if logging fails, the error is ignored.
     */
     public static function record(?User $user, string $action, string $description, ?Model $subject = null): ?self

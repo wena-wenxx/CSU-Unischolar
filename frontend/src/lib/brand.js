@@ -5,7 +5,7 @@
 export const APP_NAME = "ScholarGuide";
 export const UNIVERSITY = "Caraga State University";
 export const OFFICE = "Office of Admission and Scholarship";
-export const CARD_FOOTER = "CSU UniScholar — Capstone Prototype 2026";
+export const CARD_FOOTER = `© ${new Date().getFullYear()} Caraga State University`;
 
 // Official CSU core values (shown on the university banner).
 export const MOTTO = "Competence. Service. Uprightness.";

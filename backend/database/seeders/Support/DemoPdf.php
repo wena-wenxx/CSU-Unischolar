@@ -15,7 +15,7 @@ class DemoPdf
      * @param  string   $title  Big heading, e.g. "CERTIFICATE OF REGISTRATION"
      * @param  string[] $lines  Body lines (plain text)
      */
-    public static function make(string $title, array $lines, string $issuer = 'CSU UniScholar Demo'): string
+    public static function make(string $title, array $lines, string $issuer = 'Sample document'): string
     {
         $content = [];
 

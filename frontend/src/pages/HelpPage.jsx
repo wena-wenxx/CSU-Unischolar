@@ -72,8 +72,7 @@ export default function HelpPage() {
       ))}
 
       <p className="muted help-footer">
-        Still stuck? Visit or message the Office of Admission and Scholarship. Apart from the test student account,
-        all accounts and records in this prototype are fictional.
+        Still stuck? Visit or message the Office of Admission and Scholarship.
       </p>
     </div>
   );

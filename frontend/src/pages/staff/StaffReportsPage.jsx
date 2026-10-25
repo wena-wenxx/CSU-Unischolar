@@ -301,8 +301,7 @@ export default function StaffReportsPage() {
 
         <p className="muted small">
           Students get an e-mail when their application is approved (by review or by an agency list), and when OAS invites
-          them from AI Recommendations. Demo setting:
-          e-mails are written to the server log or caught by a Mailtrap test inbox, never delivered to real addresses.
+          them from AI Recommendations. Each one is listed here with its status, so OAS can see if a message failed.
         </p>
 
         {data.emails.length === 0 ? (

@@ -88,7 +88,7 @@ Every request needs the header **Accept: application/json**. After logging in, p
 - [ ] **A4. Scholarships** — `GET /api/scholarships` (student token). Expect **200** and **12** programs with `requirements` (CMSP is closed, so students do not see it).
 - [ ] **A5. Staff dashboard** — `GET /api/staff/dashboard` (staff token). Expect **200**, `total_applicants: 130`, `total_applications: 560`, `needs_action: 49`, `approved: 99`, `active_scholars: 61`, `payroll_ready: 18`, `ai_flags: 225`, `scholarships: 20`.
 - [ ] **A6. Students are blocked** — A5 with the *student* token. Expect **403**.
-- [ ] **A7. Data Bank** — `GET /api/staff/data-bank?q=2026-00003` (staff token). Expect **200** and Ana Demo Student in the list.
+- [ ] **A7. Data Bank** — `GET /api/staff/data-bank?q=2026-00003` (staff token). Expect **200** and Ana Torres Ramirez in the list.
 
 ---
 
@@ -150,9 +150,9 @@ Every request needs the header **Accept: application/json**. After logging in, p
   "Is this student currently enrolled?" → keep **Yes, currently enrolled** → **Save verification**.
   Expect: "Enrollment verified. You can now tag this student as a grantee."
 - [ ] **B17. Tag grantee** — Close the window. **Scholar Records** → *Ready to Tag as Grantee* lists 8 students,
-  including Liza Demo Mendoza and Juan Demo Student.
+  including Liza Morales Mendoza and Juan Lopez Navarro.
   Click **Tag as Grantee** on Juan. Choose **Yes, has an ATM card** → **Tag as grantee**.
-  Expect: "Juan Demo Student is now tagged as a grantee." and Juan under *Current Scholar Records*.
+  Expect: "Juan Lopez Navarro is now tagged as a grantee." and Juan under *Current Scholar Records*.
 - [ ] **B18. One active scholarship rule** — Sign in as `student1` (Juan), click **Apply** on any other scholarship.
   Expect: "You already have an active scholarship. Only one active scholarship is allowed." Sign back in as staff.
 - [ ] **B19. Batch payroll** — **Payroll** → click **Prepare payroll for all enrolled scholars (62)**.
@@ -246,7 +246,7 @@ Run `php artisan migrate:fresh --seed` first. In `backend/.env` set `QUEUE_CONNE
 
 **Search, cards, sidebar, profile**
 - [ ] **D6.** Search box (top bar): student types `my doc` → "Go to My Documents"; staff types `juan` → three students →
-  click *Juan Student (2026-00001)* → Data Bank opens his history. `CHED` → two programs → click → Manage window.
+  click *Juan Navarro (2026-00001)* → Data Bank opens his history. `CHED` → two programs → click → Manage window.
   `payroll` + Enter → Payroll page.
 - [ ] **D7.** Staff dashboard: every number is a link. Needs Action → Applications with *Needs action (49)* selected;
   AI Flags (documents) 225 "In 179 applications" → *Has AI flags (179)*; Payroll Ready → Payroll with *Ready (18)*.
@@ -446,7 +446,7 @@ fictional students, and the first run of the recommendations). See `AI_RECOMMEND
 Before: `php artisan demo:external-lists` (writes 4 sample lists to `backend/storage/app/demo-external-lists/`), and
 the AI service running with `openpyxl` and `python-docx` installed (`pip install -r requirements.txt`).
 
-- [ ] **J1.** External Grantees shows one saved sample list (*Sample Municipal Scholarship*, 3 students).
+- [ ] **J1.** External Grantees shows one saved sample list (*Municipal Educational Assistance Program*, 3 students).
 - [ ] **J2.** Upload `lgu-educational-assistance.xlsx` as *Sample LGU Educational Assistance* → "Read 6 line(s): 5
   matched … 1 did not match". The misspelled name ("Gacria") is matched by name (about 93%).
 - [ ] **J3.** Upload `foundation-scholars.docx` → 2 matched, **1 to check** (the Student ID belongs to another

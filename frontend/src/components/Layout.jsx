@@ -173,8 +173,6 @@ export default function Layout() {
 
             {user.role === "student" && <NotificationBell />}
 
-            <span className="user-name">{user.name}</span>
-
             <span className="role-label">{user.role}</span>
           </div>
         </header>

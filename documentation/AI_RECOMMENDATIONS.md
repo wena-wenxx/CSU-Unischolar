@@ -21,7 +21,7 @@ explains and suggests**. Nothing is approved by the AI.
 | AI part | Model | What it does | Without it |
 |---|---|---|---|
 | **Field fit** (`ai-service/fit_matcher.py`) | Sentence embeddings, **BAAI/bge-small-en-v1.5** through **fastembed** (pretrained, ~70 MB, CPU) | Compares each student (course, college, year, and their optional *My field and goals*) with each program's description, and tags both with fields of study (Agriculture, Engineering, Computing, …). Programs for the student's field are listed first, and agency-direct programs for their field are shown as *Also for your field*. | TF-IDF word matching (built in). Same fields, rougher similarity. |
-| **Memo reader** (`ai-service/rule_reader.py`) | A local large language model through **Ollama** (default **llama3.2:3b**) | Staff paste or upload a scholarship memo; the model suggests the GWA, income ceiling, year levels, colleges, one-scholarship rule, documents, deadline and amount, **each with the sentence it came from**. Values whose sentence is not in the memo are marked *check*. Staff tick what is right; it goes into the form; staff press Save. | Simple pattern reading (GWA 2.25, ₱300,000, "first year", document names…). |
+| **Memo reader** (`ai-service/rule_reader.py`) | A local large language model through **Ollama** (it uses the model you installed: **qwen2.5:1.5b** or llama3.2:3b) | Staff paste or upload a scholarship memo; the model suggests the GWA, income ceiling, year levels, colleges, one-scholarship rule, documents, deadline and amount, **each with the sentence it came from**. Values whose sentence is not in the memo are marked *check*. Staff tick what is right; it goes into the form; staff press Save. | Simple pattern reading (GWA 2.25, ₱300,000, "first year", document names…). |
 
 Fit levels: **Matches the field** (a shared field), **Close to the field** (similar text, no shared field), **Other
 fields**, **Open to all fields** (the program names no field, e.g. TES: this is not a "low fit"). The similarity
@@ -50,10 +50,10 @@ pip install -r requirements-ai.txt        # fastembed; the model downloads on fi
 ```
 Ollama: install it from https://ollama.com (Windows installer), then in PowerShell:
 ```
-ollama pull llama3.2:3b                   # about 2 GB; needs about 8 GB of RAM to run
+ollama pull qwen2.5:1.5b                  # about 1 GB; runs on a normal 8 GB laptop
 ```
 Keep Ollama running (it starts with Windows after install). Optional settings in the AI service environment:
-`OLLAMA_URL` (default `http://127.0.0.1:11434`), `OLLAMA_MODEL` (default `llama3.2:3b`), `FIT_MODEL`.
+`OLLAMA_URL` (default `http://127.0.0.1:11434`), `OLLAMA_MODEL` (empty = use the installed model, qwen2.5:1.5b first), `FIT_MODEL`.
 Check: `http://127.0.0.1:8001/fit-status` says `"method": "embeddings"` when the model is in use.
 
 The existing AI parts keep their jobs:

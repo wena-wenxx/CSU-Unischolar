@@ -6,7 +6,8 @@ saved or approved here.
 
 Two ways to read:
   1. A local large language model through Ollama (free, runs on the OAS
-     computer, nothing leaves it). Default model: llama3.2:3b.
+     computer, nothing leaves it). It uses the installed model
+     (qwen2.5:1.5b or llama3.2:3b first) unless OLLAMA_MODEL is set.
        Install Ollama (ollama.com), then:  ollama pull llama3.2:3b
        Settings (.env of the AI service): OLLAMA_URL, OLLAMA_MODEL
      The model must quote the sentence for every value. Values whose quote
@@ -23,7 +24,23 @@ import urllib.request
 from fit_matcher import fields_of
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+# Empty = use whichever model is installed (qwen2.5:1.5b or llama3.2:3b first).
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "").strip()
+PREFERRED_MODELS = ("qwen2.5:1.5b", "llama3.2:3b", "qwen2.5:3b", "llama3.2:1b")
+
+
+def ollama_model(timeout=3):
+    """The model to use: OLLAMA_MODEL if set, else the best one Ollama has installed."""
+    if OLLAMA_MODEL:
+        return OLLAMA_MODEL
+    with urllib.request.urlopen(OLLAMA_URL.rstrip("/") + "/api/tags", timeout=timeout) as response:
+        names = [m.get("name", "") for m in json.loads(response.read().decode()).get("models", [])]
+    if not names:
+        raise RuntimeError("Ollama is running but has no model. Run: ollama pull qwen2.5:1.5b")
+    for wanted in PREFERRED_MODELS:
+        if wanted in names:
+            return wanted
+    return names[0]
 MAX_CHARS = 12000
 
 DOCUMENT_PATTERNS = {
@@ -161,14 +178,14 @@ MEMO:
 \"\"\"{memo}\"\"\""""
 
 
-def _ollama(text, options, timeout=180):
+def _ollama(text, options, model, timeout=180):
     prompt = PROMPT.format(
         years=json.dumps(options.get("year_levels", [])),
         colleges=json.dumps(options.get("colleges", [])),
         documents=json.dumps(options.get("documents", [])),
         memo=text[:MAX_CHARS],
     )
-    body = json.dumps({"model": OLLAMA_MODEL, "prompt": prompt, "stream": False, "format": "json",
+    body = json.dumps({"model": model, "prompt": prompt, "stream": False, "format": "json",
                        "options": {"temperature": 0}}).encode()
     request = urllib.request.Request(OLLAMA_URL.rstrip("/") + "/api/generate", data=body,
                                      headers={"Content-Type": "application/json"})
@@ -228,13 +245,16 @@ def suggest(text, options, use_llm=True):
     patterns = _clean(pattern_suggest(text, options), text, options, "pattern")
 
     if use_llm:
+        model = OLLAMA_MODEL or "Ollama"
         try:
-            llm = _clean(_ollama(text, options), text, options, "llm")
+            model = ollama_model()
+            llm = _clean(_ollama(text, options, model), text, options, "llm")
             # The model's answers first; the patterns fill what it left out.
             merged = {**patterns, **llm}
-            return {"method": f"ollama:{OLLAMA_MODEL}", "suggestions": merged, "warnings": warnings}
+            return {"method": f"ollama:{model}", "suggestions": merged, "warnings": warnings}
         except Exception as e:
-            warnings.append(f"The local AI model (Ollama, {OLLAMA_MODEL}) is not running or failed ({type(e).__name__}), "
-                            "so simple pattern reading was used. Start Ollama for better results.")
+            reason = str(e) if isinstance(e, RuntimeError) else type(e).__name__
+            warnings.append(f"The local AI model ({model}) is not running or failed ({reason}), "
+                            "so simple pattern reading was used. Open the Ollama app, then try again.")
 
     return {"method": "patterns", "suggestions": patterns, "warnings": warnings}

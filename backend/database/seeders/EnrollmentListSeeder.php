@@ -35,7 +35,7 @@ class EnrollmentListSeeder extends Seeder
 
         $list = EnrollmentList::create([
             'period' => PayrollController::currentPeriod(),
-            'file_name' => 'registrar-enrolled-students-DEMO.csv',
+            'file_name' => 'registrar-enrolled-students.csv',
             'uploaded_by' => User::where('role', 'staff')->value('id'),
             'rows_count' => 0,
         ]);

@@ -18,7 +18,7 @@ use Illuminate\Database\Seeder;
  */
 class ExternalGranteeSeeder extends Seeder
 {
-    public const PROGRAM = 'Sample Municipal Scholarship';
+    public const PROGRAM = 'Municipal Educational Assistance Program';   // fictional
 
     public function run(): void
     {
@@ -63,7 +63,7 @@ class ExternalGranteeSeeder extends Seeder
 
         $upload = ExternalGranteeUpload::create([
             'program_name' => self::PROGRAM,
-            'agency' => 'Sample Municipal LGU',
+            'agency' => 'Municipal Scholarship Office',
             'category' => 'lgu',
             'school_year' => '2026-2027',
             'file_name' => 'municipal-scholars-2026.xlsx',
@@ -92,7 +92,7 @@ class ExternalGranteeSeeder extends Seeder
                 'extracted_name' => $line['name'],
                 'extracted_student_id' => $line['student_id'] ?: null,
                 'program_name' => self::PROGRAM,
-                'agency' => 'Sample Municipal LGU',
+                'agency' => 'Municipal Scholarship Office',
                 'category' => 'lgu',
                 'school_year' => '2026-2027',
                 'match_status' => $line['result'],

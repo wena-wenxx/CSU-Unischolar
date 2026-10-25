@@ -141,7 +141,7 @@ export default function MyDocumentsPage() {
                       : "This document does not expire."}
                   </p>
 
-                  <AiResult file={current} />
+                  <AiResult file={current} checkable={Boolean(row)} />
 
                   {current.applications.length > 0 && (
                     <p className="muted small">
@@ -171,14 +171,18 @@ export default function MyDocumentsPage() {
                   onChange={(event) => setFiles((f) => ({ ...f, [type]: event.target.files?.[0] || null }))}
                 />
 
-                <button
-                  type="button"
-                  className="button button-small button-primary"
-                  onClick={() => save(type, current)}
-                  disabled={!files[type] || busy !== null}
-                >
-                  {busy === type ? "Saving..." : current ? "Replace" : "Upload"}
-                </button>
+                {files[type] ? (
+                  <button
+                    type="button"
+                    className="button button-small button-primary"
+                    onClick={() => save(type, current)}
+                    disabled={busy !== null}
+                  >
+                    {busy === type ? "Saving..." : current ? "Replace with this file" : "Upload"}
+                  </button>
+                ) : (
+                  <span className="muted small">Choose a file to {current ? "replace this copy" : "upload it"}.</span>
+                )}
 
                 {current && row && current.status === "uploaded" && (
                   <button
@@ -242,7 +246,7 @@ function ValidityBadge({ file }) {
   return <span className="status status-success">Valid</span>;
 }
 
-function AiResult({ file }) {
+function AiResult({ file, checkable }) {
   if (file.status === "validated") {
     return <p className="ai-note ok">✓ AI check: no problems found.</p>;
   }
@@ -268,5 +272,9 @@ function AiResult({ file }) {
     return <p className="ai-note review">The AI could not read this file. OAS will check it by hand.</p>;
   }
 
-  return <p className="ai-note muted small">Not checked by the AI yet.</p>;
+  if (!checkable) {
+    return <p className="ai-note muted small">Sent to OAS with your application. The staff will check it.</p>;
+  }
+
+  return <p className="ai-note muted small">Not checked by the AI yet. Press “Check with AI” below.</p>;
 }

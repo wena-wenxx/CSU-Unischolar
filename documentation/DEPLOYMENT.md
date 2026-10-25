@@ -14,6 +14,17 @@ Laravel *and* MySQL in one project and keeps uploaded files on a volume.
 Hugging Face gives the AI service 16 GB of RAM for free, which PaddleOCR
 needs and which would be expensive anywhere else.
 
+> **Read first — things that changed (checked October 25, 2026):**
+> - **Hugging Face** now needs a paid **PRO** account to create a Docker Space. The "free AI service on
+>   Hugging Face" in step 1 no longer works on a free account.
+> - **Railway** blocks normal e-mail sending (SMTP, like Gmail) on the Trial and Hobby plans; it works only on Pro.
+>   Online, send e-mail through an HTTPS e-mail service instead (for example Resend: `composer require
+>   resend/resend-php`, then `MAIL_MAILER=resend` and `RESEND_API_KEY=...`), or keep `MAIL_MAILER=log`.
+> - **Ollama** (the memo reader's AI model) runs on your own computer. Online, the memo reader uses its
+>   simple pattern reading unless the server has its own Ollama.
+> - For the defense, the safest choice is to run everything on your laptop and share it with a link
+>   (see "Option: share from your laptop" at the end).
+
 > **Status:** the files this guide uses (`backend/Dockerfile`,
 > `backend/docker/start.sh`, `ai-service/Dockerfile`, `frontend/vercel.json`)
 > were written for this project but have **not** been test-deployed yet.
@@ -248,3 +259,23 @@ If something fails, look here first:
 - All demo accounts and documents are fictional. Do not upload real student
   documents to the public demo.
 - `APP_DEBUG=false` in production so error pages do not show secrets.
+
+
+---
+
+## Option: share from your laptop (free, nothing to host)
+
+Everything (Gmail e-mail, Ollama, PaddleOCR) keeps working because it all runs on your computer.
+The link works only while your laptop is on and these windows are open.
+
+1. Start the system as usual (backend, AI service, `npm run dev`).
+2. Install Cloudflare's free tunnel tool once: `winget install --id Cloudflare.cloudflared`
+3. Open a new PowerShell and run: `cloudflared tunnel --url http://localhost:5173`
+4. It prints a link like `https://random-words.trycloudflare.com`. Anyone can open it.
+5. Open a third PowerShell for the backend: `cloudflared tunnel --url http://localhost:8000`. Copy its link.
+6. In `frontend/.env` set `VITE_API_URL=<backend link>/api`. In `backend/.env` set `APP_URL=<backend link>`
+   (so uploaded files open) and leave `FRONTEND_URL` empty. Restart `npm run dev` and `php artisan serve`.
+   (`frontend/vite.config.js` already allows `*.trycloudflare.com` links.)
+
+The links change every time you start the tunnels, and Cloudflare says quick tunnels are for testing only
+(no uptime promise). Fine for a demo; not for real OAS use.

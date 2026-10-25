@@ -36,6 +36,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::get('/office-contact', [SettingController::class, 'officeContact']);   // login page help (public contact only)
 
 Route::middleware('auth:sanctum')->group(function () {
 

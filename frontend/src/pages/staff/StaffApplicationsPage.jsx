@@ -262,11 +262,11 @@ export default function StaffApplicationsPage() {
                       <small className="muted account-note">{application.student?.student_id}</small>
                     </td>
                     {activeProgram === "all" && (
-                      <td title={application.scholarship?.name}>
+                      <td className="nowrap" title={application.scholarship?.name}>
                         {application.scholarship?.short_name || application.scholarship?.name}
                       </td>
                     )}
-                    <td>{application.submitted_at ? formatDate(application.submitted_at) : "Not submitted"}</td>
+                    <td className="nowrap">{application.submitted_at ? formatDate(application.submitted_at) : "Not submitted"}</td>
                     <td>
                       <StatusBadge status={application.status} />
                     </td>
@@ -351,6 +351,15 @@ const ACTIONS = {
   rejected: { label: "Rejected by agency", className: "button-danger" },
 };
 
+// What staff see after changing the status (plain words, not status codes).
+const DONE_MESSAGE = {
+  under_review: "Marked as under review.",
+  needs_action: "Sent back to the student with your remarks.",
+  complete: "Forwarded to the agency. It is now in Forwarded to Agency.",
+  approved: "Recorded: approved by the agency. Next, verify the enrollment.",
+  rejected: "Recorded: not approved by the agency.",
+};
+
 // What staff should do next, for each status.
 const NEXT_HINT = {
   draft: "The student has not submitted this application yet. Nothing to review.",
@@ -386,7 +395,7 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
       });
 
       toast.success(
-        status === application.status ? "Remarks saved." : `Status changed to "${status.replaceAll("_", " ")}".`
+        status === application.status ? "Remarks saved." : DONE_MESSAGE[status] || `Status changed to "${status.replaceAll("_", " ")}".`
       );
 
       // Approval e-mail to the student (see Reports → E-mails sent).

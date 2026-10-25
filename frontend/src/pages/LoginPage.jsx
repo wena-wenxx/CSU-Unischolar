@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 
 import api, { errMsg } from "../services/api";
@@ -17,7 +17,8 @@ import {
 
 /*
   Login: full-screen CSU Main Campus photo under a dark green layer,
-  with a centred white sign-in card.
+  with a centred white sign-in card. "Forgot password?" shows how to get
+  a new password from the OAS (with its contact details).
 */
 export default function LoginPage() {
   const { user, login } = useAuth();
@@ -28,6 +29,16 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [forgot, setForgot] = useState(false);
+  const [contact, setContact] = useState(null);
+
+  // OAS contact details for "Forgot your password?" (public, no login needed).
+  useEffect(() => {
+    api
+      .get("/office-contact")
+      .then(({ data }) => setContact(data))
+      .catch(() => setContact(null));
+  }, []);
 
   // Already logged in? Go straight to the dashboard.
   if (user) {
@@ -96,7 +107,12 @@ export default function LoginPage() {
               />
             </div>
 
-            <label htmlFor="password">Password</label>
+            <div className="login-label-row">
+              <label htmlFor="password">Password</label>
+              <button type="button" className="login-forgot" onClick={() => setForgot(!forgot)} aria-expanded={forgot}>
+                Forgot password?
+              </button>
+            </div>
 
             <div className="login-input-wrapper">
               <span className="login-input-icon" aria-hidden="true">
@@ -123,6 +139,23 @@ export default function LoginPage() {
               </button>
             </div>
 
+            {forgot && (
+              <div className="login-help" role="note">
+                <strong>Forgot your password?</strong>
+                <p>
+                  The Office of Admission and Scholarship resets passwords. Contact them with your Student ID; you get a
+                  temporary password that you change after signing in.
+                </p>
+                {contact && (contact.oas_email || contact.oas_phone) && (
+                  <p className="login-help-contact">
+                    {contact.oas_email && <a href={`mailto:${contact.oas_email}`}>{contact.oas_email}</a>}
+                    {contact.oas_email && contact.oas_phone && " · "}
+                    {contact.oas_phone}
+                  </p>
+                )}
+              </div>
+            )}
+
             <button type="submit" className="login-submit" disabled={loading}>
               {loading ? (
                 <>
@@ -139,25 +172,6 @@ export default function LoginPage() {
             <span aria-hidden="true">✓</span> For CSU students and authorized OAS staff only.
           </p>
 
-          <details className="login-demo">
-            <summary>Demo accounts for testing</summary>
-
-            <dl>
-              <dt>System Admin</dt>
-              <dd>admin@carsu.edu.ph · Admin@12345</dd>
-
-              <dt>OAS Staff</dt>
-              <dd>oas.staff@carsu.edu.ph · Staff@12345</dd>
-
-              <dt>Test student</dt>
-              <dd>wenarose.contiga@carsu.edu.ph · Student@12345</dd>
-
-              <dt>Other demo student</dt>
-              <dd>student1@carsu.edu.ph · Student@12345</dd>
-            </dl>
-
-            <p>Testing accounts only; not connected to CSU SSO. Every other student in the demo data is fictional.</p>
-          </details>
 
           <p className="login-card-footer">{CARD_FOOTER}</p>
         </section>

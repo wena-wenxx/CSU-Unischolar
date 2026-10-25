@@ -15,7 +15,7 @@ Kit layout:
 
 ```
 csu-unischolar-demo-files/
-├── students/2026-00001-juan-student/ … 2026-00010-grace-lim/
+├── students/2026-00001-juan-navarro/ … 2026-00010-grace-lim/
 │     certificate-of-registration.pdf   certificate-of-grades.pdf
 │     certificate-of-indigency.pdf      birth-certificate.pdf
 │     valid-id.pdf                      barangay-clearance.pdf
@@ -57,7 +57,7 @@ its keywords appear. Always add a line `SAMPLE — NOT AN OFFICIAL DOCUMENT` at 
 SAMPLE — NOT AN OFFICIAL DOCUMENT
 CERTIFICATE OF REGISTRATION
 1st Semester, Academic Year 2026–2027
-Name: STUDENT, JUAN DEMO            Student ID No.: 2026-00001
+Name: NAVARRO, JUAN LOPEZ            Student ID No.: 2026-00001
 Course: BS Information Technology   Year Level: 4th Year
 [table] Code | Subject | Units | Schedule   (5–6 rows)
 Total units: 17
@@ -69,7 +69,7 @@ AI checks: name, **student ID**, keywords *REGISTRATION, ENROLL, UNITS, SUBJECT,
 SAMPLE — NOT AN OFFICIAL DOCUMENT
 CERTIFICATE OF GRADES
 2nd Semester, Academic Year 2025–2026
-Name: STUDENT, JUAN DEMO            Student ID No.: 2026-00001
+Name: NAVARRO, JUAN LOPEZ            Student ID No.: 2026-00001
 [table] Code | Subject | Units | Final Grade | Remarks
 General Weighted Average (GWA): 1.47
 ```
@@ -79,7 +79,7 @@ AI checks: name, **student ID**, keywords *GRADE(S), GWA, AVERAGE, SEMESTER, SUB
 A landscape box (Insert → Table, 1 cell) with:
 ```
 STUDENT IDENTIFICATION CARD     (sample only)
-[grey box: PHOTO]   Name: JUAN DEMO STUDENT
+[grey box: PHOTO]   Name: JUAN LOPEZ NAVARRO
                     ID No.: 2026-00001
                     Course: BS Information Technology
 _____________ Student signature          SAMPLE — NOT A REAL ID
@@ -92,8 +92,8 @@ Do not use a real photo; leave the grey box.
 SAMPLE — NOT AN OFFICIAL DOCUMENT
 Sample Civil Registry — for testing only
 CERTIFICATE OF LIVE BIRTH
-Name of child: JUAN DEMO STUDENT     Date of birth: January 15, 2004
-Mother: ELENA DEMO STUDENT           Father: RAMON DEMO STUDENT
+Name of child: JUAN LOPEZ NAVARRO     Date of birth: January 15, 2004
+Mother: ELENA LOPEZ NAVARRO           Father: RAMON CRUZ NAVARRO
 ```
 AI checks: name, keywords *BIRTH, LIVE BIRTH, PSA, REGISTRY, CIVIL REGISTRAR*. No student ID needed.
 Do **not** copy the real PSA form, logo or security patterns.
@@ -103,7 +103,7 @@ Do **not** copy the real PSA form, logo or security patterns.
 SAMPLE — NOT AN OFFICIAL DOCUMENT
 Barangay Sample, Butuan City (fictional)
 CERTIFICATE OF INDIGENCY
-This is to certify that JUAN DEMO STUDENT ... belongs to an indigent family with a low income.
+This is to certify that JUAN LOPEZ NAVARRO ... belongs to an indigent family with a low income.
 ```
 AI checks: name, keywords *INDIGENCY, INDIGENT, LOW INCOME*. No student ID needed.
 
@@ -112,7 +112,7 @@ AI checks: name, keywords *INDIGENCY, INDIGENT, LOW INCOME*. No student ID neede
 SAMPLE — NOT AN OFFICIAL DOCUMENT
 Barangay Sample, Butuan City (fictional)
 BARANGAY CLEARANCE
-This is to certify that JUAN DEMO STUDENT is a resident ... with no derogatory record.
+This is to certify that JUAN LOPEZ NAVARRO is a resident ... with no derogatory record.
 ```
 AI checks: name, keyword *CLEARANCE*. No student ID needed.
 Don't write "indigent" on a clearance (or "clearance" on an indigency certificate), or the two can't be told apart.
@@ -122,7 +122,7 @@ Don't write "indigent" on a clearance (or "clearance" on an indigency certificat
 SAMPLE — NOT AN OFFICIAL DOCUMENT
 Office of Student Affairs (sample)
 CERTIFICATE OF GOOD MORAL CHARACTER
-This is to certify that JUAN DEMO STUDENT, Student ID No. 2026-00001, has shown good moral character ...
+This is to certify that JUAN LOPEZ NAVARRO, Student ID No. 2026-00001, has shown good moral character ...
 ```
 AI checks: name, keywords *GOOD MORAL, MORAL CHARACTER*. No student ID needed.
 
@@ -130,7 +130,7 @@ AI checks: name, keywords *GOOD MORAL, MORAL CHARACTER*. No student ID needed.
 ```
 SAMPLE — NOT AN OFFICIAL DOCUMENT
 ANNUAL INCOME TAX RETURN — SUMMARY (sample, taxable year 2025)
-Taxpayer: RAMON DEMO STUDENT (father of the applicant)
+Taxpayer: RAMON CRUZ NAVARRO (father of the applicant)
 Gross compensation income: PHP 96,000.00     Taxable income: PHP 0.00     Tax due: PHP 0.00
 ```
 AI checks: only the **family surname** (the names on it are the parents', not the student's), keywords
@@ -141,7 +141,7 @@ AI checks: only the **family surname** (the names on it are the parents', not th
 SAMPLE — NOT AN OFFICIAL DOCUMENT
 October 1, 2026
 To the Scholarship Committee:
-I am pleased to recommend JUAN DEMO STUDENT for the scholarship ...
+I am pleased to recommend JUAN LOPEZ NAVARRO for the scholarship ...
 (signed) Prof. Sample Adviser, Department of Sample Studies
 ```
 AI checks: name, keyword *RECOMMEND*. No student ID needed.

@@ -23,4 +23,21 @@ class SettingController extends Controller
             'current_period' => PayrollController::currentPeriod(),
         ]);
     }
+
+    /*
+    | GET /office-contact  (no login needed; round 12)
+    | Only the OAS public contact details, for the login page
+    | ("Forgot your password?" / "Need help?").
+    */
+    public function officeContact()
+    {
+        $values = Setting::allValues();
+
+        return response()->json([
+            'oas_office_hours' => $values['oas_office_hours'],
+            'oas_location' => $values['oas_location'],
+            'oas_email' => $values['oas_email'],
+            'oas_phone' => $values['oas_phone'],
+        ]);
+    }
 }

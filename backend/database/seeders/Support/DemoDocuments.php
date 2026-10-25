@@ -64,7 +64,7 @@ class DemoDocuments
         $formal = strtoupper("{$p['last']}, {$p['first']} {$p['middle']}");
         $full = strtoupper("{$p['first']} {$p['middle']} {$p['last']}");
         $barangay = $p['barangay'] ?? 'Barangay Sample';
-        $registrar = 'CSU UniScholar Demo - Sample University Registrar';
+        $registrar = 'Sample University Registrar';
         $barangayOffice = "{$barangay}, Butuan City (fictional) - Office of the Punong Barangay";
 
         switch ($requirement) {
@@ -108,7 +108,7 @@ class DemoDocuments
                     '[ photo ]',
                     'Student signature: ____________________',
                     'Sample card for system testing only.',
-                ], 'CSU UniScholar Demo - sample only'];
+                ], 'Sample only'];
 
             case self::BIRTH:
                 return ['CERTIFICATE OF LIVE BIRTH', [
@@ -146,7 +146,7 @@ class DemoDocuments
                     'and has no record of disciplinary action in this office.',
                     'Issued this 1st day of September 2026.',
                     'Guidance Office (sample)',
-                ], 'CSU UniScholar Demo - Sample Guidance Office'];
+                ], 'Sample Guidance Office'];
 
             case self::ITR:
                 $income = number_format($p['family_income'] ?? 96000, 2);
@@ -169,10 +169,10 @@ class DemoDocuments
                     'I have found this applicant diligent, respectful and active in class and in school activities.',
                     'Respectfully yours,',
                     'Faculty Adviser (sample)',
-                ], 'CSU UniScholar Demo - sample letter'];
+                ], 'Sample letter'];
         }
 
-        return ['DOCUMENT', [$full], 'CSU UniScholar Demo'];
+        return ['DOCUMENT', [$full], 'Sample document'];
     }
 
     /** Plain text of a document, the way a PDF text reader would see it. */
