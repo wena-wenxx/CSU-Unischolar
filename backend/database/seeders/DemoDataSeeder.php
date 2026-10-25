@@ -172,7 +172,10 @@ class DemoDataSeeder extends Seeder
 
         [$gwa, $income, $years, $colleges] = self::SAMPLE_RULES[$name];
 
-        return ['max_gwa' => $gwa, 'max_family_income' => $income, 'year_levels' => $years, 'colleges' => $colleges];
+        return ['max_gwa' => $gwa, 'max_family_income' => $income, 'year_levels' => $years, 'colleges' => $colleges,
+            // Shown in the AI Recommendations "Why?" window, so nobody mistakes demo rules for official ones.
+            'rules_source' => 'SAMPLE rules for the demonstration only. They are NOT the official criteria of the provider. '
+                .'OAS: replace them with the rules in the current program memo (Scholarships → Manage → Eligibility rules).'];
     }
 
     /**
@@ -331,7 +334,7 @@ class DemoDataSeeder extends Seeder
             }
 
             $path = "documents/demo/{$student->student_id}/{$application->id}-{$fileName}";
-            Storage::disk('public')->put($path, $pdf);
+            Storage::disk(\App\Models\Document::DISK)->put($path, $pdf);
 
             Document::create([
                 'application_id' => $application->id,

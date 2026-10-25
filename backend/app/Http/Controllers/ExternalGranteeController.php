@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\OfficeTable;
+
 use App\Models\ActivityLog;
 use App\Models\ExternalGrantee;
 use App\Models\ExternalGranteeUpload;
@@ -399,6 +401,16 @@ class ExternalGranteeController extends Controller
         ]);
 
         $file = $request->file('file');
+        $extension = strtolower($file->getClientOriginalExtension());
+
+        // Word and Excel are read right here (no AI service needed).
+        if (in_array($extension, ['docx', 'xlsx'], true)) {
+            try {
+                return response()->json(OfficeTable::read($file->getRealPath(), $extension));
+            } catch (\Throwable $e) {
+                return response()->json(['message' => 'The file could not be read: '.$e->getMessage()], 422);
+            }
+        }
 
         try {
             $response = Http::timeout(300)
@@ -406,7 +418,7 @@ class ExternalGranteeController extends Controller
                 ->post(rtrim(config('services.ai.url'), '/').'/read-table');
         } catch (\Throwable $e) {
             return response()->json([
-                'message' => 'The AI service is not running, so this file could not be read. Start it, or save the list as CSV.',
+                'message' => 'The AI service is not running, so this PDF or picture could not be read. Start it (Terminal 2), or upload the list as Excel, Word or CSV.',
             ], 503);
         }
 

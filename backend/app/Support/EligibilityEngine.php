@@ -35,8 +35,20 @@ use Illuminate\Support\Facades\DB;
 | says whether OAS has checked them (data_verified), and staff can show
 | only students whose data OAS checked.
 |
-| Every check has equal weight:
-|     score = checks met / all checks x 100   (rounded)
+| Every check is worth 1 point, but a check only earns its full point when
+| it is backed by something checked:
+|     GWA / family income  1 point when OAS verified the figure; ½ point when
+|                          it was only typed by the student
+|     a document           1 point when OAS staff verified it; when the AI
+|                          check passed, the point is how sure the AI was that
+|                          the name on it is the student's (e.g. 0.92)
+|     year level, college   1 point (from the student's account: typed at sign-up;
+|                           later changes need an OAS-approved correction request)
+|     one scholarship       1 point (ScholarGuide grantee records + external lists)
+|     anything not met / not checked         0 points
+|     score = points earned / all checks x 100   (rounded)
+| So 100% means every rule is met with OAS-verified data and every required
+| document was checked with no doubt.
 | A must-have rule that is NOT met makes the verdict "not_eligible", even
 | when the score is high; a must-have rule that cannot be checked (no GWA
 | entered yet) makes it "no_data". Only "eligible" rows are recommended by
@@ -173,8 +185,7 @@ class EligibilityEngine
             ->groupBy('student_id');
 
         $external = ExternalGrantee::query()
-            ->where('match_status', 'matched')
-            ->where('status', 'active')
+            ->counting()
             ->whereIn('student_id', $studentIds)
             ->get()
             ->groupBy('student_id');
@@ -186,7 +197,7 @@ class EligibilityEngine
 
         // Newest copy of each document type per student (My Documents + applications).
         $documents = [];
-        Document::with(['requirement:id,name', 'validationResult:id,document_id,flags'])
+        Document::with(['requirement:id,name', 'validationResult:id,document_id,flags,confidence_score'])
             ->whereIn('student_id', $studentIds)
             ->orderBy('created_at')
             ->orderBy('id')
@@ -217,7 +228,7 @@ class EligibilityEngine
             $checks[] = self::check('gwa', 'GWA', true,
                 'GWA of '.number_format($limit, 2).' or better (1.00 is the highest grade)',
                 $gwa === null ? 'Not entered' : number_format($gwa, 2)." ({$source})",
-                $gwa === null ? 'no_data' : ($gwa <= $limit ? 'met' : 'not_met'));
+                $gwa === null ? 'no_data' : ($gwa <= $limit ? 'met' : 'not_met'), $verified ? 1.0 : 0.5);
         }
 
         if ($scholarship->max_family_income !== null) {
@@ -226,7 +237,7 @@ class EligibilityEngine
             $checks[] = self::check('income', 'Family income', true,
                 'Annual family income of PHP '.number_format($limit, 0).' or less',
                 $income === null ? 'Not entered' : 'PHP '.number_format($income, 0)." ({$source})",
-                $income === null ? 'no_data' : ($income <= $limit ? 'met' : 'not_met'));
+                $income === null ? 'no_data' : ($income <= $limit ? 'met' : 'not_met'), $verified ? 1.0 : 0.5);
         }
 
         if (!empty($scholarship->year_levels)) {
@@ -258,10 +269,10 @@ class EligibilityEngine
 
         foreach ($scholarship->requirements->where('is_required', true) as $requirement) {
             $document = $context['documents'][$student->id][$requirement->name] ?? null;
-            [$value, $result] = self::documentState($document);
+            [$value, $result, $points] = self::documentState($document);
 
             $checks[] = self::check('doc:'.$requirement->id, self::SHORT[$requirement->name] ?? $requirement->name, false,
-                'Required document: '.$requirement->name, $value, $result);
+                'Required document: '.$requirement->name, $value, $result, $points);
         }
 
         $total = count($checks);
@@ -278,7 +289,9 @@ class EligibilityEngine
             $verdict = 'no_data';
         }
 
-        $score = $total ? (int) round($met / $total * 100) : 0;
+        $earned = array_sum(array_column($checks, 'points'));
+        $score = $total ? (int) round($earned / $total * 100) : 0;
+        $pointsText = rtrim(rtrim(number_format($earned, 2, '.', ''), '0'), '.');
 
         return [
             'checks' => $checks,
@@ -286,13 +299,17 @@ class EligibilityEngine
             'total' => $total,
             'score' => $score,
             'verdict' => $verdict,
-            'calculation' => "{$met} of {$total} checks met ({$mustMet} of ".count($musts)." must-have rules, {$docsMet} of {$docs} documents) = {$score}%",
+            'calculation' => "{$met} of {$total} checks met ({$mustMet} of ".count($musts)." must-have rules, {$docsMet} of {$docs} documents); "
+                ."points earned {$pointsText} of {$total} = {$score}%",
         ];
     }
 
-    private static function check(string $key, string $label, bool $must, string $rule, string $value, string $result): array
+    /** One check. points: what it adds to the score (0 when not met; less than 1 when not fully checked). */
+    private static function check(string $key, string $label, bool $must, string $rule, string $value, string $result, float $points = 1.0): array
     {
-        return compact('key', 'label', 'must', 'rule', 'value', 'result');
+        $points = $result === 'met' ? round(max(0.0, min(1.0, $points)), 2) : 0.0;
+
+        return compact('key', 'label', 'must', 'rule', 'value', 'result', 'points');
     }
 
     private static function inList(string $value, array $list): bool
@@ -302,30 +319,34 @@ class EligibilityEngine
         return collect($list)->contains(fn ($item) => mb_strtolower(trim((string) $item)) === $needle);
     }
 
-    /** [what the staff member sees, met / not_met] for the student's newest copy of a document. */
+    /** [what the staff member sees, met / not_met, points] for the student's newest copy of a document. */
     private static function documentState(?Document $document): array
     {
         if (!$document) {
-            return ['Not uploaded', 'not_met'];
+            return ['Not uploaded', 'not_met', 0.0];
         }
 
         $saved = 'Saved '.$document->created_at?->format('M j, Y');
 
         if ($document->isExpired()) {
-            return [$saved.', expired on '.$document->expiresAt()?->format('M j, Y'), 'not_met'];
+            return [$saved.', expired on '.$document->expiresAt()?->format('M j, Y'), 'not_met', 0.0];
         }
 
         // A person's check (e.g. PhilSys Check, Registrar, barangay) counts even when the AI could not read it.
         if ($document->staff_verified_at) {
-            return [$saved.' · verified by OAS staff', 'met'];
+            return [$saved.' · verified by OAS staff', 'met', 1.0];
         }
 
+        // AI check passed: the point is how sure the AI was that the name on it is the student's.
+        $sure = $document->validationResult?->confidence_score;
+        $sure = $sure === null ? 100.0 : (float) $sure;
+
         return match ($document->status) {
-            'flagged' => [$saved.' · AI flagged: '.self::firstFlag($document), 'not_met'],
-            'needs_review' => [$saved.' · the AI could not read it (check by hand)', 'not_met'],
-            'validated' => [$saved.' · AI check: no problems', 'met'],
+            'flagged' => [$saved.' · AI flagged: '.self::firstFlag($document), 'not_met', 0.0],
+            'needs_review' => [$saved.' · the AI could not read it (check by hand)', 'not_met', 0.0],
+            'validated' => [$saved.' · AI check found no issue'.($sure < 100 ? ' (name match '.round($sure).'%)' : ''), 'met', $sure / 100],
             // Not checked yet: it may be fine, but it is not counted until the AI checks it.
-            default => [$saved.' · not AI-checked yet (run the AI check to count it)', 'not_met'],
+            default => [$saved.' · not AI-checked yet (run the AI check to count it)', 'not_met', 0.0],
         };
     }
 

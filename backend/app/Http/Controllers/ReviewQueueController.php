@@ -58,8 +58,7 @@ class ReviewQueueController extends Controller
 
         // Scholarships from outside parties (External Grantees) count too.
         $externalGrants = ExternalGrantee::query()
-            ->where('match_status', 'matched')
-            ->where('status', 'active')
+            ->counting()
             ->whereIn('student_id', $applications->pluck('student_id'))
             ->get()
             ->groupBy('student_id');

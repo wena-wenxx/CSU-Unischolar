@@ -4,8 +4,9 @@ import { parseCSV } from "./csv";
 /*
   Reads a list file chosen on Approved Lists or Enrollment into rows of cells.
     .csv                       read in the browser (no server needed)
-    .xlsx .docx .pdf .png .jpg read by the AI service (POST /staff/read-table)
-  For files read by the AI, title lines above the header (agency name,
+    .xlsx .docx                read by Laravel (POST /staff/read-table), no AI service needed
+    .pdf .png .jpg             read by the AI service (through the same address)
+  For files read on the server, title lines above the header (agency name,
   school year...) are dropped: the list starts at the widest row near the top.
   Returns { rows, warnings }.
 */

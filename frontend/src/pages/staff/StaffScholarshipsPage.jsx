@@ -28,6 +28,7 @@ const EMPTY_FORM = {
   year_levels: [],
   colleges: [],
   one_scholarship_only: true,
+  rules_source: "",
 };
 
 // The rule fields as the API expects them ("" -> null).
@@ -38,6 +39,7 @@ function rulesPayload(form) {
     year_levels: form.year_levels || [],
     colleges: form.colleges || [],
     one_scholarship_only: Boolean(form.one_scholarship_only),
+    rules_source: form.rules_source?.trim() || null,
   };
 }
 
@@ -382,6 +384,7 @@ function ManageScholarshipModal({ scholarshipId, types, ruleOptions, onClose, on
             year_levels: data.year_levels || [],
             colleges: data.colleges || [],
             one_scholarship_only: data.one_scholarship_only ?? true,
+            rules_source: data.rules_source || "",
           });
           setRequirements(data.requirements || []);
         })

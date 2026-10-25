@@ -483,7 +483,7 @@ class BulkDemoSeeder extends Seeder
 
             $slug = Doc::FILE_NAMES[$requirement->name] ?? 'document.pdf';
             $path = "documents/demo/bulk/{$p['student_id']}/{$applicationId}-{$slug}";
-            Storage::disk('public')->put($path, $pdf);
+            Storage::disk(\App\Models\Document::DISK)->put($path, $pdf);
             $this->files++;
 
             $original = $this->chance(0.5)

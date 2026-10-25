@@ -373,6 +373,11 @@ class ApplicationController extends Controller
 
         $application = Application::findOrFail($id);
 
+        // Separation of duties: the system administrator manages accounts, not applications.
+        if ($request->user()->role === 'admin') {
+            return response()->json(['message' => 'Only the student or OAS staff can add documents to an application.'], 403);
+        }
+
         if ($request->user()->role === 'student') {
 
             $student = Student::where(
@@ -416,10 +421,7 @@ class ApplicationController extends Controller
             }
         }
 
-        $path = $file->store(
-            'documents',
-            'public'
-        );
+        $path = $file->store('documents', Document::DISK);   // private: opened through a signed link
 
         $requirementName = $request->scholarship_requirement_id
             ? ScholarshipRequirement::whereKey($request->scholarship_requirement_id)->value('name')

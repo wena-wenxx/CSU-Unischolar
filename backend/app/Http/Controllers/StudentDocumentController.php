@@ -53,6 +53,7 @@ class StudentDocumentController extends Controller
             'type' => $document->typeName(),
             'original_filename' => $document->original_filename,
             'file_path' => $document->file_path,
+            'file_url' => $document->file_url,
             'status' => $document->status,
             'uploaded_at' => $document->created_at,
             'expires_at' => $expires?->toDateString(),
@@ -143,7 +144,7 @@ class StudentDocumentController extends Controller
             'application_id' => null,
             'scholarship_requirement_id' => null,
             'original_filename' => $file->getClientOriginalName(),
-            'file_path' => $file->store('documents', 'public'),
+            'file_path' => $file->store('documents', Document::DISK),
             'document_type' => $type,
             'status' => 'uploaded',
         ]);

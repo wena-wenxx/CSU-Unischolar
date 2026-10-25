@@ -235,7 +235,7 @@ export default function ApplicationDetailPage() {
         {fillable.length > 0 && (
           <div className="saved-banner">
             <span>
-              You already have {fillable.length} of these document{fillable.length === 1 ? "" : "s"} in{" "}
+              You already have {fillable.length} of these documents in{" "}
               <Link to="/student/documents">My Documents</Link>.
             </span>
             <button

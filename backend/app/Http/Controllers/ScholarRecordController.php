@@ -187,6 +187,12 @@ class ScholarRecordController extends Controller
 
         $record = ScholarRecord::findOrFail($id);
 
+        // Re-activating a grant follows the same one-active-scholarship rule as tagging.
+        if (($data['status'] ?? null) === 'active' && $record->status !== 'active'
+            && ($holding = $record->student?->otherActiveScholarship($record->scholarship_id))) {
+            return response()->json(['message' => "Student already has another active scholarship: {$holding}."], 422);
+        }
+
         // Funds only apply to a grantee with an ATM; the note only to one without.
         if (array_key_exists('has_atm', $data)) {
             if ($data['has_atm']) {

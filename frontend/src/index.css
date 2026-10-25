@@ -5216,3 +5216,115 @@ a.stat-card:hover,
 .login-card-footer {
   margin-top: 14px;
 }
+
+/* Program tabs wrap onto a second line instead of scrolling sideways, so every program is visible. */
+.sheet-tabs {
+  flex-wrap: wrap;
+  row-gap: 4px;
+  overflow: visible;
+}
+
+.sheet-tab {
+  border-bottom: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.sheet-tab.active {
+  border-bottom-color: var(--primary-color);
+}
+
+.sheet-tab.pinned {
+  position: static;
+  box-shadow: none;
+}
+
+.sheet-tabs {
+  padding-bottom: 8px;
+}
+
+/* Wide screens: the page uses the full width (no empty strip on the right). Long text lines stay
+   readable because cards and tables set their own widths. */
+.content {
+  max-width: none;
+}
+
+/* Recent activity and Profile correction requests start at the same height. */
+.dashboard-grid {
+  align-items: start;
+}
+
+.dashboard-grid > .card,
+.dashboard-recent {
+  margin-top: 0;
+}
+
+.dashboard-grid {
+  margin-top: 24px;
+}
+
+/* Applications grouped by student: a line above each student's block, none between their rows. */
+tr.group-start td {
+  border-top: 2px solid var(--border-strong, #c9d3cc);
+}
+
+tr.group-cont td {
+  border-top: 0;
+}
+
+/* "Why?" window: where the program's rules come from. */
+.rules-source {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+.rules-source-text {
+  margin: 4px 0;
+  white-space: pre-line;
+  font-size: 14px;
+}
+
+.score-split {
+  display: block;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+/* "The documents show different figures?" : two inputs and the button on one row. */
+.correct-figures {
+  margin: 6px 0 16px;
+}
+
+.correct-figures summary {
+  cursor: pointer;
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.correct-figures .inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+  margin: 10px 0 6px;
+}
+
+.correct-figures .inline-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 200px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.correct-figures .inline-form input {
+  width: 100%;
+}
+
+.correct-figures .inline-form .button {
+  flex: 0 0 auto;
+  height: 42px;
+}

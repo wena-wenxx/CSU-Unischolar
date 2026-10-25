@@ -41,9 +41,9 @@ class AIController extends Controller
             }
         }
 
-        $fullPath = Storage::disk('public')->path($document->file_path);
+        $fullPath = $document->absolutePath();
 
-        if (!file_exists($fullPath)) {
+        if (!$fullPath || !file_exists($fullPath)) {
             return response()->json([
                 'message' => 'Document file not found.'
             ], 404);
@@ -85,7 +85,8 @@ class AIController extends Controller
 
             return response()->json([
                 'message' => 'Unable to connect to AI service. The document was sent to manual review.',
-                'error' => $e->getMessage()
+                // Technical detail only for staff (it can show server names).
+                'error' => $request->user()->role === 'staff' ? $e->getMessage() : null,
             ], 503);
         }
 

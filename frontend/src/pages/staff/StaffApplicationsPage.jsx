@@ -30,6 +30,7 @@ const FILTERS = [
 ];
 
 const SORTS = {
+  student: "Grouped by student",
   recent: "Latest activity first",
   name: "Student name (A–Z)",
   submitted_old: "Oldest submitted first (queue)",
@@ -55,7 +56,7 @@ export default function StaffApplicationsPage() {
   });
   const [query, setQuery] = useState("");
   const [program, setProgram] = useState("all");
-  const [sort, setSort] = useState("recent");
+  const [sort, setSort] = useState("student");
   const [selected, setSelected] = useState(null);
   const [verifying, setVerifying] = useState(null);
   const version = useRef(null);
@@ -129,10 +130,11 @@ export default function StaffApplicationsPage() {
     if (selected?.id === id) await openApplication(id);
   }
 
+  // All programs: one block per student (a student can apply to several programs).
   // A program tab lists its students A to Z (like a sheet in Excel).
   function chooseProgram(key) {
     setProgram(key);
-    setSort(key === "all" ? "recent" : "name");
+    setSort(key === "all" ? "student" : "name");
   }
 
   const inFilter = (application, key) => {
@@ -162,14 +164,28 @@ export default function StaffApplicationsPage() {
   const tabs = programTabs(searched, (a) => a.scholarship);
   const activeProgram = tabs.some((tab) => tab.key === program) ? program : "all";
 
+  // Grouped by student: the student with the newest activity first, then their applications (newest first).
+  const latestOf = {};
+  searched.forEach((a) => {
+    latestOf[a.student_id] = Math.max(latestOf[a.student_id] || 0, time(a.updated_at));
+  });
+  const countOf = {};
   const shown = searched
     .filter((application) => activeProgram === "all" || String(application.scholarship_id) === activeProgram)
     .sort((a, b) => {
+      if (sort === "student") {
+        return latestOf[b.student_id] - latestOf[a.student_id] || a.student_id - b.student_id || time(b.updated_at) - time(a.updated_at);
+      }
       if (sort === "submitted_new") return time(b.submitted_at) - time(a.submitted_at);
       if (sort === "submitted_old") return (time(a.submitted_at) || Infinity) - (time(b.submitted_at) || Infinity);
       if (sort === "name") return byLastName(a.student, b.student);
       return time(b.updated_at) - time(a.updated_at); // the backend's default order
     });
+  shown.forEach((a) => {
+    countOf[a.student_id] = (countOf[a.student_id] || 0) + 1;
+  });
+  const grouped = sort === "student";
+
   // Long lists: 25 rows first, then Show more (resets on another tab, filter or search).
   const page = usePaged(shown, `${activeProgram}|${shown.length}|${shown[0]?.id}`);
 
@@ -255,11 +271,22 @@ export default function StaffApplicationsPage() {
               </thead>
 
               <tbody>
-                {page.visible.map((application) => (
-                  <tr key={application.id}>
+                {page.visible.map((application, index) => {
+                  const sameStudent = grouped && index > 0 && page.visible[index - 1].student_id === application.student_id;
+                  return (
+                  <tr key={application.id} className={sameStudent ? "group-cont" : grouped ? "group-start" : undefined}>
                     <td>
-                      <strong>{lastFirst(application.student)}</strong>
-                      <small className="muted account-note">{application.student?.student_id}</small>
+                      {sameStudent ? (
+                        <span className="sr-only">{lastFirst(application.student)}</span>
+                      ) : (
+                        <>
+                          <strong>{lastFirst(application.student)}</strong>
+                          <small className="muted account-note">
+                            {application.student?.student_id}
+                            {grouped && countOf[application.student_id] > 1 && ` · ${countOf[application.student_id]} applications`}
+                          </small>
+                        </>
+                      )}
                     </td>
                     {activeProgram === "all" && (
                       <td className="nowrap" title={application.scholarship?.name}>
@@ -300,7 +327,8 @@ export default function StaffApplicationsPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

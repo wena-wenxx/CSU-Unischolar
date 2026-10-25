@@ -554,6 +554,14 @@ export default function ExternalGranteesPage() {
                     </td>
                     <td>
                       <span className={`status status-${g.status === "active" ? "success" : "neutral"}`}>{g.status}</span>
+                      {g.status === "active" && g.past_school_year && (
+                        <small
+                          className="muted account-note"
+                          title="A list from a school year that has ended does not block other scholarships"
+                        >
+                          Past school year: not counted
+                        </small>
+                      )}
                     </td>
                     <td>
                       {g.student && (

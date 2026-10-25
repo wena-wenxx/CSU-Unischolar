@@ -74,10 +74,10 @@ class DataBankController extends Controller
                 ->whereHas('applications', fn ($a) => $a->where('scholarship_id', $id))
                 ->orWhereHas('scholarRecords', fn ($r) => $r->where('scholarship_id', $id))))
             ->when($filters['external_program'] ?? null, fn ($q, $name) => $q->whereHas('externalGrantees',
-                fn ($e) => $e->where('program_name', $name)->where('match_status', 'matched')->where('status', 'active')))
+                fn ($e) => $e->where('program_name', $name)->counting()))
             ->when($filters['standing'] ?? null, function ($q, $standing) {
                 $submitted = fn ($a) => $a->where('status', '!=', 'draft');
-                $external = fn ($e) => $e->where('match_status', 'matched')->where('status', 'active');
+                $external = fn ($e) => $e->counting();
                 match ($standing) {
                     'external' => $q->whereHas('externalGrantees', $external),
                     'active' => $q->whereHas('scholarRecords', fn ($r) => $r->where('status', 'active')),
@@ -96,7 +96,7 @@ class DataBankController extends Controller
         $students = $query
             ->with(['user:id,email', 'applications:id,student_id,scholarship_id,status', 'applications.scholarship:id,name',
                 'scholarRecords:id,student_id,scholarship_id,status', 'scholarRecords.scholarship:id,name',
-                'externalGrantees' => fn ($e) => $e->where('match_status', 'matched')->where('status', 'active')
+                'externalGrantees' => fn ($e) => $e->counting()
                     ->select('id', 'student_id', 'program_name', 'agency', 'status')])
             ->orderBy('last_name')->orderBy('first_name')->orderBy('student_id')
             ->skip(($page - 1) * $perPage)->take($perPage)
@@ -116,7 +116,7 @@ class DataBankController extends Controller
             $response['options'] = [
                 'colleges' => Student::query()->whereNotNull('college')->distinct()->orderBy('college')->pluck('college'),
                 'year_levels' => Student::query()->whereNotNull('year_level')->distinct()->orderBy('year_level')->pluck('year_level'),
-                'external_programs' => ExternalGrantee::query()->where('match_status', 'matched')->where('status', 'active')
+                'external_programs' => ExternalGrantee::query()->counting()
                     ->distinct()->orderBy('program_name')->pluck('program_name'),
             ];
         }
@@ -139,7 +139,7 @@ class DataBankController extends Controller
         ])->findOrFail($id);
 
         $student->setAttribute('has_active_scholarship', $student->scholarRecords->where('status', 'active')->isNotEmpty()
-            || $student->externalGrantees->where('status', 'active')->isNotEmpty());
+            || $student->externalGrantees->contains(fn ($e) => $e->match_status === 'matched' && $e->status === 'active' && !$e->isPastSchoolYear()));
         $student->setAttribute('eligibility_verified', EligibilityEngine::dataVerified($student));
 
         return response()->json($student);

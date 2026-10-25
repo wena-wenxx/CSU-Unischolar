@@ -35,6 +35,7 @@ Matching rules (thresholds are 0-100 RapidFuzz scores):
 import csv
 import os
 import re
+import zipfile
 import statistics
 import tempfile
 import unicodedata
@@ -74,6 +75,8 @@ def _clean(value) -> str:
         return ""
     if isinstance(value, float) and value.is_integer():
         value = int(value)
+    if hasattr(value, "strftime"):          # Excel date -> 2026-10-22 (time only when there is one)
+        value = value.strftime("%Y-%m-%d %H:%M" if getattr(value, "hour", 0) or getattr(value, "minute", 0) else "%Y-%m-%d")
     return re.sub(r"\s+", " ", str(value)).strip()
 
 
@@ -95,9 +98,17 @@ def _read_csv(path):
 
 
 def _read_xlsx(path):
-    from openpyxl import load_workbook
+    try:
+        from openpyxl import load_workbook
+    except ImportError:          # library not installed: use the built-in reader
+        return _read_xlsx_builtin(path)
 
-    book = load_workbook(path, read_only=True, data_only=True)
+    try:
+        # read_only=False: some files (Google Sheets, older tools) give wrong sizes in read-only mode.
+        book = load_workbook(path, data_only=True)
+    except zipfile.BadZipFile:
+        raise ValueError("This is not a real .xlsx file (maybe an old .xls that was renamed). "
+                         "Open it in Excel and use Save As .xlsx.")
     rows = []
     try:
         for sheet in book.worksheets:
@@ -108,6 +119,142 @@ def _read_xlsx(path):
     return rows
 
 
+# Built-in readers (Python standard library only): a .xlsx / .docx file is a zip
+# folder of XML files. Used when openpyxl / python-docx are not installed.
+_X = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+_W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+_R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+
+
+def _open_zip(path, kind):
+    try:
+        return zipfile.ZipFile(path)
+    except zipfile.BadZipFile:
+        raise ValueError(f"This is not a real .{kind} file (maybe an old file that was renamed). "
+                         f"Open it and use Save As .{kind}.")
+
+
+def _column(ref):
+    letters = re.match(r"[A-Z]+", ref or "")
+    if not letters:
+        return None
+    n = 0
+    for ch in letters.group(0):
+        n = n * 26 + ord(ch) - 64
+    return n - 1
+
+
+def _read_xlsx_builtin(path):
+    import datetime
+    from xml.etree import ElementTree as ET
+
+    with _open_zip(path, "xlsx") as z:
+        names = set(z.namelist())
+        shared = []
+        if "xl/sharedStrings.xml" in names:
+            for si in ET.fromstring(z.read("xl/sharedStrings.xml")).iter(_X + "si"):
+                shared.append("".join(t.text or "" for t in si.iter(_X + "t")))
+
+        date_styles = set()
+        if "xl/styles.xml" in names:
+            styles = ET.fromstring(z.read("xl/styles.xml"))
+            custom = set()
+            for fmt in styles.iter(_X + "numFmt"):
+                code = re.sub(r'"[^"]*"|\[[^\]]*\]', "", (fmt.get("formatCode") or "").lower())
+                if re.search(r"[dy]|m{3,}", code):
+                    custom.add(int(fmt.get("numFmtId")))
+            xfs = styles.find(_X + "cellXfs")
+            for i, xf in enumerate(xfs if xfs is not None else []):
+                fid = int(xf.get("numFmtId") or 0)
+                if 14 <= fid <= 22 or 45 <= fid <= 47 or fid in custom:
+                    date_styles.add(i)
+
+        sheets = []
+        if "xl/workbook.xml" in names and "xl/_rels/workbook.xml.rels" in names:
+            rels = {r.get("Id"): r.get("Target") for r in ET.fromstring(z.read("xl/_rels/workbook.xml.rels"))}
+            for sheet in ET.fromstring(z.read("xl/workbook.xml")).iter(_X + "sheet"):
+                target = (rels.get(sheet.get(_R + "id")) or "").lstrip("/")
+                if target:
+                    sheets.append(target if target.startswith("xl/") else "xl/" + target)
+        if not sheets:
+            sheets = sorted(n for n in names if re.fullmatch(r"xl/worksheets/sheet\d+\.xml", n))
+
+        rows = []
+        for sheet in sheets:
+            if sheet not in names:
+                continue
+            for row in ET.fromstring(z.read(sheet)).iter(_X + "row"):
+                cells = []
+                for c in row.findall(_X + "c"):
+                    kind, v = c.get("t"), c.find(_X + "v")
+                    raw = v.text if v is not None and v.text else ""
+                    if kind == "s":
+                        value = shared[int(raw)] if raw.isdigit() and int(raw) < len(shared) else ""
+                    elif kind == "inlineStr":
+                        value = "".join(t.text or "" for t in c.iter(_X + "t"))
+                    elif kind == "b":
+                        value = "TRUE" if raw == "1" else "FALSE"
+                    elif kind in ("str", "e"):
+                        value = raw
+                    else:
+                        value = raw
+                        try:
+                            number = float(raw)
+                            if int(c.get("s") or 0) in date_styles:
+                                value = (datetime.date(1899, 12, 30) + datetime.timedelta(days=round(number))).isoformat()
+                            elif number.is_integer():
+                                value = str(int(number))
+                            else:
+                                value = repr(number)        # "32.200000000000003" -> "32.2"
+                        except ValueError:
+                            pass
+                    col = _column(c.get("r"))
+                    col = len(cells) if col is None else col
+                    cells.extend([""] * (col - len(cells)))
+                    if col < len(cells):
+                        cells[col] = _clean(value)
+                    else:
+                        cells.append(_clean(value))
+                rows.append(cells)
+    return rows
+
+
+def _read_docx_builtin(path):
+    from xml.etree import ElementTree as ET
+
+    with _open_zip(path, "docx") as z:
+        try:
+            root = ET.fromstring(z.read("word/document.xml"))
+        except KeyError:
+            raise ValueError("This Word file has no text part. Open it in Word and Save As .docx again.")
+
+    def text_of(node):
+        out = []
+        for el in node.iter():
+            if el.tag == _W + "t":
+                out.append(el.text or "")
+            elif el.tag in (_W + "tab", _W + "br"):
+                out.append("\t")
+        return "".join(out)
+
+    rows = []
+    for tr in root.iter(_W + "tr"):
+        cells = []
+        for tc in tr.findall(_W + "tc"):
+            cells.append(_clean(" ".join(text_of(p) for p in tc.iter(_W + "p"))))
+            span = tc.find(f"{_W}tcPr/{_W}gridSpan")
+            cells.extend([""] * (int(span.get(_W + "val")) - 1 if span is not None else 0))
+        rows.append(cells)
+    if rows:
+        return rows, "table"
+    for p in root.iter(_W + "p"):
+        text = text_of(p)
+        if text.strip():
+            rows.append(_split_line(text))
+    return rows, "text"
+
+
+
 def _split_line(text):
     """A text line -> cells (tabs, or two or more spaces, separate columns)."""
     parts = [p.strip() for p in re.split(r"\t|\s{2,}|\s\|\s", text) if p.strip()]
@@ -115,9 +262,16 @@ def _split_line(text):
 
 
 def _read_docx(path):
-    import docx
+    try:
+        import docx
+    except ImportError:          # library not installed: use the built-in reader
+        return _read_docx_builtin(path)
 
-    document = docx.Document(path)
+    try:
+        document = docx.Document(path)
+    except (zipfile.BadZipFile, KeyError, ValueError):
+        raise ValueError("This is not a real .docx file (maybe an old .doc that was renamed). "
+                         "Open it in Word and use Save As .docx.")
     rows = []
     for table in document.tables:
         for row in table.rows:

@@ -6,10 +6,19 @@ import Modal from "./Modal";
 
 /*
   Five short steps shown the first time someone logs in on this browser.
-  "Got it" remembers it (per user) so it does not appear again.
+  It is remembered (per user) as soon as it appears, so it shows only once,
+  even if the person moves to another page without closing it.
   The Help page has a button that shows it again.
 */
 const key = (user) => `scholarguide-welcome-seen-${user.id}`;
+
+function markSeen(user) {
+  try {
+    window.localStorage.setItem(key(user), "yes");
+  } catch {
+    // Private browsing: it will simply show again next time.
+  }
+}
 
 function alreadySeen(user) {
   try {
@@ -23,6 +32,10 @@ export default function WelcomeModal() {
   const { user } = useAuth();
   const [open, setOpen] = useState(() => !alreadySeen(user));
   const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    if (open) markSeen(user);
+  }, [open, user]);
 
   useEffect(() => {
     function show() {
@@ -40,11 +53,7 @@ export default function WelcomeModal() {
   const last = step === steps.length - 1;
 
   function close() {
-    try {
-      window.localStorage.setItem(key(user), "yes");
-    } catch {
-      // Private browsing: it will simply show again next time.
-    }
+    markSeen(user);
     setOpen(false);
   }
 

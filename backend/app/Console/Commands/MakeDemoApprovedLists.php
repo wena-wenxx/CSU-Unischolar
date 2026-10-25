@@ -82,7 +82,7 @@ class MakeDemoApprovedLists extends Command
                 $s = $a->student;
                 $middle = $s->middle_name && $s->middle_name !== 'Demo' ? ' '.mb_substr($s->middle_name, 0, 1).'.' : '';
                 $rows[] = [(string) ($n + 1), $s->student_id, mb_strtoupper($s->last_name).', '.$s->first_name.$middle,
-                    str_replace(['Bachelor of Science in ', 'Bachelor of Arts in ', 'Bachelor of '], ['BS ', 'AB ', 'B'], (string) $s->course), $date];
+                    str_replace(['Bachelor of Science in ', 'Bachelor of Arts in ', 'Bachelor of Secondary Education', 'Bachelor of Elementary Education'], ['BS ', 'AB ', 'BSEd', 'BEEd'], (string) $s->course), $date];
             }
             $rows[] = [(string) (count($rows) + 1), '2026-99999', 'SAMPLE, NOT IN SCHOLARGUIDE', 'BS Biology', $date];
 

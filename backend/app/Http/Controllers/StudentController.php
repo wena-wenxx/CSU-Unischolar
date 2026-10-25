@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Document;
 use App\Models\ActivityLog;
 use App\Models\AiRecommendation;
 use App\Models\ApplicationStatusLog;
@@ -293,6 +294,19 @@ class StudentController extends Controller
 
         $fits = ProgramFit::where('student_id', $student->id)->get()->keyBy('scholarship_id');
 
+        // Newest copy of each document type that is inside an application already sent to OAS:
+        // the student cannot check it again (OAS does), so the to-do says "OAS will check it".
+        $sentToOas = Document::with('application:id,status')
+            ->where('student_id', $student->id)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get()
+            ->keyBy(fn (Document $d) => $d->typeName())
+            ->filter(fn (Document $d) => $d->application_id
+                && !in_array($d->application?->status, ['draft', 'needs_action'], true))
+            ->keys()
+            ->all();
+
         $rows = AiRecommendation::with('scholarship')
             ->where('student_id', $student->id)
             ->whereIn('verdict', ['eligible', 'no_data'])
@@ -300,8 +314,8 @@ class StudentController extends Controller
             ->where('staff_status', '!=', 'wrong')
             ->whereHas('scholarship', fn ($q) => $q->visibleToStudents())
             ->get()
-            ->map(function (AiRecommendation $r) use ($fits) {
-                $todo = NextSteps::forStudent($r);
+            ->map(function (AiRecommendation $r) use ($fits, $sentToOas) {
+                $todo = NextSteps::forStudent($r, $sentToOas);
                 $toDo = count(array_filter($todo, fn ($t) => $t['kind'] !== 'wait'));
                 $program = $r->scholarship;
 

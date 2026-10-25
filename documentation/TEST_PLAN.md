@@ -426,8 +426,9 @@ fictional students, and the first run of the recommendations). See `AI_RECOMMEND
 - [ ] **I4.** Filters: *Applied or not → Not applied yet* (proactive list), *Any score → 90–100%*, the *Show* list
   (Not enough data / Fails a must-have rule / Marked wrong / Everything), search `Contiga` + Enter. Click **Score**
   to sort lowest first; click again for highest first.
-- [ ] **I5.** Wena's **Why?**: "2 of 10 checks met (2 of 2 must-have rules, 0 of 8 documents) = 20%" for TES; every
-  check shows the rule, her data ("PHP 180,000, typed by the student, not yet verified") and the result.
+- [ ] **I5.** Wena's **Why?** for TES after a fresh seed: "1 of 10 checks met (1 of 2 must-have rules, 0 of 8
+  documents); points earned 1 of 10 = 10%". Every check shows the rule, her data ("typed by the student, not yet
+  verified") and its **Points** (a GWA/income only typed by the student earns ½; see AI_RECOMMENDATIONS.md).
 - [ ] **I6.** Press **Mark GWA and income as checked** → "Checked by OAS". Press **Send invitation** with a note →
   e-mail logged (Reports → E-mails sent, From: AI Recommendations). Wena's bell lists the invitation.
 - [ ] **I7.** **Add to scholarship** → confirm → Wena has a *Draft* application (My Applications), her bell says

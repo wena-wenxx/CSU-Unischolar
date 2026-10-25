@@ -72,6 +72,14 @@ export default function MemoReader({ form, onApply, onClose }) {
       const line = `For students in: ${s.fields_of_study.value.join(", ")}.`;
       if (!String(form.description || "").includes(line)) patch.description = `${line} ${form.description || ""}`.trim();
     }
+    // Keep where the values came from: the memo and the exact sentences used.
+    const quotes = keys.filter((k) => picked[k] && s[k].quote).map((k) => `“${s[k].quote}”`);
+    if (quotes.length) {
+      const memo = file ? `memo file ${file.name}` : "pasted memo text";
+      const today = new Date().toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
+      const note = `From ${memo} (read with AI, checked by staff, ${today}): ${quotes.join(" ")}`;
+      patch.rules_source = form.rules_source ? `${form.rules_source}\n${note}` : note;
+    }
     onApply(patch);
     toast.success("Put into the form. Check it, then press Save.");
     onClose();

@@ -75,7 +75,7 @@ export default function MyDocumentsPage() {
       const { data: result } = await api.post(`/documents/${row.id}/validate`);
       const status = result.document?.status;
 
-      if (status === "validated") toast.success("AI check: no problems found.");
+      if (status === "validated") toast.success("The AI check found no issues. OAS staff still review it.");
       else if (status === "flagged") toast.info("AI check: something may need fixing. See the reasons below.");
       else toast.info(result.message || "The file could not be read automatically.");
 
@@ -248,7 +248,13 @@ function ValidityBadge({ file }) {
 
 function AiResult({ file, checkable }) {
   if (file.status === "validated") {
-    return <p className="ai-note ok">✓ AI check: no problems found.</p>;
+    const notes = String(file.flags || "").split("\n").filter(Boolean);
+    return (
+      <div className="ai-note ok">
+        ✓ The AI check found no issues (OAS staff still review it).
+        {notes.length > 0 && <span className="muted small"> Note: {notes.join(" ")}</span>}
+      </div>
+    );
   }
 
   if (file.status === "flagged") {

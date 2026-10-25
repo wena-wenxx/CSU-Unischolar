@@ -20,6 +20,7 @@ class ReportController extends Controller
                 ->latest('id')
                 ->limit(100)
                 ->get()
+                ->each(fn (EmailLog $log) => $log->setAttribute('reason', $log->status === 'failed' ? EmailLog::plainError($log->error) : null))
         );
     }
 }

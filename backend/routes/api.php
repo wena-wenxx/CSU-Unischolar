@@ -34,11 +34,13 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+// At most 10 tries a minute per e-mail and computer: stops password guessing.
+// No public sign-up: accounts are created by the System Admin (ADMIN_ROLE.md), so nobody can
+// make an account with someone else's Student ID. (AuthController::register is kept but not routed.)
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 Route::get('/office-contact', [SettingController::class, 'officeContact']);   // login page help (public contact only)
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', \App\Http\Middleware\RequirePasswordChange::class])->group(function () {
 
     /*
     |--------------------------------------------------------------------------
@@ -252,3 +254,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/admin/settings', [AdminController::class, 'settings']);
     Route::put('/admin/settings', [AdminController::class, 'updateSettings']);
 });
+
+// A student document, through a signed link that expires (no login needed for the link itself).
+Route::get('/files/documents/{id}', [\App\Http\Controllers\DocumentFileController::class, 'show'])
+    ->middleware(['signed', 'throttle:120,1'])
+    ->name('documents.file');

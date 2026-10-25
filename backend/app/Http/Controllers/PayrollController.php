@@ -198,6 +198,7 @@ class PayrollController extends Controller
 
         $labels = $records->keyBy('id');
 
+        try {
         DB::transaction(function () use ($included, $period, $labels, $request) {
             foreach ($included as $row) {
                 PayrollRecord::create([
@@ -210,6 +211,10 @@ class PayrollController extends Controller
                 ]);
             }
         });
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            // Someone else prepared the same payroll at the same moment: nothing was saved twice.
+            return response()->json(['message' => 'This payroll was just prepared by someone else. Refresh the page to see it.'], 409);
+        }
 
         $program = isset($data['scholarship_id']) ? $records->first()?->scholarship?->name ?? 'one program' : 'all programs';
         ActivityLog::record($request->user(), 'payroll.prepared',
@@ -425,7 +430,36 @@ class PayrollController extends Controller
 
         $payroll = PayrollRecord::findOrFail($id);
 
-        $payroll->update($data);
+        // Same rules as the Mark Ready / Mark Processed buttons:
+        //   draft -> ready -> processed, ready -> draft; a processed entry (stipend released) never changes;
+        //   amount and period can change only while the entry is a draft.
+        if ($payroll->status === 'processed') {
+            return response()->json(['message' => 'This entry is already processed (stipend released) and cannot be changed.'], 422);
+        }
+        if (isset($data['status']) && $data['status'] !== $payroll->status) {
+            $allowed = ['draft' => ['ready'], 'ready' => ['processed', 'draft']][$payroll->status] ?? [];
+            if (!in_array($data['status'], $allowed, true)) {
+                return response()->json(['message' => "A {$payroll->status} entry cannot be marked {$data['status']}. Steps: Draft → Ready → Processed."], 422);
+            }
+        }
+        $money = array_intersect(array_keys($data), ['amount', 'period']);
+        if ($money && $payroll->status !== 'draft') {
+            return response()->json(['message' => 'Amount and period can be changed only while the entry is a draft. Move it back to Draft first.'], 422);
+        }
+
+        $before = $payroll->only(array_keys($data));
+        try {
+            $payroll->update($data);
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            return response()->json(['message' => 'This scholar already has an entry for that period.'], 422);
+        }
+
+        $changes = collect($data)->filter(fn ($v, $k) => (string) ($before[$k] ?? '') !== (string) $v)
+            ->map(fn ($v, $k) => "{$k}: ".($before[$k] ?? 'none')." → {$v}")->values()->all();
+        if ($changes) {
+            ActivityLog::record($request->user(), 'payroll.updated',
+                "Changed payroll entry #{$payroll->id} (".($payroll->scholarRecord?->student?->fullName() ?? 'scholar').'): '.implode('; ', $changes).'.', $payroll);
+        }
 
         return response()->json([
             'message' => 'Payroll record updated successfully.',

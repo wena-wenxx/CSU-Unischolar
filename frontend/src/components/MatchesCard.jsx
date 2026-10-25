@@ -19,20 +19,36 @@ const STATUS = {
 };
 const SHOWN = 3;
 
-// One line per kind of task, so the same words are not repeated for every document.
+// One short line per kind of task ("Check 5 documents with AI"); the document names are behind "Show list".
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
 function checklist(todo) {
   const names = (kind) => todo.filter((item) => item.kind === kind).map((item) => item.doc);
   const lines = [];
-  if (names("upload").length) lines.push({ text: `Upload: ${names("upload").join(", ")}`, wait: false });
-  todo.filter((item) => item.kind === "renew").forEach((item) => lines.push({ text: item.text, wait: false }));
-  if (names("check").length) {
-    lines.push({ text: `Press Check with AI in My Documents for: ${names("check").join(", ")}`, wait: false });
+  if (names("upload").length) {
+    lines.push({ text: `Upload ${plural(names("upload").length, "document")}`, items: names("upload"), wait: false });
   }
-  todo.filter((item) => item.kind === "wait").forEach((item) => lines.push({ text: item.text, wait: true }));
+  todo.filter((item) => item.kind === "renew").forEach((item) => lines.push({ text: item.text, items: [], wait: false }));
+  if (names("check").length) {
+    lines.push({
+      text: `Check ${plural(names("check").length, "document")} with AI in My Documents`,
+      items: names("check"),
+      wait: false,
+    });
+  }
+  const waiting = todo.filter((item) => item.kind === "wait");
+  const sent = waiting.filter((item) => item.text.includes("sent to OAS")).map((item) => item.doc);
+  if (sent.length) {
+    lines.push({ text: `${plural(sent.length, "document")} sent to OAS with your application: OAS will check them`, items: sent, wait: true });
+  }
+  waiting
+    .filter((item) => !item.text.includes("sent to OAS"))
+    .forEach((item) => lines.push({ text: item.text, items: [], wait: true }));
   return lines;
 }
 
 function MatchRow({ match }) {
+  const [listOpen, setListOpen] = useState(false);
   const todo = match.todo.filter((item) => item.kind !== "profile");
   const lines = checklist(todo);
   const [label, tone] = STATUS[match.status];
@@ -74,8 +90,16 @@ function MatchRow({ match }) {
             <li key={line.text} className={line.wait ? "muted" : ""}>
               {line.wait ? "⏳ " : "☐ "}
               {line.text}
+              {listOpen && line.items.length > 0 && <span className="muted small match-docs">: {line.items.join(", ")}</span>}
             </li>
           ))}
+          {lines.some((line) => line.items.length > 0) && (
+            <li className="match-list-toggle">
+              <button type="button" className="link-button" onClick={() => setListOpen(!listOpen)} aria-expanded={listOpen}>
+                {listOpen ? "Hide list" : "Show list"}
+              </button>
+            </li>
+          )}
         </ul>
       )}
 

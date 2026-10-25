@@ -342,6 +342,7 @@ export default function StaffReportsPage() {
                       >
                         {item.status}
                       </span>
+                      {item.reason && <small className="muted account-note">{item.reason}</small>}
                     </td>
                   </tr>
                 ))}

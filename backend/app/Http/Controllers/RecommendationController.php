@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\EmailLog;
 use App\Models\ActivityLog;
 use App\Models\AiRecommendation;
 use App\Models\Application;
@@ -239,6 +240,12 @@ class RecommendationController extends Controller
                 ->where('scholarship_id', $r->scholarship_id)->value('id'),
             // Round 12: what to do next, and the student's other programs (best first).
             'next_steps' => NextSteps::forStaff($r),
+            // Where this program's rules come from, and who last changed them.
+            'rules_info' => [
+                'source' => $r->scholarship?->rules_source,
+                'updated_at' => $r->scholarship?->rules_updated_at,
+                'updated_by' => $r->scholarship?->rulesEditor?->name,
+            ],
             // AI field fit for this program, and agency-direct programs that match the student's field.
             'fit' => ProgramFit::where('student_id', $r->student_id)->where('scholarship_id', $r->scholarship_id)->first()?->summary(),
             'field_matches' => ProgramFit::with('scholarship:id,name,short_name,application_mode')
@@ -331,7 +338,7 @@ class RecommendationController extends Controller
         return response()->json([
             'message' => $log && $log->status !== 'failed'
                 ? 'Invitation e-mail sent to '.$r->student->fullName().'.'
-                : 'Invitation recorded, but the e-mail could not be sent (see Reports → E-mails sent).',
+                : 'Invitation recorded, but the e-mail could not be sent. '.EmailLog::plainError($log?->error),
             'recommendation' => $this->present($r->fresh(['student', 'scholarship'])),
         ]);
     }
@@ -389,7 +396,7 @@ class RecommendationController extends Controller
 
         return response()->json([
             'message' => "Draft application started for {$student->fullName()}."
-                .($log && $log->status !== 'failed' ? ' The student was e-mailed.' : ' The e-mail could not be sent (see Reports).'),
+                .($log && $log->status !== 'failed' ? ' The student was e-mailed.' : ' The e-mail could not be sent. '.EmailLog::plainError($log?->error)),
             'application_id' => $application->id,
             'recommendation' => $this->present($r->fresh(['student', 'scholarship'])),
         ], 201);
@@ -461,16 +468,40 @@ class RecommendationController extends Controller
     }
 
     /*
-    | POST /staff/students/{id}/eligibility   Body: verified (true | false)
+    | POST /staff/students/{id}/eligibility   Body: verified (true | false),
+    |      gwa, family_income (optional: the correct figures from the documents)
     | OAS checked the student's GWA and family income against the Certificate
-    | of Grades and the Parents' ITR (or takes the check back).
+    | of Grades and the Parents' ITR (or takes the check back). When the typed
+    | figure is wrong, staff save the figure from the document; the change is
+    | logged with the old and new value.
     */
     public function verifyStudentData(Request $request, $id)
     {
         $this->staffOnly($request);
-        $verified = $request->validate(['verified' => 'required|boolean'])['verified'];
+        $data = $request->validate([
+            'verified' => 'required|boolean',
+            'gwa' => 'nullable|numeric|min:1|max:5',
+            'family_income' => 'nullable|numeric|min:0|max:100000000',
+        ]);
+        $verified = $data['verified'];
 
         $student = Student::findOrFail($id);
+
+        $corrections = [];
+        foreach (['gwa' => 'GWA', 'family_income' => 'family income'] as $field => $label) {
+            if (isset($data[$field]) && (float) $data[$field] !== (float) $student->{$field}) {
+                $old = $student->{$field} === null ? 'none' : ($field === 'gwa' ? number_format((float) $student->{$field}, 2) : 'PHP '.number_format((float) $student->{$field}, 0));
+                $new = $field === 'gwa' ? number_format((float) $data[$field], 2) : 'PHP '.number_format((float) $data[$field], 0);
+                $corrections[] = "{$label} {$old} → {$new}";
+                $student->{$field} = $data[$field];
+            }
+        }
+        if ($corrections) {
+            $student->eligibility_updated_at = now();
+            $student->save();
+            ActivityLog::record($request->user(), 'eligibility.corrected',
+                "Corrected the figures of {$student->fullName()} from the documents: ".implode('; ', $corrections).'.', $student);
+        }
 
         if ($verified && ($student->gwa === null || $student->family_income === null)) {
             return response()->json(['message' => 'The student has not entered both the GWA and the family income yet.'], 422);
@@ -486,7 +517,8 @@ class RecommendationController extends Controller
             ($verified ? 'Verified' : 'Removed the verification of')." the GWA and family income of {$student->fullName()}.", $student);
 
         return response()->json([
-            'message' => $verified ? 'GWA and family income marked as verified.' : 'Verification removed.',
+            'message' => ($corrections ? 'Corrected ('.implode('; ', $corrections).') and ' : '')
+                .($verified ? 'GWA and family income marked as verified.' : 'Verification removed.'),
             'student' => $student->fresh(),
         ]);
     }

@@ -101,7 +101,20 @@ engine (`backend/app/Support/EligibilityEngine.php`) runs these checks:
 | No other scholarship | yes | no active grantee record in ScholarGuide **and** no active outside scholarship (External Grantees) |
 | Each required document | no | not expired **and** either checked by the AI with no problem found (*validated*) or marked *verified* by OAS staff. A file that is only uploaded (not checked yet), flagged, or *needs review* does **not** count |
 
-**Score = checks met ÷ all checks × 100.** Every check has equal weight. A check with no data counts as not met.
+**Score = points earned ÷ all checks × 100** (changed October 25, 2026). Every check is worth 1 point, but it earns
+the full point only when it is backed by something checked:
+
+| Check | Points when met |
+|---|---|
+| GWA, family income | **1** when OAS verified the figure; **½** when it was only typed by the student |
+| Each required document | **1** when OAS staff verified it; when the AI check passed, **how sure the AI was** that the name on it is the student's (e.g. a 92% name match = 0.92) |
+| Year level, college | **1**. Source: the student's account (typed at sign-up; later changes need an OAS-approved correction request). There is no Registrar connection, so this is *not* checked against official records; the enrollment check happens later, before tagging. |
+| No other scholarship | **1** (ScholarGuide grantee records and the External Grantees lists of the current school year) |
+| Anything not met, flagged, expired or not checked | **0** |
+
+So **100% means** every rule is met with OAS-verified data and every required document was checked with no doubt.
+A student whose GWA and income are only typed by themselves can reach at most about 80–90%, and the table shows
+"Based on what the student typed" next to the score. The "Why?" window shows the points of every check.
 
 **Verdict** (the label staff see):
 - **Meets the rules**: every must-have rule is met. The score then shows how ready the student is (documents).
@@ -109,10 +122,11 @@ engine (`backend/app/Support/EligibilityEngine.php`) runs these checks:
 - **Not enough data**: a must-have rule could not be checked (for example, no GWA entered).
 
 Example: the student's income is under the ceiling and they hold no other scholarship. They have uploaded 0 of
-the 8 required documents. The result is "2 of 10 checks met (2 of 2 must-have rules, 0 of 8 documents) = 20%",
-with the verdict *Meets the rules*.
+the 8 required documents, and OAS has verified their income. The result is "2 of 10 checks met (2 of 2 must-have
+rules, 0 of 8 documents); points earned 2 of 10 = 20%", with the verdict *Meets the rules*.
 
-**Weights.** Equal weights are used on purpose. They are simple to explain, and a panel can check them by hand.
+**Weights.** Every check has the same weight (1 point) on purpose. It is simple to explain, and a panel can
+check it by hand. Only *how much of the point* is earned depends on whether the data was checked.
 Custom weights per rule are left as **future work**: they need OAS policy decisions and testing that cannot be
 done before the defense.
 

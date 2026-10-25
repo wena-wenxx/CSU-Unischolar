@@ -20,6 +20,8 @@ class Scholarship extends Model
         'application_start', 'application_end', 'amount', 'status',
         // Eligibility rules used by AI Recommendations (empty = no rule)
         'max_gwa', 'max_family_income', 'year_levels', 'colleges', 'one_scholarship_only',
+        // Where the rules come from, and who last changed them
+        'rules_source', 'rules_updated_by', 'rules_updated_at',
     ];
 
     protected $casts = [
@@ -28,6 +30,7 @@ class Scholarship extends Model
         'year_levels' => 'array',
         'colleges' => 'array',
         'one_scholarship_only' => 'boolean',
+        'rules_updated_at' => 'datetime',
     ];
 
     // Sent with every scholarship so the frontend can show "Open", "Closed", ...
@@ -106,4 +109,6 @@ class Scholarship extends Model
             default => 'This scholarship is not open for applications.',
         };
     }
+
+    public function rulesEditor() { return $this->belongsTo(User::class, 'rules_updated_by'); }
 }

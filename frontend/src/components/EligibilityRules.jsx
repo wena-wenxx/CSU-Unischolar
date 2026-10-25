@@ -93,6 +93,20 @@ export default function EligibilityRules({ value, onChange, options, idPrefix })
         />
         The student must not hold another active scholarship (including outside scholarships in External Grantees)
       </label>
+
+      <div className="full-column">
+        <label htmlFor={`${idPrefix}-rules-source`}>Where these rules come from</label>
+        <textarea
+          id={`${idPrefix}-rules-source`}
+          rows={3}
+          value={value.rules_source || ""}
+          placeholder="e.g. CHED Memorandum Order No. __, s. 2026, section 5: “GWA of 2.00 or better …”"
+          onChange={(event) => onChange({ rules_source: event.target.value })}
+        />
+        <small className="muted">
+          Write the memo or guideline (number, school year) and the sentences used. Staff see this in the “Why?” window.
+        </small>
+      </div>
     </div>
   );
 }

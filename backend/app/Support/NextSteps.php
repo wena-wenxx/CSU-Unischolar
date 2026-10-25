@@ -95,7 +95,11 @@ class NextSteps
      * What the STUDENT still has to do for one program (no percentage shown).
      * Each item: ['text' => ..., 'kind' => 'profile' | 'upload' | 'renew' | 'check' | 'wait', 'doc' => name].
      */
-    public static function forStudent(AiRecommendation $r): array
+    /**
+     * $sentToOas: document names whose newest copy is in an application already sent to OAS.
+     * The student cannot run the AI check on those (OAS checks them), so they become "wait" items.
+     */
+    public static function forStudent(AiRecommendation $r, array $sentToOas = []): array
     {
         $todo = [];
 
@@ -122,6 +126,7 @@ class NextSteps
                 str_contains($value, 'expired') => ['text' => "Upload a new {$name} (yours has expired)", 'kind' => 'renew'],
                 str_contains($value, 'AI flagged') => ['text' => "Replace your {$name}: the check found a problem (".self::after($value, 'AI flagged: ').')', 'kind' => 'renew'],
                 str_contains($value, 'could not read') => ['text' => "{$name}: uploaded; the AI could not read it, so OAS will check it by hand", 'kind' => 'wait'],
+                in_array($name, $sentToOas, true) => ['text' => "{$name}: sent to OAS with your application; OAS will check it", 'kind' => 'wait'],
                 default => ['text' => "{$name}: uploaded; press Check with AI in My Documents so it counts", 'kind' => 'check'],
             };
         }

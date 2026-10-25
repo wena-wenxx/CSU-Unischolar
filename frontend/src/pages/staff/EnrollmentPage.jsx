@@ -73,7 +73,7 @@ export default function EnrollmentPage() {
   const headers = useMemo(() => (rows.length ? rows[0].map((h, i) => h.trim() || `Column ${i + 1}`) : []), [rows]);
   const dataRows = rows.slice(1);
 
-  // CSV is read here; Excel, Word, PDF and pictures are read by the AI service.
+  // CSV is read here; Excel and Word by Laravel; PDF and pictures by the AI service.
   async function readFile(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -235,8 +235,9 @@ export default function EnrollmentPage() {
             </div>
           </div>
           <p className="muted small">
-            Excel (.xlsx), CSV, Word (.docx) or PDF from the Registrar. Files other than CSV are read by the AI service, so
-            keep it running. Only the Student ID, name and course columns are read.
+            Excel (.xlsx), CSV, Word (.docx) or PDF from the Registrar. PDF files are read by the AI service, so keep it
+            running for those. Only the Student ID, name and course columns are read. Old .xls/.doc files: open them and
+            Save As .xlsx/.docx first.
           </p>
 
           {rows.length > 0 && (

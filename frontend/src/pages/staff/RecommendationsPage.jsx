@@ -192,8 +192,14 @@ export default function RecommendationsPage() {
             scholarship) and <strong>required documents</strong> are checked for every student.
           </li>
           <li>
-            Every check counts the same. <strong>Score = checks met ÷ all checks × 100.</strong> A document counts only after
-            the AI check found no problem; a file not checked yet does not count.
+            Every check is worth 1 point, but it earns the full point only when it is backed by something checked:
+            a GWA or income <strong>verified by OAS</strong> earns 1, one only <strong>typed by the student</strong> earns ½;
+            a document <strong>verified by staff</strong> earns 1, one that passed the <strong>AI check</strong> earns how sure
+            the AI was that the name on it is the student&apos;s (for example 0.92). Not met or not checked earns 0.{" "}
+            <strong>Requirements match = points earned ÷ all checks × 100.</strong> So 100% means every rule is met with
+            verified data and every document was checked without doubt. It is <strong>not</strong> a chance of being
+            approved: the agency decides. Under each score, <em>Rules</em> are the eligibility rules and <em>Docs</em> are
+            the application documents, counted separately so missing documents never hide that a student qualifies.
           </li>
           <li>
             A must-have rule that is not met shows <strong>Fails a rule</strong>, even with a high score. A missing GWA or
@@ -292,9 +298,9 @@ export default function RecommendationsPage() {
                       type="button"
                       className="th-sort"
                       onClick={() => change("sort", filters.sort === "score_desc" ? "score_asc" : "score_desc")}
-                      title="Sort by score"
+                      title="Requirements match score: how many of the program's checks are met and backed by checked data. Not a chance of being approved."
                     >
-                      Score {sortIcon}
+                      Requirements match {sortIcon}
                     </button>
                   </th>
                   <th>Met</th>
@@ -317,11 +323,6 @@ export default function RecommendationsPage() {
                         <small className="muted account-note">
                           {row.student?.student_id} · {row.student?.year_level || "—"}
                         </small>
-                        {!row.data_verified && (
-                          <small className="unchecked-tag" title="The GWA and income were typed by the student and not yet checked by OAS">
-                            GWA/income not checked
-                          </small>
-                        )}
                       </td>
                       {programId === "all" && <td title={row.scholarship?.name}>{programLabel(row.scholarship)}</td>}
                       <td className="nowrap">
@@ -330,10 +331,16 @@ export default function RecommendationsPage() {
                           <span className="score-bar" aria-hidden="true">
                             <span style={{ width: `${row.score}%` }} className={`tone-${(VERDICTS[row.verdict] || [])[1]}`} />
                           </span>
-                          <small className="muted">
-                            {row.met_count} of {row.total_count}
-                          </small>
                         </div>
+                        <small className="muted score-split">{splitText(row.checks)}</small>
+                        {!row.data_verified && (
+                          <small
+                            className="unchecked-tag"
+                            title="The GWA and income were typed by the student and not yet checked by OAS, so they count half in the score"
+                          >
+                            Based on what the student typed
+                          </small>
+                        )}
                         {row.verdict !== "eligible" && <Badge map={VERDICTS} value={row.verdict} />}
                         {row.fit?.level === "high" && (
                           <small className="fit-tag" title="AI field fit: this program is for the student's field of study">
@@ -443,10 +450,10 @@ function RecommendationWindow({ id: firstId, onClose, onChanged }) {
     }
   }
 
-  async function verify(verified) {
+  async function verify(verified, corrected = {}) {
     setBusy(true);
     try {
-      const { data } = await api.post(`/staff/students/${rec.student.id}/eligibility`, { verified });
+      const { data } = await api.post(`/staff/students/${rec.student.id}/eligibility`, { verified, ...corrected });
       toast.success(data.message);
       await load();
     } catch (err) {
@@ -556,6 +563,23 @@ function RecommendationWindow({ id: firstId, onClose, onChanged }) {
           Calculated {formatDateTime(rec.computed_at)} · shown to staff {rec.times_shown} time{rec.times_shown === 1 ? "" : "s"}
         </small>
       </div>
+      <div className="rules-source">
+        <span className="field-label">The program&apos;s rules come from</span>
+        {rec.rules_info?.source ? (
+          <p className="rules-source-text">{rec.rules_info.source}</p>
+        ) : (
+          <p className="muted small">
+            No source written yet. Add the memo or guideline on Scholarships → Manage → Eligibility rules, so every
+            score can be traced to an official document.
+          </p>
+        )}
+        {rec.rules_info?.updated_at && (
+          <small className="muted">
+            Rules last changed {formatDateTime(rec.rules_info.updated_at)}
+            {rec.rules_info.updated_by ? ` by ${rec.rules_info.updated_by}` : ""}
+          </small>
+        )}
+      </div>
 
       <div className="table-wrapper">
         <table className="check-table">
@@ -565,6 +589,7 @@ function RecommendationWindow({ id: firstId, onClose, onChanged }) {
               <th>Check</th>
               <th>Rule</th>
               <th>Student&apos;s data used</th>
+              <th className="nowrap">Points</th>
             </tr>
           </thead>
           <tbody>
@@ -583,6 +608,7 @@ function RecommendationWindow({ id: firstId, onClose, onChanged }) {
                   </td>
                   <td>{check.rule}</td>
                   <td>{check.value}</td>
+                  <td className="nowrap">{pointsText(check)}</td>
                 </tr>
               );
             })}
@@ -617,6 +643,7 @@ function RecommendationWindow({ id: firstId, onClose, onChanged }) {
         Check the GWA against the Certificate of Grades and the income against the Parents&apos; ITR before marking them as
         checked.
       </p>
+      <CorrectFigures student={student} busy={busy} onSave={(figures) => verify(true, figures)} />
 
       <h3>Your decision</h3>
       <label htmlFor="rec-note">
@@ -697,5 +724,53 @@ function RecommendationWindow({ id: firstId, onClose, onChanged }) {
         </>
       )}
     </Modal>
+  );
+}
+
+// "1", "½", "0.92" or "0" (rows calculated before points existed count 1 when met).
+function pointsText(check) {
+  const points = check.points ?? (check.result === "met" ? 1 : 0);
+  if (points === 0.5) return "½ of 1";
+  return `${Number(points.toFixed(2))} of 1`;
+}
+
+// "Rules 3/3 · Docs 5/8": eligibility rules and application documents, counted separately.
+function splitText(checks = []) {
+  const rules = checks.filter((c) => c.must);
+  const docs = checks.filter((c) => !c.must);
+  const met = (list) => list.filter((c) => c.result === "met").length;
+  const parts = [];
+  if (rules.length) parts.push(`Rules ${met(rules)}/${rules.length}`);
+  if (docs.length) parts.push(`Docs ${met(docs)}/${docs.length}`);
+  return parts.join(" · ");
+}
+
+// When the typed GWA or income does not match the documents, staff save the figure from the document.
+function CorrectFigures({ student, busy, onSave }) {
+  const [gwa, setGwa] = useState("");
+  const [income, setIncome] = useState("");
+  const figures = {};
+  if (gwa !== "") figures.gwa = Number(gwa);
+  if (income !== "") figures.family_income = Number(income);
+  const ready = Object.keys(figures).length > 0 && (gwa !== "" || student.gwa !== null) && (income !== "" || student.family_income !== null);
+
+  return (
+    <details className="correct-figures">
+      <summary>The documents show different figures?</summary>
+      <div className="inline-form">
+        <label>
+          GWA on the Certificate of Grades
+          <input type="number" step="0.01" min="1" max="5" value={gwa} onChange={(e) => setGwa(e.target.value)} placeholder={student.gwa ?? ""} />
+        </label>
+        <label>
+          Annual family income on the ITR (₱)
+          <input type="number" min="0" value={income} onChange={(e) => setIncome(e.target.value)} placeholder={student.family_income ?? ""} />
+        </label>
+        <button type="button" className="button button-small button-primary" disabled={busy || !ready} onClick={() => onSave(figures)}>
+          Save the correct figures as checked
+        </button>
+      </div>
+      <small className="muted">The old and new figures are saved in the Activity Log, and the scores are recalculated.</small>
+    </details>
   );
 }

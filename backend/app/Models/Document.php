@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 
 class Document extends Model
 {
@@ -43,6 +44,45 @@ class Document extends Model
                 $document->student_id = Application::whereKey($document->application_id)->value('student_id');
             }
         });
+    }
+
+    /*
+    | Privacy (Data Privacy Act): student documents are kept on the PRIVATE
+    | disk (storage/app/private/documents), not in the public web folder.
+    | They open only through a signed link that expires (file_url), which the
+    | API gives only to the owner and to OAS staff. Files saved by older
+    | versions in the public folder still open the same way.
+    */
+    public const DISK = 'local';
+
+    protected $appends = ['file_url'];
+
+    public function getFileUrlAttribute(): ?string
+    {
+        return $this->id ? URL::temporarySignedRoute('documents.file', now()->addMinutes(30), ['id' => $this->id]) : null;
+    }
+
+    /** The disk that actually has this file (private first; public = saved by an older version). */
+    public static function diskFor(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+        foreach ([self::DISK, 'public'] as $disk) {
+            if (Storage::disk($disk)->exists($path)) {
+                return $disk;
+            }
+        }
+
+        return null;
+    }
+
+    /** Full path on this computer, or null when the file is missing. */
+    public function absolutePath(): ?string
+    {
+        $disk = self::diskFor($this->file_path);
+
+        return $disk ? Storage::disk($disk)->path($this->file_path) : null;
     }
 
     public function application() { return $this->belongsTo(Application::class); }
@@ -84,6 +124,7 @@ class Document extends Model
             ->exists();
 
         if (!$stillUsed) {
+            Storage::disk(self::DISK)->delete($path);
             Storage::disk('public')->delete($path);
         }
     }

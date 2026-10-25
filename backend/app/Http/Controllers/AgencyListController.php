@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\EnrollmentList;
 use App\Models\ActivityLog;
 use App\Models\AgencyListUpload;
 use App\Models\Application;
@@ -122,7 +123,8 @@ class AgencyListController extends Controller
     private function processRow(array $row, Scholarship $scholarship, int $staffId, array $data, array &$seen): array
     {
         $line = ['row' => $row['row'], 'student_id' => trim((string) ($row['student_id'] ?? ''))];
-        $schoolId = strtoupper($line['student_id']);
+        // "2026-00001", "2026 00001" and 202600001 (Excel turns the ID into a number) are the same student.
+        $schoolId = EnrollmentList::normalizeId($line['student_id']);
 
         if ($schoolId === '') {
             return $line + ['result' => 'error', 'note' => 'No Student ID in this row.'];
@@ -133,7 +135,7 @@ class AgencyListController extends Controller
         }
         $seen[$schoolId] = $row['row'];
 
-        $student = Student::whereRaw('upper(student_id) = ?', [$schoolId])->first();
+        $student = Student::whereRaw("upper(replace(replace(replace(student_id, '-', ''), ' ', ''), '.', '')) = ?", [$schoolId])->first();
 
         if (!$student) {
             return $line + ['result' => 'unmatched', 'note' => 'No student with this Student ID in the system.'];

@@ -81,7 +81,7 @@ export default function AgencyListsPage() {
     setAgency(program?.provider || "");
   }
 
-  // CSV is read here; Excel, Word, PDF and pictures are read by the AI service.
+  // CSV is read here; Excel and Word by Laravel; PDF and pictures by the AI service.
   async function readFile(event) {
     const file = event.target.files?.[0];
     setResult(null);
@@ -198,8 +198,9 @@ export default function AgencyListsPage() {
             <label htmlFor="agency-file">Approved list (Excel, CSV, Word or PDF)</label>
             <input id="agency-file" key={fileKey} type="file" accept={LIST_ACCEPT} onChange={readFile} />
             <p className="muted small">
-              Excel (.xlsx), CSV, Word (.docx), PDF or a photo. Files other than CSV are read by the AI service, so keep it
-              running. The list needs a column with the Student ID; an approval date column is optional.
+              Excel (.xlsx), CSV, Word (.docx), PDF or a photo. PDFs and photos are read by the AI service, so keep it
+              running for those. The list needs a column with the Student ID; an approval date column is optional. Old
+              .xls/.doc files: open them and Save As .xlsx/.docx first.
             </p>
           </div>
         </div>

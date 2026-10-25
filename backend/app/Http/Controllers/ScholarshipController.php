@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\EligibilityEngine;
 use App\Models\ActivityLog;
 use App\Models\Document;
 use App\Models\Scholarship;
@@ -64,7 +65,27 @@ class ScholarshipController extends Controller
             'colleges' => 'nullable|array|max:30',
             'colleges.*' => 'string|max:255',
             'one_scholarship_only' => 'nullable|boolean',
+            'rules_source' => 'nullable|string|max:3000',
         ];
+    }
+
+    private const RULE_FIELDS = ['max_gwa', 'max_family_income', 'year_levels', 'colleges', 'one_scholarship_only'];
+
+    private const RULE_LABELS = [
+        'max_gwa' => 'highest GWA', 'max_family_income' => 'income ceiling', 'year_levels' => 'year levels',
+        'colleges' => 'colleges', 'one_scholarship_only' => 'one scholarship only',
+    ];
+
+    private static function ruleText(string $field, $value): string
+    {
+        return match (true) {
+            $value === null || $value === [] => 'none',
+            is_bool($value) => $value ? 'yes' : 'no',
+            is_array($value) => implode(', ', $value),
+            $field === 'max_gwa' => number_format((float) $value, 2),
+            $field === 'max_family_income' => 'PHP '.number_format((float) $value, 0),
+            default => (string) $value,
+        };
     }
 
     /** Empty lists are stored as null ("any year level", "any college"). */
@@ -137,6 +158,10 @@ class ScholarshipController extends Controller
 
         $requirements = $data['requirements'] ?? [];
         unset($data['requirements']);
+        if (collect(self::RULE_FIELDS)->contains(fn ($f) => !in_array($data[$f] ?? null, [null, [], false], true))) {
+            $data['rules_updated_by'] = $request->user()->id;
+            $data['rules_updated_at'] = now();
+        }
 
         $scholarship = DB::transaction(function () use ($data, $requirements) {
             $scholarship = Scholarship::create($data);
@@ -167,12 +192,30 @@ class ScholarshipController extends Controller
         $data = $this->cleanRules($request->validate($this->rules(false)));
 
         $scholarship = Scholarship::findOrFail($id);
+        $before = $scholarship->only(self::RULE_FIELDS);
         $scholarship->fill($data);
         $changed = array_keys($scholarship->getDirty());
+
+        // Rule changes keep who and when, and the log shows old -> new values.
+        $ruleChanges = array_values(array_intersect($changed, self::RULE_FIELDS));
+        if ($ruleChanges) {
+            $scholarship->rules_updated_by = $request->user()->id;
+            $scholarship->rules_updated_at = now();
+        }
         $scholarship->save();
 
-        if ($changed) {
-            ActivityLog::record($request->user(), 'scholarship.updated', "Edited scholarship {$scholarship->name}: ".implode(', ', $changed).'.', $scholarship);
+        if ($ruleChanges) {
+            $parts = array_map(fn ($f) => self::RULE_LABELS[$f].': '.self::ruleText($f, $before[$f]).' → '.self::ruleText($f, $scholarship->{$f}), $ruleChanges);
+            ActivityLog::record($request->user(), 'scholarship.rules_changed',
+                "Changed the eligibility rules of {$scholarship->name}: ".implode('; ', $parts).'.', $scholarship);
+            EligibilityEngine::recalculate();
+        }
+        $other = array_diff($changed, self::RULE_FIELDS, ['rules_source']);
+        if ($other) {
+            ActivityLog::record($request->user(), 'scholarship.updated', "Edited scholarship {$scholarship->name}: ".implode(', ', $other).'.', $scholarship);
+        }
+        if (in_array('rules_source', $changed, true)) {
+            ActivityLog::record($request->user(), 'scholarship.rules_source', "Updated where the rules of {$scholarship->name} come from.", $scholarship);
         }
 
         return response()->json($scholarship);

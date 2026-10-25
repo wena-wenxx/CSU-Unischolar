@@ -63,8 +63,10 @@ export function fullName(student) {
     .join(" ");
 }
 
+// A student document: a signed link from the API that works for 30 minutes
+// (the files are private). If the page was open longer, reload it.
 export function fileUrl(document) {
-  return `${FILES_URL}/${document.file_path}`;
+  return document.file_url || `${FILES_URL}/${document.file_path}`;
 }
 
 // Announcement picture: "/announcements/x.jpg" is a sample shipped with the

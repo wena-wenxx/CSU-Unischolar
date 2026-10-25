@@ -1,7 +1,7 @@
 /*
   Excel-style sheet tabs above a table: one tab per scholarship program.
   tabs: [{ key, label, count, title }]   value: the active key
-  The row scrolls sideways when there are many programs.
+  When there are many programs the tabs wrap onto a second line (all stay visible).
 */
 export default function SheetTabs({ tabs, value, onChange, label = "Programs" }) {
   return (
