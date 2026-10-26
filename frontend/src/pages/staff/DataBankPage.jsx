@@ -315,8 +315,10 @@ export default function DataBankPage() {
                 {results.map((item) => (
                   <tr key={item.id}>
                     <td>
-                      <strong>{item.last_name}</strong>, {item.first_name}
-                      {item.middle_name ? ` ${item.middle_name}` : ""}
+                      <strong className="student-name">
+                        {item.last_name}, {item.first_name}
+                        {item.middle_name ? ` ${item.middle_name}` : ""}
+                      </strong>
                     </td>
                     <td>{item.student_id}</td>
                     <td>{item.course || "—"}</td>

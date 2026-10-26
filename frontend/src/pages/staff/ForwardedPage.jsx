@@ -189,7 +189,9 @@ export default function ForwardedPage() {
               <tbody>
                 {page.visible.map((a) => (
                   <tr key={a.id}>
-                    <td>{lastFirst(a.student)}</td>
+                    <td>
+                      <strong className="student-name">{lastFirst(a.student)}</strong>
+                    </td>
                     <td>{a.student?.student_id}</td>
                     <td>
                       {a.student?.course}

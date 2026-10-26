@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Application approved</title>
 </head>
-<body style="margin:0;padding:24px;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+<body style="margin:0;padding:24px;background:#f4f6f8;font-family:'Segoe UI Historic',sans-serif;color:#111827;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e3e3e3;">
         <tr>
             <td style="background:#004d26;color:#ffffff;padding:20px 24px;border-bottom:4px solid #d4af37;">

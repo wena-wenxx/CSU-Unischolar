@@ -132,7 +132,10 @@ export default function MessagesPage() {
                     <span className="muted small">{timeAgo(item.created_at)}</span>
                   </div>
                   <small className="muted">
-                    {s.first_name} {s.last_name} · {s.student_id} · {s.course}
+                    <strong className="student-name">
+                      {s.first_name} {s.last_name}
+                    </strong>{" "}
+                    · {s.student_id} · {s.course}
                     {s.year_level ? `, ${s.year_level}` : ""} · {data.topics[item.topic] || item.topic}
                     {s.user?.email ? ` · ${s.user.email}` : ""}
                     {s.contact_number ? ` · ${s.contact_number}` : ""}

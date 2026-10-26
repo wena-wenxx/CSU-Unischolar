@@ -324,7 +324,10 @@ export default function StaffReportsPage() {
                   <tr key={item.id}>
                     <td>{formatDateTime(item.created_at)}</td>
                     <td>
-                      {fullName(item.student)} ({item.student?.student_id})
+                      <strong className="student-name">
+                        {fullName(item.student)}
+                      </strong>{" "}
+                      ({item.student?.student_id})
                     </td>
                     <td>{item.to_email}</td>
                     <td>{item.subject}</td>

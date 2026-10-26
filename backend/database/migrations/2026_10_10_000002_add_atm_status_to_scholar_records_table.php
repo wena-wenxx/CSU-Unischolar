@@ -18,13 +18,19 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('scholar_records', function (Blueprint $table) {
-            $table->string('atm_funds', 10)->nullable()->after('has_atm');
-            $table->string('atm_note', 100)->nullable()->after('atm_funds');
+            if (! Schema::hasColumn('scholar_records', 'atm_funds')) {
+                $table->string('atm_funds', 10)->nullable()->after('has_atm');
+            }
+            if (! Schema::hasColumn('scholar_records', 'atm_note')) {
+                $table->string('atm_note', 100)->nullable()->after('atm_funds');
+            }
         });
 
         Schema::table('payroll_records', function (Blueprint $table) {
-            $table->foreignId('prepared_by')->nullable()->after('signature')
-                ->constrained('users')->nullOnDelete();
+            if (! Schema::hasColumn('payroll_records', 'prepared_by')) {
+                $table->foreignId('prepared_by')->nullable()->after('signature')
+                    ->constrained('users')->nullOnDelete();
+            }
         });
 
         // Give existing grantees a starting value.

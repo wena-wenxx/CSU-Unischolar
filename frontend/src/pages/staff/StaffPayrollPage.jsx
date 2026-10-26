@@ -319,7 +319,9 @@ export default function StaffPayrollPage() {
                         onChange={() => toggle(item.id)}
                       />
                     </td>
-                    <td>{lastFirst(item.scholar_record?.student)}</td>
+                    <td>
+                      <strong className="student-name">{lastFirst(item.scholar_record?.student)}</strong>
+                    </td>
                     <td>{item.scholar_record?.student?.student_id}</td>
                     <td title={item.scholar_record?.scholarship?.name}>
                       {item.scholar_record?.scholarship?.short_name || item.scholar_record?.scholarship?.name}

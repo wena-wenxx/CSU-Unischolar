@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ScholarRecord extends Model
 {
@@ -54,7 +55,13 @@ class ScholarRecord extends Model
         $paid = DB::table('payroll_records')->where('status', 'processed')->pluck('scholar_record_id')->unique()->all();
 
         $count = 0;
-        foreach (self::with('scholarship:id,application_mode')->whereNull('atm_funds')->whereNull('atm_note')->get() as $record) {
+        $records = self::query()->whereNull('atm_funds')->whereNull('atm_note');
+
+        if (Schema::hasColumn('scholarships', 'application_mode')) {
+            $records->with('scholarship:id,application_mode');
+        }
+
+        foreach ($records->get() as $record) {
             $record->timestamps = false;
 
             // Agency-direct programs pay the grantee themselves.

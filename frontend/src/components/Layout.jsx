@@ -174,7 +174,7 @@ export default function Layout() {
           <div className="user-menu">
             <SearchBox />
 
-            {user.role === "student" && <NotificationBell />}
+            {(user.role === "student" || user.role === "staff") && <NotificationBell />}
 
             <span className="role-label">{user.role}</span>
           </div>

@@ -2,7 +2,7 @@
 
 /* =========================================================
    CARAGA STATE UNIVERSITY — ScholarGuide theme
-   Fonts (Playfair Display + Inter) are loaded in frontend/index.html.
+   All system text uses Segoe UI Historic.
 
    SYSTEM VARIABLES (change the look of the whole system here):
      --primary-color  Deep CSU Forest Green   #004d26
@@ -84,8 +84,8 @@
   --print-rule: #bbbbbb;
   --print-border: #cccccc;
 
-  --font-heading: "Playfair Display", Georgia, "Times New Roman", serif;
-  --font-body: Inter, "Segoe UI", Roboto, system-ui, -apple-system, sans-serif;
+  --font-heading: "Segoe UI Historic", sans-serif;
+  --font-body: "Segoe UI Historic", sans-serif;
 
   --radius: var(--radius-system);
   --shadow: 0 18px 50px rgba(var(--primary-dark-rgb), 0.14);
@@ -93,12 +93,18 @@
   font-family: var(--font-body);
   color: var(--text);
   background: var(--page-bg);
-  font-synthesis: none;
+  font-synthesis: weight;
   text-rendering: optimizeLegibility;
 }
 
 * {
   box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  font-family: "Segoe UI Historic", sans-serif !important;
 }
 
 body {
@@ -179,7 +185,7 @@ label {
   color: var(--text-strong);
 }
 
-/* Headings: Playfair Display in CSU Green */
+/* Headings: Segoe UI Historic in CSU Green */
 h1,
 h2,
 h3 {
@@ -217,6 +223,10 @@ hr {
 
 .muted {
   color: var(--text-muted);
+}
+
+.student-name {
+  font-weight: 700 !important;
 }
 
 .sr-only {
@@ -434,7 +444,6 @@ hr {
   color: rgba(var(--white-rgb), 0.85);
 }
 
-
 @media (max-width: 600px) {
   .login-page {
     padding: 24px 12px 20px;
@@ -468,7 +477,7 @@ hr {
 }
 
 .sidebar {
-  width: 260px;
+  width: 300px;
   background: var(--csu-green);
   color: var(--csu-white);
   padding: 20px 18px;
@@ -500,8 +509,9 @@ hr {
 .sidebar-university {
   display: block;
   font-family: var(--font-heading);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.25;
+  text-transform: uppercase;
 }
 
 .sidebar-app {
@@ -509,14 +519,16 @@ hr {
   margin-top: 3px;
   color: var(--csu-gold); /* gold on CSU Green: 4.9:1 */
   font-weight: 700;
-  font-size: 14px;
+  font-size: 15px;
+  text-transform: uppercase;
 }
 
 .sidebar-brand small {
   display: block;
   margin-top: 2px;
-  font-size: 12px;
+  font-size: 13px;
   opacity: 0.9;
+  text-transform: uppercase;
 }
 
 .sidebar nav {
@@ -533,6 +545,9 @@ hr {
   padding: 11px 14px;
   border-radius: 8px;
   font-weight: 500;
+  font-size: 16px;
+  line-height: 1.35;
+  text-transform: uppercase;
   transition:
     background 0.2s,
     color 0.2s;
@@ -572,6 +587,8 @@ hr {
   padding: 10px;
   border-radius: 8px;
   font-weight: 600;
+  font-size: 16px;
+  text-transform: uppercase;
 }
 
 .logout-button:hover {
@@ -583,8 +600,8 @@ hr {
 }
 
 .main-content {
-  margin-left: 260px;
-  width: calc(100% - 260px);
+  margin-left: 300px;
+  width: calc(100% - 300px);
   min-width: 0;
 }
 
@@ -911,7 +928,7 @@ tbody tr:hover {
 }
 
 /* =========================================================
-   STATUS BADGES (Inter, uppercase)
+   STATUS BADGES (Segoe UI Historic, uppercase)
 ========================================================= */
 
 .status {
@@ -1358,7 +1375,7 @@ tbody tr:hover {
    (Login page responsive rules are in the RESPONSIVE LOGIN section.) */
 @media (max-width: 900px) {
   .sidebar {
-    width: 270px;
+    width: 300px;
     transform: translateX(-100%);
     transition: transform 0.25s ease;
   }
@@ -2219,7 +2236,7 @@ tbody tr:hover {
   gap: 24px;
 }
 
-/* Desktop (1024px and wider): 280px sidebar that stays in view while the
+/* Desktop (1024px and wider): 300px sidebar that stays in view while the
    page scrolls. Below 900px the ☰ slide-in menu is kept (see above). */
 .sidebar {
   overflow-y: auto;
@@ -2227,7 +2244,7 @@ tbody tr:hover {
 
 @media (min-width: 1024px) {
   .sidebar {
-    width: 280px;
+    width: 300px;
     position: sticky;
     top: 0;
     height: 100vh;
@@ -2247,7 +2264,9 @@ tbody tr:hover {
   border-left: 4px solid var(--primary-color);
   border-top: 1px solid var(--border);
   border-radius: var(--radius-system);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .metric-card:hover {
@@ -2291,7 +2310,12 @@ tbody tr:hover {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, rgba(var(--primary-dark-rgb), 0.92) 0%, rgba(var(--primary-rgb), 0.78) 55%, rgba(var(--primary-rgb), 0.45) 100%);
+  background: linear-gradient(
+    100deg,
+    rgba(var(--primary-dark-rgb), 0.92) 0%,
+    rgba(var(--primary-rgb), 0.78) 55%,
+    rgba(var(--primary-rgb), 0.45) 100%
+  );
 }
 
 .dashboard-hero-text {
@@ -2344,7 +2368,10 @@ tbody tr:hover {
   border-radius: var(--radius-system);
   color: var(--text-main);
   text-decoration: none;
-  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .quick-tile:hover {
@@ -2431,9 +2458,15 @@ tbody tr:hover {
   white-space: nowrap;
 }
 
+.profile-text strong {
+  font-size: 16px;
+  text-transform: uppercase;
+}
+
 .profile-text small {
   color: rgba(var(--white-rgb), 0.85);
-  font-size: 12px;
+  font-size: 13px;
+  text-transform: uppercase;
 }
 
 .profile-role {
@@ -2784,7 +2817,6 @@ li.search-empty {
     color: var(--print-ink);
   }
 }
-
 /* =====================================================================
    ROUND 7: review steps, requirement picker, payroll, ATM, Data Bank
    ===================================================================== */
@@ -3365,7 +3397,11 @@ tbody tr.row-selected:hover {
 .announcement-image.placeholder {
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, var(--primary-color), var(--csu-green-dark));
+  background: linear-gradient(
+    135deg,
+    var(--primary-color),
+    var(--csu-green-dark)
+  );
 }
 
 .announcement-image.placeholder img {
@@ -3399,7 +3435,9 @@ tbody tr.row-selected:hover {
   background: var(--surface);
   color: var(--text-strong);
   text-decoration: none;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .announcement-card:hover {
@@ -3486,7 +3524,11 @@ tbody tr:nth-child(even) {
 }
 
 .button {
-  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.1s ease;
 }
 
 .button:not(:disabled):active {
@@ -3536,7 +3578,9 @@ tbody tr:nth-child(even) {
   font: 500 14px var(--font-body);
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .sheet-tab small {
@@ -4362,11 +4406,11 @@ tbody tr:nth-child(even) {
 .sidebar nav {
   flex: 1 1 auto;
   min-height: 120px;
-  gap: 2px;
+  gap: 4px;
 }
 
 .nav-item {
-  padding: 8px 14px;
+  padding: 10px 14px;
 }
 
 .nav-heading {
@@ -4386,7 +4430,7 @@ tbody tr:nth-child(even) {
   }
 
   .sidebar nav {
-    gap: 0;
+    gap: 3px;
   }
 
   .sidebar {
@@ -4395,8 +4439,8 @@ tbody tr:nth-child(even) {
   }
 
   .nav-item {
-    padding: 4px 14px;
-    font-size: 15px;
+    padding: 8px 14px;
+    font-size: 16px;
     line-height: 1.35;
   }
 
@@ -5066,6 +5110,134 @@ a.stat-card:hover,
   gap: 6px;
 }
 
+/* =====================================================================
+   PORTAL SIDEBAR: light school-portal treatment for every role
+   ===================================================================== */
+
+@media screen {
+  .sidebar {
+    width: 304px;
+    padding: 18px 14px 14px;
+    background: var(--surface);
+    color: var(--csu-green-dark);
+    border-right: 1px solid var(--border);
+    border-top: 4px solid var(--csu-gold);
+    box-shadow: 8px 0 24px rgba(var(--shadow-rgb), 0.04);
+  }
+
+  .sidebar-brand {
+    gap: 11px;
+    padding: 0 8px 14px;
+    margin-bottom: 12px;
+    border-bottom-color: var(--border);
+  }
+
+  .sidebar-logo {
+    width: 48px;
+  }
+
+  .sidebar-university {
+    color: var(--csu-green-dark);
+    font-size: 15px;
+  }
+
+  .sidebar-app {
+    color: var(--csu-green);
+    font-size: 14px;
+  }
+
+  .sidebar-brand small {
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+
+  .sidebar nav {
+    gap: 3px;
+    padding: 2px 0;
+  }
+
+  .nav-item {
+    padding: 10px 12px;
+    border-left: 3px solid transparent;
+    border-radius: 6px;
+    color: var(--csu-green-dark);
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: none;
+  }
+
+  .nav-item:hover {
+    background: var(--csu-green-tint);
+    color: var(--csu-green-dark);
+  }
+
+  .nav-item.active,
+  .nav-item.active:hover {
+    background: var(--surface-muted);
+    border-left-color: var(--csu-green);
+    color: var(--csu-green-dark);
+    font-weight: 700;
+  }
+
+  .nav-heading {
+    margin: 11px 12px 3px;
+    color: var(--text-muted);
+    font-size: 10px;
+  }
+
+  .sidebar-footer {
+    padding: 12px 8px 0;
+  }
+
+  .sidebar-motto {
+    color: var(--text-muted);
+  }
+
+  .logout-button {
+    border-color: var(--csu-green);
+    color: var(--csu-green-dark);
+    font-size: 13px;
+    text-transform: none;
+  }
+
+  .logout-button:hover {
+    background: var(--csu-green-tint);
+  }
+
+  .sidebar-profile .profile-trigger:hover,
+  .sidebar-profile .profile-trigger[aria-expanded="true"] {
+    background: var(--surface-muted);
+    border-color: var(--border);
+  }
+
+  .sidebar-profile .profile-text strong {
+    color: var(--csu-green-dark);
+  }
+
+  .sidebar-profile .profile-text small {
+    color: var(--text-muted) !important;
+  }
+
+  .sidebar-profile .profile-role {
+    color: var(--csu-green) !important;
+  }
+
+  .sidebar-profile .profile-caret {
+    color: var(--csu-green);
+  }
+
+  .profile-menu {
+    border-color: var(--border);
+    box-shadow: 0 12px 28px rgba(var(--shadow-rgb), 0.12);
+  }
+}
+
+@media screen and (max-width: 900px) {
+  .sidebar {
+    box-shadow: 10px 0 30px rgba(var(--shadow-rgb), 0.16);
+  }
+}
+
 .memo-list {
   margin: 0;
   padding: 0;
@@ -5366,12 +5538,12 @@ tr.group-cont td {
 /* Laptop screens (768 px tall): the staff menu (4 step headings) fits without scrolling. */
 @media (min-width: 901px) and (max-height: 920px) {
   .sidebar .nav-item {
-    padding-top: 3px;
-    padding-bottom: 3px;
+    padding-top: 8px;
+    padding-bottom: 8px;
   }
 
   .sidebar .nav-heading {
-    margin-top: 4px;
+    margin-top: 8px;
   }
 }
 
@@ -5457,4 +5629,12 @@ tr.group-cont td {
   margin: 4px 0 0;
   color: var(--csu-orange-text, #9a5b00);
   font-weight: 600;
+}
+
+.documents-apply {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #dfe7e2;
 }

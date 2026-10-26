@@ -232,7 +232,9 @@ export default function ManageAccountsPage({ kind }) {
                     <td>
                       {isStudent && account.student ? (
                         <>
-                          <strong>{account.student.last_name}</strong>, {account.student.first_name}
+                          <strong className="student-name">
+                            {account.student.last_name}, {account.student.first_name}
+                          </strong>
                         </>
                       ) : (
                         <strong>{account.name}</strong>

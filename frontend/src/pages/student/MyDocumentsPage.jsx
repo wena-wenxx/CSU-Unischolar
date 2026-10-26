@@ -2,7 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { fileUrl, formatDate, statusLabel } from "../../lib/format";
-import { checkableRow, groupDocuments, loadMyDocuments } from "../../lib/documents";
+import {
+  checkableRow,
+  groupDocuments,
+  loadMyDocuments,
+} from "../../lib/documents";
 import { useToast } from "../../lib/toast";
 import PageHeader from "../../components/PageHeader";
 import Loading from "../../components/Loading";
@@ -33,7 +37,7 @@ export default function MyDocumentsPage() {
           toast.error(errMsg(err, "Unable to load your documents."));
           setData({ types: [], documents: [] });
         }),
-    [toast]
+    [toast],
   );
 
   useEffect(() => {
@@ -52,9 +56,11 @@ export default function MyDocumentsPage() {
 
     try {
       const { data: result } = await api.post(
-        current ? `/student/documents/${current.id}/replace` : "/student/documents",
+        current
+          ? `/student/documents/${current.id}/replace`
+          : "/student/documents",
         form,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        { headers: { "Content-Type": "multipart/form-data" } },
       );
 
       toast.success(result.message);
@@ -75,9 +81,18 @@ export default function MyDocumentsPage() {
       const { data: result } = await api.post(`/documents/${row.id}/validate`);
       const status = result.document?.status;
 
-      if (status === "validated") toast.success("The AI check found no issues. OAS staff still review it.");
-      else if (status === "flagged") toast.info("AI check: something may need fixing. See the reasons below.");
-      else toast.info(result.message || "The file could not be read automatically.");
+      if (status === "validated")
+        toast.success(
+          "The AI check found no issues. OAS staff still review it.",
+        );
+      else if (status === "flagged")
+        toast.info(
+          "AI check: something may need fixing. See the reasons below.",
+        );
+      else
+        toast.info(
+          result.message || "The file could not be read automatically.",
+        );
 
       await load();
     } catch (err) {
@@ -91,7 +106,9 @@ export default function MyDocumentsPage() {
   if (!data) return <Loading />;
 
   const groups = groupDocuments(data);
-  const savedCount = groups.filter((g) => g.files.some((f) => !f.is_expired)).length;
+  const savedCount = groups.filter((g) =>
+    g.files.some((f) => !f.is_expired),
+  ).length;
 
   return (
     <div>
@@ -106,9 +123,11 @@ export default function MyDocumentsPage() {
       />
 
       <div className="alert alert-info">
-        Files you upload are kept here. When you apply for another scholarship, press{" "}
-        <strong>Use saved file</strong> on the checklist instead of uploading again. Uploading a new copy here also updates
-        your draft applications; submitted applications keep the file OAS is already checking.
+        Files you upload are kept here. When you apply for another scholarship,
+        press <strong>Use saved file</strong> on the checklist instead of
+        uploading again. Uploading a new copy here also updates your draft
+        applications; submitted applications keep the file OAS is already
+        checking.
       </div>
 
       <div className="documents-grid">
@@ -118,7 +137,10 @@ export default function MyDocumentsPage() {
           const row = current ? checkableRow(current) : null;
 
           return (
-            <section className={`card doc-card${current?.is_expired ? " expired" : ""}`} key={type}>
+            <section
+              className={`card doc-card${current?.is_expired ? " expired" : ""}`}
+              key={type}
+            >
               <div className="doc-card-head">
                 <h2>{type}</h2>
                 <ValidityBadge file={current} />
@@ -130,7 +152,10 @@ export default function MyDocumentsPage() {
                     <a href={fileUrl(current)} target="_blank" rel="noreferrer">
                       {current.original_filename}
                     </a>
-                    <span className="muted small"> · uploaded {formatDate(current.uploaded_at)}</span>
+                    <span className="muted small">
+                      {" "}
+                      · uploaded {formatDate(current.uploaded_at)}
+                    </span>
                   </p>
 
                   <p className="muted small">
@@ -149,7 +174,10 @@ export default function MyDocumentsPage() {
                       {current.applications.map((a, i) => (
                         <span key={`${a.id}-${i}`}>
                           {i > 0 && ", "}
-                          <Link to={`/student/applications/${a.id}`}>{a.scholarship}</Link> ({statusLabel(a.status)})
+                          <Link to={`/student/applications/${a.id}`}>
+                            {a.scholarship}
+                          </Link>{" "}
+                          ({statusLabel(a.status)})
                         </span>
                       ))}
                     </p>
@@ -168,7 +196,12 @@ export default function MyDocumentsPage() {
                   key={inputKeys[type] || 0}
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(event) => setFiles((f) => ({ ...f, [type]: event.target.files?.[0] || null }))}
+                  onChange={(event) =>
+                    setFiles((f) => ({
+                      ...f,
+                      [type]: event.target.files?.[0] || null,
+                    }))
+                  }
                 />
 
                 {files[type] ? (
@@ -191,7 +224,9 @@ export default function MyDocumentsPage() {
                     onClick={() => check(row)}
                     disabled={busy !== null}
                   >
-                    {busy === `check-${row.id}` ? "Checking..." : "Check with AI"}
+                    {busy === `check-${row.id}`
+                      ? "Checking..."
+                      : "Check with AI"}
                   </button>
                 )}
               </div>
@@ -201,23 +236,32 @@ export default function MyDocumentsPage() {
                   <button
                     type="button"
                     className="link-button"
-                    onClick={() => setHistory((h) => ({ ...h, [type]: !h[type] }))}
+                    onClick={() =>
+                      setHistory((h) => ({ ...h, [type]: !h[type] }))
+                    }
                     aria-expanded={Boolean(history[type])}
                   >
-                    {history[type] ? "Hide" : "Show"} {older.length} older cop{older.length === 1 ? "y" : "ies"}
+                    {history[type] ? "Hide" : "Show"} {older.length} older cop
+                    {older.length === 1 ? "y" : "ies"}
                   </button>
 
                   {history[type] && (
                     <ul>
                       {older.map((file) => (
                         <li key={file.file_path}>
-                          <a href={fileUrl(file)} target="_blank" rel="noreferrer">
+                          <a
+                            href={fileUrl(file)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
                             {file.original_filename}
                           </a>{" "}
                           <span className="muted small">
                             {formatDate(file.uploaded_at)}
                             {file.is_expired ? " · expired" : ""}
-                            {file.applications.length ? ` · ${file.applications.map((a) => a.scholarship).join(", ")}` : ""}
+                            {file.applications.length
+                              ? ` · ${file.applications.map((a) => a.scholarship).join(", ")}`
+                              : ""}
                           </span>
                         </li>
                       ))}
@@ -231,9 +275,10 @@ export default function MyDocumentsPage() {
       </div>
 
       <p className="muted small">
-        How long documents stay valid (from the upload date): COR, grades, indigency, barangay clearance, good moral and
-        recommendation letter: 6 months · income tax return: 1 year · birth certificate and valid ID: no expiry. OAS may
-        still ask for a newer copy.
+        How long documents stay valid (from the upload date): COR, grades,
+        indigency, barangay clearance, good moral and recommendation letter: 6
+        months · income tax return: 1 year · birth certificate and valid ID: no
+        expiry. OAS may still ask for a newer copy.
       </p>
     </div>
   );
@@ -241,8 +286,10 @@ export default function MyDocumentsPage() {
 
 function ValidityBadge({ file }) {
   if (!file) return <span className="status status-neutral">Missing</span>;
-  if (file.is_expired) return <span className="status status-danger">Expired</span>;
-  if (file.status === "flagged") return <span className="status status-warning">Needs attention</span>;
+  if (file.is_expired)
+    return <span className="status status-danger">Expired</span>;
+  if (file.status === "flagged")
+    return <span className="status status-warning">Needs attention</span>;
   return <span className="status status-success">Valid</span>;
 }
 
@@ -269,13 +316,19 @@ function AiResult({ file, checkable }) {
               <li key={flag}>{flag}</li>
             ))}
         </ul>
-        <span className="muted small">The AI only points things out; OAS staff make the decision.</span>
+        <span className="muted small">
+          The AI only points things out; OAS staff make the decision.
+        </span>
       </div>
     );
   }
 
   if (file.status === "needs_review") {
-    return <p className="ai-note review">The AI could not read this file. OAS will check it by hand.</p>;
+    return (
+      <p className="ai-note review">
+        The AI could not read this file. OAS will check it by hand.
+      </p>
+    );
   }
 
   if (!checkable) {

@@ -331,7 +331,7 @@ class StudentController extends Controller
                     'status' => $r->verdict === 'no_data' ? 'need_info' : ($todo ? 'almost' : 'ready'),
                     'todo' => $todo,
                     'to_do_count' => $toDo,
-                    'fit' => $fits[$program->id]?->summary(),
+                    'fit' => $fits->get($program->id)?->summary(),
                 ];
             })
             ->sortBy([

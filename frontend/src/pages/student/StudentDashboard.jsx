@@ -8,6 +8,8 @@ import EmptyState from "../../components/EmptyState";
 import AnnouncementCarousel from "../../components/AnnouncementCarousel";
 import Loading from "../../components/Loading";
 import MatchesCard from "../../components/MatchesCard";
+import QuickActions from "../../components/QuickActions";
+import StatCard from "../../components/StatCard";
 
 export default function StudentDashboard() {
   const [applications, setApplications] = useState([]);
@@ -23,26 +25,41 @@ export default function StudentDashboard() {
       api.get("/profile"),
       api.get("/announcements", { params: { limit: 5 } }),
     ])
-      .then(([apps, scholarshipsResponse, profileResponse, announcementsResponse]) => {
-        setApplications(apps.data);
-        setScholarships(scholarshipsResponse.data);
-        setProfile(profileResponse.data);
-        setAnnouncements(announcementsResponse.data);
-      })
+      .then(
+        ([
+          apps,
+          scholarshipsResponse,
+          profileResponse,
+          announcementsResponse,
+        ]) => {
+          setApplications(apps.data);
+          setScholarships(scholarshipsResponse.data);
+          setProfile(profileResponse.data);
+          setAnnouncements(announcementsResponse.data);
+        },
+      )
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <Loading />;
 
+  const count = (...statuses) =>
+    applications.filter((a) => statuses.includes(a.status)).length;
   const grant = profile?.active_scholar_record;
-  const openCount = scholarships.filter((s) => s.availability === "open").length;
+  const openCount = scholarships.filter(
+    (s) => s.availability === "open",
+  ).length;
   const needsAction = applications.filter((a) => a.status === "needs_action");
 
   return (
     <div>
       <DashboardHero
-        title={profile?.student ? `Welcome, ${profile.student.first_name}!` : "Student Dashboard"}
+        title={
+          profile?.student
+            ? `Welcome, ${profile.student.first_name}!`
+            : "Student Dashboard"
+        }
         subtitle="Apply for scholarships, keep your documents in one place, and follow every step online."
       />
 
@@ -52,8 +69,8 @@ export default function StudentDashboard() {
             <span className="grant-label">Current scholarship</span>
             <strong>{grant.scholarship?.name}</strong>
             <span>
-              Grantee since {formatDate(grant.grantee_tagged_at)} · {formatMoney(grant.scholarship?.amount)} per
-              semester
+              Grantee since {formatDate(grant.grantee_tagged_at)} ·{" "}
+              {formatMoney(grant.scholarship?.amount)} per semester
             </span>
           </div>
 
@@ -61,8 +78,18 @@ export default function StudentDashboard() {
             <span className="grant-label">Latest payroll</span>
             {grant.payroll_records?.length ? (
               <>
-                <strong>{grant.payroll_records[grant.payroll_records.length - 1].period}</strong>
-                <StatusBadge status={grant.payroll_records[grant.payroll_records.length - 1].status} />
+                <strong>
+                  {
+                    grant.payroll_records[grant.payroll_records.length - 1]
+                      .period
+                  }
+                </strong>
+                <StatusBadge
+                  status={
+                    grant.payroll_records[grant.payroll_records.length - 1]
+                      .status
+                  }
+                />
               </>
             ) : (
               <span>Not prepared yet</span>
@@ -73,16 +100,73 @@ export default function StudentDashboard() {
 
       {needsAction.map((application) => (
         <div className="alert alert-warning" key={application.id}>
-          <strong>OAS needs something from you</strong> for {application.scholarship?.name}.{" "}
-          <Link to={`/student/applications/${application.id}`}>Open the application</Link> to see what to fix.
+          <strong>OAS needs something from you</strong> for{" "}
+          {application.scholarship?.name}.{" "}
+          <Link to={`/student/applications/${application.id}`}>
+            Open the application
+          </Link>{" "}
+          to see what to fix.
         </div>
       ))}
 
       {!grant && <MatchesCard />}
 
+      <div className="stats-grid">
+        <StatCard
+          title="Open Scholarships"
+          value={openCount}
+          to="/student/scholarships"
+          hint="Browse"
+        />
+        <StatCard
+          title="My Applications"
+          value={applications.length}
+          to="/student/applications"
+        />
+        <StatCard
+          title="Being Processed"
+          value={count("submitted", "under_review", "complete")}
+          to="/student/applications?status=processing"
+        />
+        <StatCard
+          title="Approved"
+          value={count("approved")}
+          to="/student/applications?status=approved"
+        />
+      </div>
+
+      <QuickActions
+        actions={[
+          {
+            to: "/student/scholarships",
+            icon: "🎓",
+            label: "Browse Scholarships",
+            text: "See open programs and deadlines",
+          },
+          {
+            to: "/student/applications",
+            icon: "📋",
+            label: "My Applications",
+            text: "Follow each step",
+          },
+          {
+            to: "/student/documents",
+            icon: "📁",
+            label: "My Documents",
+            text: "Upload once, reuse later",
+          },
+          {
+            to: "/student/help",
+            icon: "❓",
+            label: "Help",
+            text: "How to apply",
+          },
+        ]}
+      />
+
       {applications.length === 0 && !grant && (
         <section className="card how-to-apply">
-          <h2>How to apply</h2>
+          <h2>How to apply:</h2>
           <ol>
             <li>Open <Link to="/student/scholarships">Scholarships</Link> and choose an open program.</li>
             <li>Press <strong>Apply</strong>. A checklist of the required documents appears.</li>
@@ -109,7 +193,10 @@ export default function StudentDashboard() {
               Open Scholarships <span className="count-pill">{openCount}</span>
             </h2>
 
-            <Link className="button button-secondary" to="/student/scholarships">
+            <Link
+              className="button button-secondary"
+              to="/student/scholarships"
+            >
               View all
             </Link>
           </div>
@@ -128,11 +215,14 @@ export default function StudentDashboard() {
                     </Link>
 
                     <p className="muted">
-                      {scholarship.provider || "CSU"} · {deadlineText(scholarship)}
+                      {scholarship.provider || "CSU"} ·{" "}
+                      {deadlineText(scholarship)}
                     </p>
                   </div>
 
-                  <span className={`status status-${info.tone}`}>{info.label}</span>
+                  <span className={`status status-${info.tone}`}>
+                    {info.label}
+                  </span>
                 </div>
               );
             })
@@ -145,7 +235,10 @@ export default function StudentDashboard() {
               My Applications <span className="count-pill">{applications.length}</span>
             </h2>
 
-            <Link className="button button-secondary" to="/student/applications">
+            <Link
+              className="button button-secondary"
+              to="/student/applications"
+            >
               View all
             </Link>
           </div>
@@ -157,10 +250,14 @@ export default function StudentDashboard() {
               <div className="list-item" key={application.id}>
                 <div>
                   <Link to={`/student/applications/${application.id}`}>
-                    <strong>{application.scholarship?.name || "Scholarship"}</strong>
+                    <strong>
+                      {application.scholarship?.name || "Scholarship"}
+                    </strong>
                   </Link>
 
-                  <p className="muted">Updated {timeAgo(application.updated_at)}</p>
+                  <p className="muted">
+                    Updated {timeAgo(application.updated_at)}
+                  </p>
                 </div>
 
                 <StatusBadge status={application.status} />

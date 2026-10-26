@@ -222,7 +222,9 @@ export default function StaffScholarRecordsPage() {
               <tbody>
                 {page.visible.map((record) => (
                   <tr key={record.id}>
-                    <td>{lastFirst(record.student)}</td>
+                    <td>
+                      <strong className="student-name">{lastFirst(record.student)}</strong>
+                    </td>
                     <td>{record.student?.student_id}</td>
                     {activeProgram === "all" && (
                       <td title={record.scholarship?.name}>{record.scholarship?.short_name || record.scholarship?.name}</td>
