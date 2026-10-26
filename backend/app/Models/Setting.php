@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 /*
 | Key/value system settings, changed by the admin in System Settings.
@@ -107,7 +108,7 @@ class Setting extends Model
 
     public static function allValues(): array
     {
-        $saved = self::query()->pluck('value', 'key')->all();
+        $saved = Cache::remember('system-settings', now()->addSeconds(30), fn () => self::query()->pluck('value', 'key')->all());
 
         $out = [];
         foreach (self::DEFAULTS as $key => $default) {
@@ -120,5 +121,6 @@ class Setting extends Model
     public static function put(string $key, ?string $value, ?int $userId = null): void
     {
         self::updateOrCreate(['key' => $key], ['value' => $value, 'updated_by' => $userId]);
+        Cache::forget('system-settings');
     }
 }

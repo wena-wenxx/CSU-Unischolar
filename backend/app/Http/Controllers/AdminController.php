@@ -42,17 +42,30 @@ class AdminController extends Controller
         $this->adminOnly($request);
 
         $since = now()->subDays(7);
+        $today = now()->startOfDay();
+        $accounts = User::query()
+            ->selectRaw("SUM(role = 'staff' AND is_active = 1) AS staff")
+            ->selectRaw("SUM(role = 'admin' AND is_active = 1) AS admins")
+            ->selectRaw("SUM(role = 'student' AND is_active = 1) AS students")
+            ->selectRaw("SUM(is_active = 0) AS inactive")
+            ->selectRaw("SUM(must_change_password = 1) AS must_change_password")
+            ->first();
+        $activity = ActivityLog::query()
+            ->selectRaw("SUM(action = 'auth.login' AND created_at >= ?) AS logins_today", [$today])
+            ->selectRaw("COUNT(*) AS actions_7_days")
+            ->where('created_at', '>=', $since)
+            ->first();
 
         return response()->json([
             'accounts' => [
-                'staff' => User::where('role', 'staff')->where('is_active', true)->count(),
-                'admins' => User::where('role', 'admin')->where('is_active', true)->count(),
-                'students' => User::where('role', 'student')->where('is_active', true)->count(),
-                'inactive' => User::where('is_active', false)->count(),
-                'must_change_password' => User::where('must_change_password', true)->count(),
+                'staff' => (int) $accounts->staff,
+                'admins' => (int) $accounts->admins,
+                'students' => (int) $accounts->students,
+                'inactive' => (int) $accounts->inactive,
+                'must_change_password' => (int) $accounts->must_change_password,
             ],
-            'logins_today' => ActivityLog::where('action', 'auth.login')->where('created_at', '>=', now()->startOfDay())->count(),
-            'actions_7_days' => ActivityLog::where('created_at', '>=', $since)->count(),
+            'logins_today' => (int) $activity->logins_today,
+            'actions_7_days' => (int) $activity->actions_7_days,
             'scholarships' => Scholarship::count(),
             'applications' => Application::where('status', '!=', 'draft')->count(),
             'term' => PayrollController::currentPeriod(),
