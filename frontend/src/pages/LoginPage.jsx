@@ -10,7 +10,6 @@ import {
   LOGO,
   MOTTO,
   OFFICE,
-  PHOTO_CREDIT,
   TAGLINE,
   UNIVERSITY,
 } from "../lib/brand";
@@ -168,15 +167,10 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="login-security-note">
-            <span aria-hidden="true">✓</span> For CSU students and authorized OAS staff only.
-          </p>
-
 
           <p className="login-card-footer">{CARD_FOOTER}</p>
         </section>
 
-        <small className="login-credit">{PHOTO_CREDIT}</small>
       </div>
     </main>
   );

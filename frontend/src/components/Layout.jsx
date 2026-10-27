@@ -9,32 +9,35 @@ import SidebarProfile from "./SidebarProfile";
 import WelcomeModal from "./WelcomeModal";
 
 const NAVIGATION = {
+  // A student's order: find a program, prepare documents, apply, follow it.
   student: [
     ["/student/dashboard", "Dashboard"],
     ["/student/scholarships", "Scholarships"],
-    ["/student/applications", "My Applications"],
     ["/student/documents", "My Documents"],
+    ["/student/applications", "My Applications"],
     ["/student/history", "My Scholarship History"],
     ["/student/profile", "My Profile"],
     ["/student/contact", "Contact OAS"],
     ["/student/help", "Help"],
   ],
-  // Same order as the OAS workflow: review -> agency's list -> grantees -> payroll.
-  // { heading } entries are small group titles, so the longer menu stays easy to scan.
+  // Same order as the real OAS process (numbered headings):
+  //   1 programs and who may qualify -> 2 applications to the agency and its approved list
+  //   -> 3 enrollment, grantees, payroll. Office records come last.
   staff: [
     ["/staff/dashboard", "Dashboard"],
-    { heading: "Applications" },
-    ["/staff/applications", "Applications"],
+    { heading: "1 · Programs" },
+    ["/staff/scholarships", "Scholarships"],
     ["/staff/recommendations", "AI Recommendations"],
-    ["/staff/agency-lists", "Approved Lists"],
+    { heading: "2 · Applications" },
+    ["/staff/applications", "Applications"],
     ["/staff/forwarded", "Forwarded to Agency"],
-    { heading: "Grantees" },
-    ["/staff/scholars", "Scholar Records"],
-    ["/staff/external-grantees", "External Grantees"],
+    ["/staff/agency-lists", "Approved Lists"],
+    { heading: "3 · Grantees" },
     ["/staff/enrollment", "Enrollment"],
+    ["/staff/scholars", "Scholar Records"],
     ["/staff/payroll", "Payroll"],
     { heading: "Office" },
-    ["/staff/scholarships", "Scholarships"],
+    ["/staff/external-grantees", "External Grantees"],
     ["/staff/announcements", "Announcements"],
     ["/staff/messages", "Student Messages"],
     ["/staff/data-bank", "Data Bank"],

@@ -5328,3 +5328,49 @@ tr.group-cont td {
   flex: 0 0 auto;
   height: 42px;
 }
+
+/* AI Recommendations: score groups (Ready / Almost there / Needs follow-up). */
+.score-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.score-groups .chip {
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+
+.score-groups .chip small {
+  margin-left: 6px;
+  font-weight: 700;
+}
+
+.score-groups .chip-warn:not(.active) {
+  border-color: var(--csu-orange-text, #9a5b00);
+  color: var(--csu-orange-text, #9a5b00);
+}
+
+.score-groups-hint {
+  margin: -4px 0 10px;
+}
+
+/* The top bar stays above the page while scrolling (the page title layer, z-index 20,
+   used to slide over it). Below the phone menu overlay (30) and the sidebar (40). */
+.topbar {
+  z-index: 25;
+}
+
+/* Laptop screens (768 px tall): the staff menu (4 step headings) fits without scrolling. */
+@media (min-width: 901px) and (max-height: 920px) {
+  .sidebar .nav-item {
+    padding-top: 3px;
+    padding-bottom: 3px;
+  }
+
+  .sidebar .nav-heading {
+    margin-top: 4px;
+  }
+}

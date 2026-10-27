@@ -37,7 +37,16 @@ export const SCORE_RANGES = {
   good: ["70–89%", 70, 89],
   fair: ["50–69%", 50, 69],
   low: ["Below 50%", 0, 49],
+  follow: ["Below 70% (needs follow-up)", 0, 69],
 };
+
+// The three score groups shown as chips above the AI Recommendations table.
+export const SCORE_GROUPS = [
+  ["", "All scores", null],
+  ["high", "Ready (90–100%)", "ready"],
+  ["good", "Almost there (70–89%)", "almost"],
+  ["follow", "Needs follow-up (below 70%)", "follow_up"],
+];
 
 // AI field fit (round 12): ranks and explains only; the rules decide eligibility.
 export const FIT_LEVELS = {

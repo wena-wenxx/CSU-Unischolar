@@ -5,6 +5,7 @@ import { downloadCSV, formatDateTime } from "../../lib/format";
 import {
   CHECK_RESULT,
   FIT_LEVELS,
+  SCORE_GROUPS,
   SCORE_RANGES,
   fitMethod,
   STAFF_STATUS,
@@ -86,6 +87,13 @@ export default function RecommendationsPage() {
 
   function change(key, value) {
     const next = { ...filters, [key]: value };
+    setFilters(next);
+    fetchRows(next, programId);
+  }
+
+  // Needs follow-up shows the lowest scores first; the other groups the highest first.
+  function chooseGroup(key) {
+    const next = { ...filters, range: key, sort: key === "follow" ? "score_asc" : "score_desc" };
     setFilters(next);
     fetchRows(next, programId);
   }
@@ -218,6 +226,29 @@ export default function RecommendationsPage() {
       <section className="card sheet-card">
         <SheetTabs tabs={tabs} value={programId} onChange={changeProgram} />
 
+        {/* Score groups: one click to see the students who need follow-up (lowest first). */}
+        <div className="score-groups" role="group" aria-label="Score groups">
+          {SCORE_GROUPS.map(([key, label, band]) => (
+            <button
+              key={key || "all"}
+              type="button"
+              className={`chip${filters.range === key ? " active" : ""}${key === "follow" ? " chip-warn" : ""}`}
+              aria-pressed={filters.range === key}
+              onClick={() => chooseGroup(key)}
+            >
+              {label}
+              {band && data?.bands && <small>{data.bands[band]}</small>}
+            </button>
+          ))}
+        </div>
+        {filters.range === "follow" && (
+          <p className="muted small score-groups-hint">
+            Lowest first. A low score with “Meets the rules” usually means documents are missing, flagged or not yet
+            checked, or the GWA/income is not yet verified. Open <strong>Why?</strong> to see what is missing; an
+            invitation reminds the student.
+          </p>
+        )}
+
         <div className="sheet-toolbar">
           <form
             className="toolbar-search"
@@ -256,17 +287,6 @@ export default function RecommendationsPage() {
             <option value="">Applied or not</option>
             <option value="no">Not applied yet</option>
             <option value="yes">Already applied</option>
-          </select>
-
-          <label htmlFor="rec-range" className="sr-only">
-            Score
-          </label>
-          <select id="rec-range" value={filters.range} onChange={(event) => change("range", event.target.value)}>
-            {Object.entries(SCORE_RANGES).map(([key, [label]]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
           </select>
 
           <label className="choice toolbar-check">

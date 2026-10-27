@@ -118,6 +118,15 @@ class RecommendationController extends Controller
             ->when($f['scholarship_id'] ?? null, fn ($q, $id) => $q->where('scholarship_id', $id));
         $total = (clone $query)->count();
 
+        // Score groups for the chips above the table (same filters, any score).
+        $anyScore = array_diff_key($f, ['min' => 1, 'max' => 1]);
+        $bands = $this->filtered($anyScore)
+            ->when($f['scholarship_id'] ?? null, fn ($q, $id) => $q->where('scholarship_id', $id))
+            ->selectRaw('sum(case when score >= 90 then 1 else 0 end) as ready, '
+                .'sum(case when score >= 70 and score < 90 then 1 else 0 end) as almost, '
+                .'sum(case when score < 70 then 1 else 0 end) as follow_up')
+            ->first();
+
         $sort = $f['sort'] ?? 'score_desc';
         $query->join('students', 'students.id', '=', 'ai_recommendations.student_id')
             ->select('ai_recommendations.*');
@@ -159,6 +168,7 @@ class RecommendationController extends Controller
                 'id' => $s->id, 'name' => $s->name, 'short_name' => $s->short_name, 'count' => (int) ($counts[$s->id] ?? 0),
             ])->values(),
             'all_count' => (int) $counts->sum(),
+            'bands' => ['ready' => (int) $bands?->ready, 'almost' => (int) $bands?->almost, 'follow_up' => (int) $bands?->follow_up],
             // max() returns a plain string; send it as ISO time so the browser shows the right hour.
             'computed_at' => ($last = AiRecommendation::max('computed_at')) ? \Illuminate\Support\Carbon::parse($last)->toJSON() : null,
             'unscored' => $unscored,
