@@ -293,7 +293,7 @@ export default function StaffApplicationsPage() {
                         {application.scholarship?.short_name || application.scholarship?.name}
                       </td>
                     )}
-                    <td className="nowrap">{application.submitted_at ? formatDate(application.submitted_at) : "Not submitted"}</td>
+                    <td className="nowrap">{submittedText(application)}</td>
                     <td>
                       <StatusBadge status={application.status} />
                     </td>
@@ -499,7 +499,7 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
         <ProfileItem label="Email" value={student.user?.email} />
         <ProfileItem label="Contact number" value={student.contact_number} />
         <ProfileItem label="Scholarship" value={application.scholarship?.name} />
-        <ProfileItem label="Submitted" value={application.submitted_at ? formatDate(application.submitted_at) : "Not submitted"} />
+        <ProfileItem label="Submitted" value={submittedText(application)} />
         <ProfileItem label="Enrollment" value={enrollmentText(application)} />
       </div>
 
@@ -813,4 +813,11 @@ function AiResult({ result }) {
       )}
     </div>
   );
+}
+
+// A draft is "Not submitted". An approved application with no submit date was added from the agency's
+// approved list (the student applied at the agency, not in ScholarGuide).
+function submittedText(application) {
+  if (application.submitted_at) return formatDate(application.submitted_at);
+  return application.status === "draft" ? "Not submitted" : "From agency list";
 }

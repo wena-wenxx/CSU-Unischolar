@@ -96,7 +96,7 @@ export const HELP = {
       title: "Your profile photo",
       steps: [
         "Open My Profile and press Upload photo. Use a clear photo of your face (JPG, PNG or WebP, up to 2 MB).",
-        "It is shown at the top of the menu, like on the CSU student portal. Press Remove to go back to your initials.",
+        "It is shown at the top of the menu, like on the CSU MySchool portal. Press Remove to go back to the plain picture.",
       ],
     },
     {
@@ -223,7 +223,7 @@ export const HELP = {
         "Use the search box at the top of every page: type part of a student's name or Student ID, a program name, or a page name such as \"payroll\".",
         "Click a number on the Dashboard to open the matching list (for example Needs Action or Payroll Ready).",
         "Click your name at the top of the menu for View Profile, Help and Sign Out.",
-        "Add your photo on My Profile (Upload photo). It is shown at the top of the menu; without one, your initials are shown.",
+        "Add your photo on My Profile (Upload photo). It is shown at the top of the menu; without one, a plain picture is shown.",
       ],
     },
     {
@@ -256,13 +256,13 @@ export const HELP = {
       title: "AI Recommendations",
       steps: [
         "AI Recommendations lists students who may be eligible for each program, even if they have not applied. It only suggests; nothing changes until you act.",
-        "Score = checks met ÷ all checks. The checks are the program's eligibility rules (GWA, family income, year level, college, one scholarship) and its required documents, all with equal weight.",
+        "Requirements match = points earned ÷ all checks. Each check (GWA, family income, year level, college, one scholarship, each required document) is worth 1 point: a GWA or income only typed by the student earns ½, a document passed by the AI earns how sure the AI was of the name. It is not a chance of approval.",
         "A must-have rule that is not met shows Fails a rule, even with a high score. A missing GWA or income shows Not enough data. Meets the rules with a low score means the student qualifies but has not uploaded the documents yet.",
         "Press Why? to see each check, the rule, and the student's data used. Then Send invitation (e-mail), Add to scholarship (starts a draft application), Dismiss, or Mark as wrong (write what is wrong).",
         "The Why? window starts with What to do next (for example: ready to invite, or which documents are missing). Open Other programs for this student to see every program they match, best first.",
-        "A low % with Meets the rules usually means documents are missing, not that the student is unlikely. Students see the same programs on their dashboard (Scholarships that fit you) as a checklist, without the %.",
+        "Use the buttons above the table: Ready (90–100%), Almost there (70–89%), Needs follow-up (below 70%, lowest first). A low % with Meets the rules usually means documents are missing, not that the student is unlikely. Students see the same programs on their dashboard as a checklist, without the %.",
         "A document counts only after the AI check found no problem, or after you marked it verified. A document that is only uploaded does not count yet.",
-        "Tick “Only GWA/income checked by OAS” to see only students whose GWA and income you have already checked. Others show “GWA/income not checked”.",
+        "Tick “Only GWA/income checked by OAS” to see only students whose GWA and income you have already checked. Others show “Based on what the student typed”. If the documents show a different GWA or income, open Why? → “The documents show different figures?” and save the correct ones.",
         "Set the rules in Scholarships → Manage → Eligibility rules, then press Recalculate. Mark a student's GWA and income as checked after seeing their Grades and ITR.",
         "Read the program memo with AI (in Eligibility rules): paste the memo or choose its file. The AI suggests each rule with the sentence it came from; tick the right ones, then press Save. Values marked ⚠ were not found in the memo: check them.",
         "AI field fit: \"Field: Agriculture\" under a score means the program is for the student's field. The Why? window also lists agency-direct programs for the student's field. It only ranks; the rules decide eligibility.",

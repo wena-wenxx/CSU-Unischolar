@@ -5,6 +5,7 @@ import { BANNER, MOTTO, UNIVERSITY } from "../lib/brand";
 import { showWelcomeAgain } from "../lib/help";
 import PageHeader from "../components/PageHeader";
 import StatusBadge from "../components/StatusBadge";
+import TutorialVideos from "../components/TutorialVideos";
 
 /* Step-by-step help for the logged-in role (students and staff see different text). */
 export default function HelpPage() {
@@ -27,6 +28,8 @@ export default function HelpPage() {
           </button>
         }
       />
+
+      <TutorialVideos role={user.role} />
 
       <figure className="help-banner">
         <img

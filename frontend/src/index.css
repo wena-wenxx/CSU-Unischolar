@@ -5374,3 +5374,87 @@ tr.group-cont td {
     margin-top: 4px;
   }
 }
+
+/* Help: video guides with a chapter list beside the video (below it on phones). */
+.tutorial-card .card-header {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tutorial-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tutorial-tabs .chip {
+  cursor: pointer;
+}
+
+.tutorial-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 16px;
+  align-items: start;
+  margin: 10px 0;
+}
+
+.tutorial-video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  background: #043a20;
+}
+
+.tutorial-chapters {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tutorial-chapters button {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-strong);
+  font: 500 14px var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tutorial-chapters button:hover {
+  border-color: var(--primary-color);
+}
+
+.tutorial-chapters button.active {
+  border-color: var(--primary-color);
+  background: rgba(var(--primary-rgb), 0.08);
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.tutorial-time {
+  min-width: 36px;
+  color: var(--muted, #6b7280);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .tutorial-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* A short warning line inside a list (e.g. one-scholarship rule on Scholar Records). */
+.warning-text {
+  margin: 4px 0 0;
+  color: var(--csu-orange-text, #9a5b00);
+  font-weight: 600;
+}

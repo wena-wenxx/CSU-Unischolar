@@ -106,22 +106,48 @@ export default function StaffScholarRecordsPage() {
         {readyToTag.length === 0 ? (
           <EmptyState message="No students are ready for tagging." />
         ) : (
-          readyToTag.map((application) => (
-            <div className="list-item" key={application.id}>
-              <div>
-                <strong>{fullName(application.student)}</strong>
+          readyToTag.map((application) => {
+            // One active scholarship per student: say it here, before anyone presses Tag.
+            const holding = records.find(
+              (r) => r.student_id === application.student_id && r.status === "active" && r.scholarship_id !== application.scholarship_id
+            );
+            const alsoApproved = untagged.filter(
+              (a) => a.student_id === application.student_id && a.id !== application.id
+            );
+            return (
+              <div className="list-item" key={application.id}>
+                <div>
+                  <strong>{fullName(application.student)}</strong>
 
-                <p className="muted">
-                  {application.student?.student_id} · {application.scholarship?.name} ·{" "}
-                  {enrollmentText(application)}
-                </p>
+                  <p className="muted">
+                    {application.student?.student_id} · {application.scholarship?.name} ·{" "}
+                    {enrollmentText(application)}
+                  </p>
+                  {holding && (
+                    <p className="small warning-text">
+                      Already an active grantee of {holding.scholarship?.name}. One active scholarship per student: end
+                      that record first, or tell the agency.
+                    </p>
+                  )}
+                  {!holding && alsoApproved.length > 0 && (
+                    <p className="small warning-text">
+                      Also approved for {alsoApproved.map((a) => a.scholarship?.short_name || a.scholarship?.name).join(", ")}.
+                      Only one can be tagged: confirm with the agencies which one the student accepts.
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  className="button button-primary"
+                  onClick={() => setTagging(application)}
+                  disabled={Boolean(holding)}
+                  title={holding ? "This student already holds an active scholarship." : undefined}
+                >
+                  Tag as Grantee
+                </button>
               </div>
-
-              <button className="button button-primary" onClick={() => setTagging(application)}>
-                Tag as Grantee
-              </button>
-            </div>
-          ))
+            );
+          })
         )}
 
         {waitingForVerification.length > 0 && (

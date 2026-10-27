@@ -92,7 +92,9 @@ export default function MyApplicationsPage() {
                     <td>
                       {application.submitted_at
                         ? formatDate(application.submitted_at)
-                        : "Not submitted yet"}
+                        : application.status === "draft"
+                          ? "Not submitted yet"
+                          : "Applied at the agency"}
                     </td>
 
                     <td>

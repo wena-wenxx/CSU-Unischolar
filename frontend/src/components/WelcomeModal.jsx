@@ -65,7 +65,7 @@ export default function WelcomeModal() {
       footer={
         <>
           <Link className="button button-secondary" to={`/${user.role}/help`} onClick={close}>
-            Open full Help
+            Video guide &amp; Help
           </Link>
 
           {step > 0 && (
