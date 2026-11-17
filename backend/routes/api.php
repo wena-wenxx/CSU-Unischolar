@@ -160,6 +160,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\RequirePasswordChange::c
 
     Route::get('/staff/recommendations', [RecommendationController::class, 'index']);
     Route::post('/staff/recommendations/recalculate', [RecommendationController::class, 'recalculate']);
+    Route::post('/staff/recommendations/notifications/check', [RecommendationController::class, 'checkNotifications']);
+    Route::post('/staff/recommendations/notifications', [RecommendationController::class, 'sendNotifications']);
     Route::get('/staff/recommendations/{id}', [RecommendationController::class, 'show']);
     Route::post('/staff/recommendations/{id}/invite', [RecommendationController::class, 'invite']);
     Route::post('/staff/recommendations/{id}/add', [RecommendationController::class, 'add']);

@@ -179,7 +179,7 @@ class DemoDataSeeder extends Seeder
     }
 
     /**
-     *  Juan   CMSP      approved + enrollment verified -> ready to TAG as grantee
+     *  Gleslimie CMSP   approved + enrollment verified -> ready to TAG as grantee
      *  Maria  TES       submitted; her "Indigency" upload is really a Barangay Clearance (AI should flag it)
      *  Ana    TDP-SUC   under review; also a COMPLETED past SA scholarship with processed payroll (Data Bank history)
      *  Pedro  TDP-TES   needs action (OAS asked for a clearer document)

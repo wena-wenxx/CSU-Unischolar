@@ -8,8 +8,8 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
 /**
- * Test student (REAL, used with her permission):
- *   Wena Rose N. Contiga · 221-00462 · wenarose.contiga@carsu.edu.ph
+ * Test student:
+ *   Gleslimie B. Binag · 221-00462 · wenarose.contiga@carsu.edu.ph
  *   Use this account for e-mail tests, login demos and screenshots.
  *   She starts with NO applications so the full flow can be shown live.
  *
@@ -26,14 +26,14 @@ class StudentSeeder extends Seeder
 {
     // Middle names, the same as on their sample documents (database/seeders/demo-files).
     public const MIDDLE = [
-        '2026-00001' => 'Lopez', '2026-00002' => 'Cruz', '2026-00003' => 'Torres', '2026-00004' => 'Aquino',
+        '2026-00001' => 'B', '2026-00002' => 'Cruz', '2026-00003' => 'Torres', '2026-00004' => 'Aquino',
         '2026-00005' => 'Morales', '2026-00006' => 'Bautista', '2026-00007' => 'Castillo', '2026-00008' => 'Domingo',
         '2026-00009' => 'Fernandez', '2026-00010' => 'Tan',
     ];
 
     public const STUDENTS = [
         // email number, student ID, first, last, course, year level, college
-        [1, '2026-00001', 'Juan', 'Navarro', 'Bachelor of Science in Information Technology', '4th Year', 'College of Computing and Information Sciences'],
+        [1, '2026-00001', 'Gleslimie', 'Binag', 'Bachelor of Science in Information Technology', '4th Year', 'College of Computing and Information Sciences'],
         [2, '2026-00002', 'Maria', 'Santos', 'Bachelor of Science in Information Technology', '3rd Year', 'College of Computing and Information Sciences'],
         [3, '2026-00003', 'Ana', 'Ramirez', 'Bachelor of Science in Computer Science', '2nd Year', 'College of Computing and Information Sciences'],
         [4, '2026-00004', 'Pedro', 'Garcia', 'Bachelor of Science in Civil Engineering', '3rd Year', 'College of Engineering'],
@@ -54,7 +54,7 @@ class StudentSeeder extends Seeder
         $wena = User::updateOrCreate(
             ['email' => self::TEST_STUDENT_EMAIL],
             [
-                'name' => 'Wena Rose Contiga',
+                'name' => 'Gleslimie B. Binag',
                 'password' => Hash::make('Student@12345'),
                 'role' => 'student',
             ]
@@ -64,9 +64,9 @@ class StudentSeeder extends Seeder
             ['student_id' => '221-00462'],
             [
                 'user_id' => $wena->id,
-                'first_name' => 'Wena Rose',
-                'middle_name' => 'N.',
-                'last_name' => 'Contiga',
+                'first_name' => 'Gleslimie',
+                'middle_name' => 'B',
+                'last_name' => 'Binag',
                 'sex' => 'Female',
                 'course' => 'Bachelor of Science in Information Technology',
                 'year_level' => '4th Year',
@@ -93,7 +93,7 @@ class StudentSeeder extends Seeder
                     'first_name' => $first,
                     'middle_name' => self::MIDDLE[$studentId],
                     'last_name' => $last,
-                    'sex' => in_array($first, ['Maria', 'Ana', 'Liza', 'Rosa', 'Grace'], true) ? 'Female' : 'Male',
+                    'sex' => in_array($first, ['Gleslimie', 'Maria', 'Ana', 'Liza', 'Rosa', 'Grace'], true) ? 'Female' : 'Male',
                     'course' => $course,
                     'year_level' => $yearLevel,
                     'college' => $college,

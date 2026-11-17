@@ -191,7 +191,7 @@ export default function AgencyListsPage() {
 
   function downloadTemplate() {
     downloadCSV("agency-approved-list-template.csv", [
-      { Student_ID: "2026-00001", Last_Name: "Student", First_Name: "Juan", Approval_Date: "2026-10-15" },
+      { Student_ID: "2026-00001", Last_Name: "Binag", First_Name: "Gleslimie", Approval_Date: "2026-10-15" },
     ]);
   }
 

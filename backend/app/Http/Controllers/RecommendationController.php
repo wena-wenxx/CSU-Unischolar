@@ -9,6 +9,7 @@ use App\Models\Application;
 use App\Models\ApplicationStatusLog;
 use App\Models\RecommendationLog;
 use App\Models\Scholarship;
+use App\Models\ScholarshipNotification;
 use App\Models\Student;
 use App\Support\ApplicationNotifier;
 use App\Support\EligibilityEngine;
@@ -38,6 +39,7 @@ use Illuminate\Support\Facades\DB;
 class RecommendationController extends Controller
 {
     private const VIEWS = ['recommended', 'no_data', 'not_eligible', 'acted', 'dismissed', 'wrong', 'all'];
+    private const NOTIFICATION_TYPE = 'scholarship_opportunity';
 
     private function staffOnly(Request $request): void
     {
@@ -68,6 +70,9 @@ class RecommendationController extends Controller
             ->when(!empty($f['checked']), fn ($q) => $q->where('data_verified', true))
             ->when(isset($f['min']), fn ($q) => $q->where('score', '>=', (int) $f['min']))
             ->when(isset($f['max']), fn ($q) => $q->where('score', '<=', (int) $f['max']))
+            ->when(!empty($f['college']), fn ($q) => $q->whereHas('student', fn ($s) => $s->where('college', $f['college'])))
+            ->when(!empty($f['course']), fn ($q) => $q->whereHas('student', fn ($s) => $s->where('course', $f['course'])))
+            ->when(!empty($f['year_level']), fn ($q) => $q->whereHas('student', fn ($s) => $s->where('year_level', $f['year_level'])))
             ->when($words, fn ($q) => $q->whereHas('student', function ($s) use ($words) {
                 foreach ($words as $word) {
                     $like = '%'.$word.'%';
@@ -98,6 +103,9 @@ class RecommendationController extends Controller
             'checked' => 'nullable|boolean',
             'min' => 'nullable|integer|min:0|max:100',
             'max' => 'nullable|integer|min:0|max:100',
+            'college' => 'nullable|string|max:255',
+            'course' => 'nullable|string|max:255',
+            'year_level' => 'nullable|string|max:100',
             'q' => 'nullable|string|max:100',
             'sort' => 'nullable|in:score_desc,score_asc,name',
             'page' => 'nullable|integer|min:1',
@@ -138,7 +146,7 @@ class RecommendationController extends Controller
         }
 
         $rows = $query->with([
-            'student:id,student_id,first_name,middle_name,last_name,course,year_level,college',
+            'student:id,student_id,first_name,middle_name,last_name,course,year_level,college,gwa,family_income',
             'scholarship:id,name,short_name,application_mode,status,application_start,application_end',
         ])
             ->skip(($page - 1) * $perPage)->take($perPage)
@@ -158,6 +166,11 @@ class RecommendationController extends Controller
             ->pluck('name');
 
         $fits = FitScorer::lookup($rows->map(fn ($r) => [$r->student_id, $r->scholarship_id]));
+        $filterOptions = DB::table('ai_recommendations')
+            ->join('students', 'students.id', '=', 'ai_recommendations.student_id')
+            ->select('students.college', 'students.course', 'students.year_level')
+            ->distinct()
+            ->get();
 
         return response()->json([
             'data' => $rows->map(fn ($r) => $this->present($r) + ['fit' => $fits[$r->student_id.'-'.$r->scholarship_id] ?? null])->values(),
@@ -172,6 +185,11 @@ class RecommendationController extends Controller
             // max() returns a plain string; send it as ISO time so the browser shows the right hour.
             'computed_at' => ($last = AiRecommendation::max('computed_at')) ? \Illuminate\Support\Carbon::parse($last)->toJSON() : null,
             'unscored' => $unscored,
+            'filter_options' => [
+                'colleges' => $filterOptions->pluck('college')->filter()->unique()->sort()->values(),
+                'courses' => $filterOptions->pluck('course')->filter()->unique()->sort()->values(),
+                'year_levels' => $filterOptions->pluck('year_level')->filter()->unique()->sort()->values(),
+            ],
         ]);
     }
 
@@ -180,6 +198,10 @@ class RecommendationController extends Controller
 
     private function present(AiRecommendation $r): array
     {
+        $checks = $r->checks ?? [];
+        $met = collect($checks)->where('result', 'met')->pluck('label')->take(3)->implode(', ');
+        $missing = collect($checks)->where('result', '!=', 'met')->pluck('label')->take(2)->implode(', ');
+
         return [
             'id' => $r->id,
             'student' => $r->student,
@@ -194,7 +216,10 @@ class RecommendationController extends Controller
             'met_count' => $r->met_count,
             'total_count' => $r->total_count,
             'verdict' => $r->verdict,
-            'checks' => $r->checks ?? [],
+            'checks' => $checks,
+            'reason_summary' => $r->verdict === 'eligible'
+                ? ($met ? 'Matched: '.$met : 'Review the configured rules.')
+                : ($missing ? 'Review: '.$missing : 'Review the configured rules.'),
             'calculation' => $r->calculation,
             'applied_status' => $r->applied_status,
             'data_verified' => $r->data_verified,
@@ -303,6 +328,155 @@ class RecommendationController extends Controller
             'message' => "Recalculated {$result['rows']} recommendations ({$result['students']} students x {$result['scholarships']} programs). {$result['eligible']} are eligible.".$fitNote,
             'result' => $result,
         ]);
+    }
+
+    /**
+     * POST /staff/recommendations/notifications/check
+     * Confirm which selected recommendation rows can receive an opportunity notice.
+     */
+    public function checkNotifications(Request $request)
+    {
+        $this->staffOnly($request);
+        [$scholarship, $recommendations] = $this->notificationRecipients($request);
+
+        $studentIds = $recommendations->pluck('student_id');
+        $duplicates = ScholarshipNotification::with('student:id,first_name,last_name,student_id')
+            ->where('scholarship_id', $scholarship->id)
+            ->where('type', self::NOTIFICATION_TYPE)
+            ->whereIn('student_id', $studentIds)
+            ->get()
+            ->keyBy('student_id');
+
+        return response()->json([
+            'scholarship' => $scholarship->only(['id', 'name']),
+            'selected' => $recommendations->count(),
+            'duplicates' => $duplicates->values()->map(fn ($notification) => [
+                'student_id' => $notification->student_id,
+                'student' => $notification->student?->fullName(),
+                'sent_at' => $notification->sent_at,
+            ])->values(),
+            'sendable' => $recommendations->reject(fn ($recommendation) => $duplicates->has($recommendation->student_id))->count(),
+        ]);
+    }
+
+    /**
+     * POST /staff/recommendations/notifications
+     * Store one in-portal opportunity notice per selected student.
+     */
+    public function sendNotifications(Request $request)
+    {
+        $this->staffOnly($request);
+        $data = $request->validate([
+            'scholarship_id' => 'required|integer|exists:scholarships,id',
+            'recommendation_ids' => 'required|array|min:1|max:500',
+            'recommendation_ids.*' => 'integer|distinct|exists:ai_recommendations,id',
+            'message' => 'required|string|min:10|max:5000',
+            'skip_duplicates' => 'boolean',
+        ]);
+
+        [$scholarship, $recommendations] = $this->notificationRecipients($request, $data);
+        $skipDuplicates = (bool) ($data['skip_duplicates'] ?? true);
+        $duplicates = ScholarshipNotification::where('scholarship_id', $scholarship->id)
+            ->where('type', self::NOTIFICATION_TYPE)
+            ->whereIn('student_id', $recommendations->pluck('student_id'))
+            ->pluck('student_id')
+            ->flip();
+
+        if ($duplicates->isNotEmpty() && !$skipDuplicates) {
+            return response()->json([
+                'message' => $duplicates->count().' selected student(s) already received this scholarship notification.',
+                'duplicates' => $duplicates->keys()->values(),
+            ], 409);
+        }
+
+        $sent = 0;
+        $skippedDuplicates = 0;
+        $skippedActive = 0;
+        $now = now();
+
+        DB::transaction(function () use (
+            $recommendations,
+            $scholarship,
+            $data,
+            $duplicates,
+            $now,
+            &$sent,
+            &$skippedDuplicates,
+            &$skippedActive,
+            $request
+        ) {
+            foreach ($recommendations as $recommendation) {
+                if ($duplicates->has($recommendation->student_id)) {
+                    $skippedDuplicates++;
+                    continue;
+                }
+
+                if ($recommendation->student->otherActiveScholarship($scholarship->id)) {
+                    $skippedActive++;
+                    continue;
+                }
+
+                $message = str_replace(
+                    ['[Student Name]', '[Scholarship Name]'],
+                    [$recommendation->student->fullName(), $scholarship->name],
+                    trim($data['message'])
+                );
+
+                ScholarshipNotification::create([
+                    'student_id' => $recommendation->student_id,
+                    'scholarship_id' => $scholarship->id,
+                    'sender_id' => $request->user()->id,
+                    'ai_recommendation_id' => $recommendation->id,
+                    'type' => self::NOTIFICATION_TYPE,
+                    'message' => $message,
+                    'sent_at' => $now,
+                ]);
+
+                $recommendation->update([
+                    'staff_status' => 'invited',
+                    'decided_by' => $request->user()->id,
+                    'decided_at' => $now,
+                    'invited_at' => $now,
+                ]);
+                RecommendationLog::record($recommendation, $request->user(), 'notified', $message);
+                $sent++;
+            }
+        });
+
+        ActivityLog::record(
+            $request->user(),
+            'recommendations.bulk_notified',
+            "Sent a scholarship opportunity notification to {$sent} student(s) for {$scholarship->name}."
+        );
+
+        return response()->json([
+            'message' => "Notification sent successfully to {$sent} student(s).",
+            'sent' => $sent,
+            'skipped_duplicates' => $skippedDuplicates,
+            'skipped_active' => $skippedActive,
+        ]);
+    }
+
+    private function notificationRecipients(Request $request, ?array $validated = null): array
+    {
+        $data = $validated ?? $request->validate([
+            'scholarship_id' => 'required|integer|exists:scholarships,id',
+            'recommendation_ids' => 'required|array|min:1|max:500',
+            'recommendation_ids.*' => 'integer|distinct|exists:ai_recommendations,id',
+        ]);
+
+        $recommendations = AiRecommendation::with('student')
+            ->where('scholarship_id', $data['scholarship_id'])
+            ->whereIn('id', $data['recommendation_ids'])
+            ->get();
+
+        if ($recommendations->count() !== count($data['recommendation_ids'])) {
+            abort(response()->json([
+                'message' => 'Every selected recommendation must belong to the selected scholarship.',
+            ], 422));
+        }
+
+        return [Scholarship::findOrFail($data['scholarship_id']), $recommendations];
     }
 
     /** A reason is required when staff go against the AI (e.g. invite a "not eligible" student). */

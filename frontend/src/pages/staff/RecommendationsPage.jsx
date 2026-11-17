@@ -8,6 +8,7 @@ import {
   SCORE_GROUPS,
   SCORE_RANGES,
   fitMethod,
+  recommendationStatus,
   STAFF_STATUS,
   VERDICTS,
   VIEWS,
@@ -33,7 +34,7 @@ import SheetTabs from "../../components/SheetTabs";
   then Send invitation, Add to scholarship (a draft application), Dismiss,
   or Mark as wrong. Every page shown and every decision is logged.
 */
-const EMPTY = { view: "recommended", applied: "", range: "", q: "", sort: "score_desc", checked: false };
+const EMPTY = { view: "recommended", applied: "", range: "", q: "", sort: "score_desc", checked: false, college: "", course: "", year_level: "" };
 const stamp = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
 function Badge({ map, value }) {
@@ -46,6 +47,9 @@ function params(filters, programId, extra = {}) {
   const out = { view: filters.view, sort: filters.sort, ...extra };
   if (filters.applied) out.applied = filters.applied;
   if (filters.checked) out.checked = 1;
+  if (filters.college) out.college = filters.college;
+  if (filters.course) out.course = filters.course;
+  if (filters.year_level) out.year_level = filters.year_level;
   if (filters.q.trim()) out.q = filters.q.trim();
   if (min !== null) out.min = min;
   if (max !== null) out.max = max;
@@ -62,6 +66,8 @@ export default function RecommendationsPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [busy, setBusy] = useState(false);
   const [openId, setOpenId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [notification, setNotification] = useState(null);
 
   // .then() (not await) so React's lint rule sees the state is set later.
   const fetchRows = useCallback(
@@ -88,6 +94,7 @@ export default function RecommendationsPage() {
   function change(key, value) {
     const next = { ...filters, [key]: value };
     setFilters(next);
+    setSelectedIds(new Set());
     fetchRows(next, programId);
   }
 
@@ -95,12 +102,79 @@ export default function RecommendationsPage() {
   function chooseGroup(key) {
     const next = { ...filters, range: key, sort: key === "follow" ? "score_asc" : "score_desc" };
     setFilters(next);
+    setSelectedIds(new Set());
     fetchRows(next, programId);
   }
 
   function changeProgram(key) {
     setProgramId(key);
+    setSelectedIds(new Set());
     fetchRows(filters, key);
+  }
+
+  function toggleSelected(id) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllDisplayed() {
+    setSelectedIds((current) => {
+      const displayed = data.data.map((row) => row.id);
+      const next = new Set(current);
+      const allSelected = displayed.length > 0 && displayed.every((id) => next.has(id));
+      displayed.forEach((id) => (allSelected ? next.delete(id) : next.add(id)));
+      return next;
+    });
+  }
+
+  async function openNotificationModal() {
+    if (programId === "all") {
+      toast.info("Choose one scholarship tab before sending notifications.");
+      return;
+    }
+    if (!selectedIds.size) {
+      toast.info("Select at least one student first.");
+      return;
+    }
+
+    try {
+      const { data: result } = await api.post("/staff/recommendations/notifications/check", {
+        scholarship_id: Number(programId),
+        recommendation_ids: [...selectedIds],
+      });
+      setNotification({
+        ...result,
+        message:
+          "Dear [Student Name],\n\nYou have been identified as a potential candidate for [Scholarship Name] based on the information currently available in CSU UniScholar.\n\nYou may review the scholarship requirements and apply through CSU UniScholar if you are interested.\n\nPlease note that this notification does not constitute official scholarship approval or final confirmation of eligibility. Your application remains subject to the scholarship requirements and OAS review.",
+        skipDuplicates: true,
+      });
+    } catch (err) {
+      toast.error(errMsg(err, "Unable to check the selected students."));
+    }
+  }
+
+  async function sendNotifications() {
+    setBusy(true);
+    try {
+      const { data: result } = await api.post("/staff/recommendations/notifications", {
+        scholarship_id: Number(programId),
+        recommendation_ids: [...selectedIds],
+        message: notification.message,
+        skip_duplicates: true,
+      });
+      toast.success(result.message);
+      setNotification(null);
+      setSelectedIds(new Set());
+      await fetchRows(filters, programId);
+    } catch (err) {
+      toast.error(errMsg(err, "Unable to send the scholarship notification."));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function showMore() {
@@ -172,6 +246,8 @@ export default function RecommendationsPage() {
     ...data.tabs.map((t) => ({ key: String(t.id), label: programLabel(t), title: t.name, count: t.count })),
   ];
   const sortIcon = filters.sort === "score_asc" ? "▲" : filters.sort === "score_desc" ? "▼" : "";
+  const displayedIds = data.data.map((row) => row.id);
+  const allDisplayedSelected = displayedIds.length > 0 && displayedIds.every((id) => selectedIds.has(id));
 
   return (
     <div>
@@ -254,6 +330,7 @@ export default function RecommendationsPage() {
             className="toolbar-search"
             onSubmit={(event) => {
               event.preventDefault();
+              setSelectedIds(new Set());
               fetchRows(filters, programId);
             }}
           >
@@ -289,6 +366,21 @@ export default function RecommendationsPage() {
             <option value="yes">Already applied</option>
           </select>
 
+          <select value={filters.college} onChange={(event) => change("college", event.target.value)} aria-label="College">
+            <option value="">All colleges</option>
+            {(data.filter_options?.colleges || []).map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
+
+          <select value={filters.course} onChange={(event) => change("course", event.target.value)} aria-label="Program">
+            <option value="">All programs</option>
+            {(data.filter_options?.courses || []).map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
+
+          <select value={filters.year_level} onChange={(event) => change("year_level", event.target.value)} aria-label="Year level">
+            <option value="">All year levels</option>
+            {(data.filter_options?.year_levels || []).map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
+
           <label className="choice toolbar-check">
             <input type="checkbox" checked={filters.checked} onChange={(event) => change("checked", event.target.checked)} />
             Only GWA/income checked by OAS
@@ -298,6 +390,9 @@ export default function RecommendationsPage() {
             {data.total} student{data.total === 1 ? "" : "s"} ·{" "}
             {filters.sort === "name" ? "A–Z" : filters.sort === "score_asc" ? "lowest score first" : "highest score first"}
           </span>
+          <button className="button button-primary" onClick={openNotificationModal} disabled={!selectedIds.size || busy}>
+            Send Scholarship Notification ({selectedIds.size})
+          </button>
         </div>
 
         {data.data.length === 0 ? (
@@ -308,11 +403,20 @@ export default function RecommendationsPage() {
               <thead>
                 <tr>
                   <th>
+                    <label className="choice" title="Select all currently displayed results">
+                      <input type="checkbox" checked={allDisplayedSelected} onChange={toggleAllDisplayed} />
+                      <span className="sr-only">Select All</span>
+                    </label>
+                  </th>
+                  <th>
                     <button type="button" className="th-sort" onClick={() => change("sort", "name")}>
                       Student {filters.sort === "name" ? "▲" : ""}
                     </button>
                   </th>
                   {programId === "all" && <th>Program</th>}
+                  <th>College / course</th>
+                  <th>GWA / income</th>
+                  <th>Status</th>
                   <th>
                     <button
                       type="button"
@@ -339,12 +443,36 @@ export default function RecommendationsPage() {
                   return (
                     <tr key={row.id}>
                       <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(row.id)}
+                          onChange={() => toggleSelected(row.id)}
+                          aria-label={`Select ${studentLabel(row.student)}`}
+                        />
+                      </td>
+                      <td>
                         <strong>{studentLabel(row.student)}</strong>
                         <small className="muted account-note">
                           {row.student?.student_id} · {row.student?.year_level || "—"}
                         </small>
                       </td>
                       {programId === "all" && <td title={row.scholarship?.name}>{programLabel(row.scholarship)}</td>}
+                      <td>
+                        <span>{row.student?.college || "—"}</span>
+                        <small className="muted account-note">{row.student?.course || "—"}</small>
+                      </td>
+                      <td>
+                        <span>{gwaText(row.student?.gwa)}</span>
+                        <small className="muted account-note">{peso(row.student?.family_income)}</small>
+                      </td>
+                      <td>
+                        <span className={`status status-${row.verdict === "eligible" ? "success" : row.verdict === "no_data" ? "warning" : "danger"}`}>
+                          {recommendationStatus(row)}
+                        </span>
+                        <small className="muted account-note">
+                          {row.reason_summary || "Open Why? for the criteria details."}
+                        </small>
+                      </td>
                       <td className="nowrap">
                         <div className="score">
                           <strong>{row.score}%</strong>
@@ -419,6 +547,44 @@ export default function RecommendationsPage() {
           and the agency decides.
         </p>
       </section>
+
+      {notification && (
+        <Modal
+          size="large"
+          title="Send Scholarship Notification"
+          subtitle={`${notification.scholarship.name} · ${notification.selected} student${notification.selected === 1 ? "" : "s"} selected`}
+          onClose={() => !busy && setNotification(null)}
+          footer={
+            <div className="button-row">
+              <button className="button button-secondary" onClick={() => setNotification(null)} disabled={busy}>
+                Cancel
+              </button>
+              <button className="button button-primary" onClick={sendNotifications} disabled={busy || !notification.message.trim()}>
+                {busy ? "Sending..." : "Confirm and send"}
+              </button>
+            </div>
+          }
+        >
+          {notification.duplicates?.length > 0 && (
+            <div className="alert alert-warning">
+              {notification.duplicates.length} selected student{notification.duplicates.length === 1 ? "" : "s"} already received
+              this scholarship notification. Only students who have not been notified will receive this message.
+            </div>
+          )}
+          <label htmlFor="bulk-notification-message">Message</label>
+          <textarea
+            id="bulk-notification-message"
+            rows={10}
+            maxLength={5000}
+            value={notification.message}
+            onChange={(event) => setNotification({ ...notification, message: event.target.value })}
+          />
+          <p className="muted small">
+            [Student Name] and [Scholarship Name] are personalized for each recipient. This is an opportunity notice,
+            not an approval or an application.
+          </p>
+        </Modal>
+      )}
 
       {openId && <RecommendationWindow id={openId} onClose={() => setOpenId(null)} onChanged={replaceRow} />}
     </div>

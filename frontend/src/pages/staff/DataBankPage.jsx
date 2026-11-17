@@ -202,7 +202,7 @@ export default function DataBankPage() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Student ID, name or course (e.g. 221-00462 or Contiga)"
+            placeholder="Student ID, name or course (e.g. 221-00462 or Binag)"
           />
 
           <button className="button button-primary" disabled={loading}>

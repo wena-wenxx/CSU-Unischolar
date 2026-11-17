@@ -13,7 +13,15 @@ export default function NotificationBell() {
   const { user } = useAuth();
   const location = useLocation();
   const isStaff = user.role === "staff";
-  const [data, setData] = useState({ unread: 0, items: [], unread_replies: 0, invitations: [], counts: {}, messages: [] });
+  const [data, setData] = useState({
+    unread: 0,
+    items: [],
+    unread_replies: 0,
+    invitations: [],
+    opportunities: [],
+    counts: {},
+    messages: [],
+  });
   const [open, setOpen] = useState(false);
   const boxRef = useRef(null);
 
@@ -106,6 +114,31 @@ export default function NotificationBell() {
             </>
           ) : (
             <>
+          {data.opportunities?.length > 0 && (
+            <div className="bell-invites">
+              <strong className="bell-title">Scholarship opportunities</strong>
+              {data.opportunities.map((item) => (
+                <li key={item.id} className={item.read_at ? "" : "unread"}>
+                  <Link to={`/student/scholarships/${item.scholarship_id}`} onClick={() => setOpen(false)}>
+                    <strong>{item.scholarship}</strong>
+                    <span>{item.message}</span>
+                    <small className="muted">{timeAgo(item.sent_at)}</small>
+                  </Link>
+                  <span className="button-row">
+                    <Link className="button button-small button-secondary" to={`/student/scholarships/${item.scholarship_id}`} onClick={() => setOpen(false)}>
+                      View Scholarship
+                    </Link>
+                    {item.availability === "open" && !item.agency_direct && (
+                      <Link className="button button-small button-primary" to={`/student/scholarships/${item.scholarship_id}`} onClick={() => setOpen(false)}>
+                        Apply Now
+                      </Link>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </div>
+          )}
+
           {data.unread_replies > 0 && (
             <Link className="bell-reply" to="/student/contact" onClick={() => setOpen(false)}>
               OAS replied to {data.unread_replies === 1 ? "your message" : `${data.unread_replies} of your messages`}. Open Contact OAS →

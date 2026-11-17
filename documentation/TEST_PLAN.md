@@ -26,7 +26,7 @@ What the demo data contains (one scenario per student):
 | Jose | student9 | TES | Active grantee, payroll entry **Ready** |
 | Grace | student10 | CMSP | Active grantee, no payroll yet |
 
-Besides these 10 (and Wena's test account), the seeders add **120 more fictional students** with 1–3 applications each, so every
+Besides these 10 (and Gleslimie's test account), the seeders add **120 more fictional students** with 1–3 applications each, so every
 screen has realistic numbers right after `migrate:fresh --seed`:
 
 | Table | Rows |
@@ -274,7 +274,7 @@ Run `php artisan migrate:fresh --seed` first. In `backend/.env` set `QUEUE_CONNE
 ## Part E — Round 7 features
 
 Run `php artisan migrate:fresh --seed` first. Staff: `oas.staff@carsu.edu.ph` / `Staff@12345`.
-Test student: **Wena Rose Contiga** `wenarose.contiga@carsu.edu.ph` / `Student@12345` (starts with no applications).
+Test student: **Gleslimie B. Binag** `wenarose.contiga@carsu.edu.ph` / `Student@12345` (starts with no applications).
 
 **Review steps in order**
 - [ ] **E1.** Applications → filter **Submitted** → Review. A gold "Next step" box explains what to do. Only
@@ -313,17 +313,17 @@ Test student: **Wena Rose Contiga** `wenarose.contiga@carsu.edu.ph` / `Student@1
 
 **Data Bank**
 - [ ] **E16.** 25 students, A to Z by last name; *Show more* adds 25. Filters: college, year level, sex, standing,
-  program. *Export CSV (n)* downloads every match. Search "Contiga" → Wena; *Full history* shows Sex: Female.
+  program. *Export CSV (n)* downloads every match. Search "Binag" → Gleslimie; *Full history* shows Sex: Female.
 
 **Menu and test account**
 - [ ] **E17.** Staff menu: Dashboard, Applications, Approved Lists, Scholar Records, Payroll, Scholarships,
   Announcements, Data Bank, Reports, Help. Student menu says *My Scholarship History*.
-- [ ] **E18.** The login page "Demo accounts" box lists Wena's account. Wena's profile shows *Sex: Female*.
+- [ ] **E18.** The login page "Demo accounts" box lists Gleslimie's account. Gleslimie's profile shows *Sex: Female*.
 
 **E-mail with Gmail (optional, needs internet)**
 - [ ] **E19.** Set the Gmail values from `backend/.env.example` (App Password, `MAIL_ALWAYS_TO=wenarose.contiga@carsu.edu.ph`),
-  run `php artisan config:clear`, restart `php artisan serve`. As Wena, apply to an open program, upload the files,
-  submit. As staff: Complete → Approved by agency. The e-mail arrives in Wena's CSU inbox (check Spam too) and
+  run `php artisan config:clear`, restart `php artisan serve`. As Gleslimie, apply to an open program, upload the files,
+  submit. As staff: Complete → Approved by agency. The e-mail arrives in Gleslimie's CSU inbox (check Spam too) and
   Reports → *E-mails sent* shows SENT.
 
 ## Part F — Round 8 features
@@ -339,7 +339,7 @@ Run `php artisan migrate:fresh --seed` first. Admin: `admin@carsu.edu.ph` / `Adm
   and you cannot change your own role.
 - [ ] **F4.** Deactivate the new account → it cannot log in ("This account is deactivated"). Reactivate → it can.
 - [ ] **F5.** Reset password → a new temporary password; the user's open sessions are signed out.
-- [ ] **F6.** Manage Students → search "contiga" → Wena. *New student account* with an existing Student ID → error.
+- [ ] **F6.** Manage Students → search "binag" → Gleslimie. *New student account* with an existing Student ID → error.
 - [ ] **F7.** Log in with a temporary password → the *Set your own password* page opens and no other page can be
   opened until the password is changed. The button stays grey until the three rules are ticked.
 - [ ] **F8.** System Settings → set school year 2026-2027, semester, OAS e-mail and phone → Save. The footer of every
@@ -348,9 +348,9 @@ Run `php artisan migrate:fresh --seed` first. Admin: `admin@carsu.edu.ph` / `Adm
   staff steps from the seeded applications.
 
 **Contact OAS**
-- [ ] **F10.** As Wena: Contact OAS → choose a topic, subject and message → Send. It appears under *My messages* as
+- [ ] **F10.** As Gleslimie: Contact OAS → choose a topic, subject and message → Send. It appears under *My messages* as
   *Waiting for OAS*.
-- [ ] **F11.** As staff: Dashboard → *Student Messages* card → reply. As Wena: the bell shows "OAS replied…";
+- [ ] **F11.** As staff: Dashboard → *Student Messages* card → reply. As Gleslimie: the bell shows "OAS replied…";
   Contact OAS shows the reply.
 
 **Enrollment (Registrar list)**
@@ -377,7 +377,7 @@ Run `php artisan migrate:fresh --seed` first. Admin: `admin@carsu.edu.ph` / `Adm
 
 ## Part G — Round 9: announcement pictures
 
-- [ ] **G1.** As Wena: the dashboard shows **Latest Announcements**: three cards with picture, date, title, a short
+- [ ] **G1.** As Gleslimie: the dashboard shows **Latest Announcements**: three cards with picture, date, title, a short
   preview and *Read more*.
 - [ ] **G2.** *Read more* opens the announcement page with the full-size picture and the whole message. An expired
   announcement (e.g. `/student/announcements/8`) says it is no longer available.
@@ -392,7 +392,7 @@ Run `php artisan migrate:fresh --seed` first. Admin: `admin@carsu.edu.ph` / `Adm
 ## Part H — Round 10: OAS programs, program tabs, auto-refresh
 
 - [ ] **H1.** Footer: OAS name, address, oas@carsu.edu.ph and 0960 835 4606; no semester text.
-- [ ] **H2.** As Wena → Scholarships: filters *CHED-funded, Other Government, Private-funded, University-funded*;
+- [ ] **H2.** As Gleslimie → Scholarships: filters *CHED-funded, Other Government, Private-funded, University-funded*;
   6 program cards with Apply, then one compact list **Apply directly at the agency** (7 programs). Details on
   one of them explains how to apply at the agency (no Apply button).
 - [ ] **H3.** Contact OAS shows the OAS description, Prof. Sheila Rae E. Permanes (Unit Head), e-mail, phone and the
@@ -417,21 +417,21 @@ Run `php artisan migrate:fresh --seed` first. Admin: `admin@carsu.edu.ph` / `Adm
 Before: `php artisan migrate`, then `php artisan migrate:fresh --seed` (adds sample rules, GWA and income for the
 fictional students, and the first run of the recommendations). See `AI_RECOMMENDATIONS.md`.
 
-- [ ] **I1.** As Wena → My Profile → **Grades and family income**: type GWA `1.75`, income `180000`, Save →
+- [ ] **I1.** As Gleslimie → My Profile → **Grades and family income**: type GWA `1.75`, income `180000`, Save →
   "Waiting for OAS to check". A GWA of `7` is refused (must be 1.00–5.00).
 - [ ] **I2.** Staff menu has group titles (Applications / Grantees / Office) and two new pages: **AI Recommendations**
   and **External Grantees**.
 - [ ] **I3.** AI Recommendations: program tabs with counts; default *Meets the rules (recommended)*, highest score
   first; each row shows Score (%, bar, "x of y"), Met, Not met, Applied, Decision, **Why?** and **Review**.
 - [ ] **I4.** Filters: *Applied or not → Not applied yet* (proactive list), *Any score → 90–100%*, the *Show* list
-  (Not enough data / Fails a must-have rule / Marked wrong / Everything), search `Contiga` + Enter. Click **Score**
+  (Not enough data / Fails a must-have rule / Marked wrong / Everything), search `Binag` + Enter. Click **Score**
   to sort lowest first; click again for highest first.
-- [ ] **I5.** Wena's **Why?** for TES after a fresh seed: "1 of 10 checks met (1 of 2 must-have rules, 0 of 8
+- [ ] **I5.** Gleslimie's **Why?** for TES after a fresh seed: "1 of 10 checks met (1 of 2 must-have rules, 0 of 8
   documents); points earned 1 of 10 = 10%". Every check shows the rule, her data ("typed by the student, not yet
   verified") and its **Points** (a GWA/income only typed by the student earns ½; see AI_RECOMMENDATIONS.md).
 - [ ] **I6.** Press **Mark GWA and income as checked** → "Checked by OAS". Press **Send invitation** with a note →
-  e-mail logged (Reports → E-mails sent, From: AI Recommendations). Wena's bell lists the invitation.
-- [ ] **I7.** **Add to scholarship** → confirm → Wena has a *Draft* application (My Applications), her bell says
+  e-mail logged (Reports → E-mails sent, From: AI Recommendations). Gleslimie's bell lists the invitation.
+- [ ] **I7.** **Add to scholarship** → confirm → Gleslimie has a *Draft* application (My Applications), her bell says
   "Application started", and the row's Decision is *Added (draft)*. Pressing it again is refused.
 - [ ] **I8.** Open a *Fails a must-have rule* row → Send invitation without a note → refused ("Write a short reason").
 - [ ] **I9.** **Mark as wrong** without a note → refused; with a note → listed under *Show: Marked wrong*; **Restore**

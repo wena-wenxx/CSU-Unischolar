@@ -9,6 +9,7 @@ use App\Models\ApplicationStatusLog;
 use App\Models\ExternalGrantee;
 use App\Models\ProfileChangeRequest;
 use App\Models\ScholarRecord;
+use App\Models\ScholarshipNotification;
 use App\Support\EligibilityEngine;
 use App\Support\NextSteps;
 use App\Support\FitScorer;
@@ -210,11 +211,29 @@ class StudentController extends Controller
             ->get(['id', 'scholarship_id', 'invited_at'])
             ->map(fn ($r) => ['scholarship_id' => $r->scholarship_id, 'scholarship' => $r->scholarship?->name, 'invited_at' => $r->invited_at]);
 
+        $opportunities = ScholarshipNotification::with('scholarship:id,name,short_name')
+            ->where('student_id', $student->id)
+            ->latest('sent_at')
+            ->latest('id')
+            ->limit(20)
+            ->get()
+            ->map(fn ($notification) => [
+                'id' => $notification->id,
+                'scholarship_id' => $notification->scholarship_id,
+                'scholarship' => $notification->scholarship?->name,
+                'message' => $notification->message,
+                'sent_at' => $notification->sent_at,
+                'read_at' => $notification->read_at,
+                'availability' => $notification->scholarship?->availability,
+                'agency_direct' => $notification->scholarship?->isAgencyDirect(),
+            ]);
+
         return response()->json([
-            'unread' => $logs->whereNull('read_at')->count(),
+            'unread' => $logs->whereNull('read_at')->count() + $opportunities->whereNull('read_at')->count(),
             'items' => $logs->values(),
             'unread_replies' => $replies,
             'invitations' => $invitations->values(),
+            'opportunities' => $opportunities->values(),
         ]);
     }
 
@@ -223,6 +242,9 @@ class StudentController extends Controller
         $student = $this->student($request);
 
         ApplicationStatusLog::whereHas('application', fn ($q) => $q->where('student_id', $student->id))
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+        ScholarshipNotification::where('student_id', $student->id)
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
 

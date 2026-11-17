@@ -120,7 +120,7 @@ export default function ActivityLogPage() {
             type="search"
             value={filters.q}
             onChange={(event) => change("q", event.target.value)}
-            placeholder="Search a name or words (e.g. Contiga, payroll)"
+            placeholder="Search a name or words (e.g. Binag, payroll)"
           />
           <button className="button button-primary" disabled={loading}>
             Search

@@ -224,7 +224,7 @@ real OAS decisions.
 income PHP 250,000 or less) so the demo shows both outcomes. **Replace them with the official criteria** from each
 program's memo before real use.
 
-The fictional students' GWA and income are the values printed on their sample Grades and ITR. Wena's are left
+The fictional students' GWA and income are the values printed on their sample Grades and ITR. Gleslimie's are left
 empty, so she can enter them during testing.
 
 ## 7. Files

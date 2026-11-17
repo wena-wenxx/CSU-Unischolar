@@ -10,6 +10,17 @@ export const VERDICTS = {
   not_eligible: ["Fails a rule", "danger"],
 };
 
+export const RECOMMENDATION_STATUSES = {
+  eligible: ["Potentially eligible", "success"],
+  no_data: ["Insufficient information", "warning"],
+  not_eligible: ["Does not currently match", "danger"],
+};
+
+export function recommendationStatus(row) {
+  if (!row?.checks?.length) return "Review required";
+  return RECOMMENDATION_STATUSES[row.verdict]?.[0] || "Review required";
+}
+
 // What OAS staff did with the recommendation.
 export const STAFF_STATUS = {
   new: ["New", "neutral"],
@@ -99,7 +110,7 @@ export function appliedLabel(status) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-// "Contiga, Wena Rose" from a student object.
+// "Binag, Gleslimie" from a student object.
 export function studentLabel(student) {
   if (!student) return "—";
   return `${student.last_name}, ${student.first_name}`;

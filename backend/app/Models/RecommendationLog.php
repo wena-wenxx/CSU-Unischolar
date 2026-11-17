@@ -19,6 +19,7 @@ class RecommendationLog extends Model
         'added' => 'Added to scholarship (draft application)',
         'dismissed' => 'Dismissed by staff',
         'wrong' => 'Marked as wrong',
+        'notified' => 'Scholarship notification sent',
         'restored' => 'Restored',
         'recalculated' => 'Recalculated',
     ];

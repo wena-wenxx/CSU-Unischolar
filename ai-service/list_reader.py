@@ -549,6 +549,10 @@ def _read_pdf(path):
             embedded = " ".join(w[4] for w in words)
             use_ocr = bad_text_layer(words)
             page_rows = page_layout = []
+            embedded_class = classify_page(embedded)
+            if embedded_class in ("instruction", "signature", "total"):
+                page_texts.append(embedded)
+                continue
             if not use_ocr and len(words) >= 3:
                 page_rows, page_layout = group_boxes([(w[0], w[1], w[2], w[3], w[4]) for w in words], True)
             else:
