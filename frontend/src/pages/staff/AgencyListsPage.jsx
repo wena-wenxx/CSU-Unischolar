@@ -46,15 +46,34 @@ export default function AgencyListsPage() {
   const [fileKey, setFileKey] = useState(0);
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState(null);
+  const [metadata, setMetadata] = useState({});
+  const [details, setDetails] = useState({
+    school_year: "",
+    semester: "",
+    batch: "",
+    reference_number: "",
+    list_date: "",
+    expected_count: "",
+    expected_total: "",
+    notes: "",
+  });
+  const [confirmedMismatch, setConfirmedMismatch] = useState(false);
+  const [defaults, setDefaults] = useState({});
 
   // Written with .then() (not await) so React's lint rule can see that the
   // state is set later, when the server answers, not during the effect.
   const load = useCallback(
     () =>
-      Promise.all([api.get("/scholarships"), api.get("/staff/agency-lists")])
-        .then(([programs, uploads]) => {
+      Promise.all([api.get("/scholarships"), api.get("/staff/agency-lists"), api.get("/settings/public")])
+        .then(([programs, uploads, settings]) => {
           setScholarships(programs.data);
           setHistory(uploads.data);
+          setDefaults(settings.data || {});
+          setDetails((old) => ({
+            ...old,
+            school_year: old.school_year || settings.data?.current_school_year || "",
+            semester: old.semester || settings.data?.current_semester || "",
+          }));
         })
         .catch((err) => {
           toast.error(errMsg(err, "Unable to load this page."));
@@ -89,7 +108,7 @@ export default function AgencyListsPage() {
     if (!file) return;
 
     try {
-      const { rows: parsed, warnings } = await readListFile(file);
+      const { rows: parsed, warnings, metadata: detected } = await readListFile(file);
       if (parsed.length === 0) {
         toast.error("The file is empty.");
         return;
@@ -97,6 +116,18 @@ export default function AgencyListsPage() {
       warnings.forEach((warning) => toast.info(warning));
       setRows(parsed);
       setFileName(file.name);
+      setMetadata(detected || {});
+      setConfirmedMismatch(false);
+      setDetails((old) => ({
+        ...old,
+        school_year: detected?.academic_year || old.school_year || defaults.current_school_year || "",
+        semester: detected?.semester || old.semester || defaults.current_semester || "",
+        batch: detected?.batch || old.batch || "",
+        reference_number: detected?.reference_number || "",
+        list_date: detected?.date || "",
+        expected_count: detected?.row_count ? String(detected.row_count) : "",
+        expected_total: detected?.printed_total != null ? String(detected.printed_total) : "",
+      }));
       const head = parsed[0].map((h) => String(h).trim());
       setIdColumn(guessColumn(head, [/student.?(id|no|num)/, /id.?(no|num)/, /^stud/, /^id$/]));
       setDateColumn(guessColumn(head, [/approv.*date/, /date/]));
@@ -111,6 +142,8 @@ export default function AgencyListsPage() {
     setFileName("");
     setIdColumn("");
     setDateColumn("");
+    setMetadata({});
+    setConfirmedMismatch(false);
     setFileKey((k) => k + 1);
   }
 
@@ -132,10 +165,15 @@ export default function AgencyListsPage() {
         scholarship_id: Number(scholarshipId),
         agency_name: agency.trim(),
         file_name: fileName,
+        ...details,
+        expected_count: details.expected_count === "" ? null : Number(details.expected_count),
+        expected_total: details.expected_total === "" ? null : Number(details.expected_total),
+        confirmed_mismatch: confirmedMismatch,
         rows: dataRows.map((row, i) => ({
           row: firstDataLine + i,
           student_id: (row[Number(idColumn)] || "").trim(),
           approval_date: dateColumn === "" ? null : (row[Number(dateColumn)] || "").trim() || null,
+          amount: (row[amountColumn] || "").replaceAll(",", "").trim() || null,
         })),
       };
 
@@ -160,6 +198,10 @@ export default function AgencyListsPage() {
   if (!scholarships) return <Loading />;
 
   const ready = scholarshipId && agency.trim() && fileName && idColumn !== "" && dataRows.length > 0;
+  const amountColumn = guessColumn(headers, [/tes.?amount/, /^amount$/, /total.?amount/]);
+  const countMismatch = details.expected_count !== "" && Number(details.expected_count) !== dataRows.length;
+  const amountSum = dataRows.reduce((sum, row) => sum + (Number(String(row[amountColumn] || "").replaceAll(",", "")) || 0), 0);
+  const amountMismatch = details.expected_total !== "" && Math.abs(amountSum - Number(details.expected_total)) > 0.01;
 
   return (
     <div>
@@ -208,7 +250,42 @@ export default function AgencyListsPage() {
 
       {rows.length > 0 && (
         <section className="card">
-          <h2>2. Which column is which?</h2>
+          <h2>2. List details</h2>
+          <div className="form-grid">
+            {[
+              ["school_year", "School year", "text"],
+              ["semester", "Semester", "select"],
+              ["batch", "Batch", "text"],
+              ["reference_number", "Agency reference number", "text"],
+              ["list_date", "List date", "date"],
+              ["expected_count", "Expected number of grantees", "number"],
+              ["expected_total", "Expected total amount", "number"],
+              ["notes", "Notes", "text"],
+            ].map(([key, label, type]) => (
+              <div key={key}>
+                <label htmlFor={`list-${key}`}>{label}</label>
+                {type === "select" ? (
+                  <select id={`list-${key}`} value={details[key]} onChange={(event) => setDetails({ ...details, [key]: event.target.value })}>
+                    <option value="">Choose semester</option>
+                    <option>1st Semester</option><option>2nd Semester</option><option>Summer</option>
+                  </select>
+                ) : (
+                  <input id={`list-${key}`} type={type} value={details[key]} onChange={(event) => setDetails({ ...details, [key]: event.target.value })} />
+                )}
+                {metadata[key === "school_year" ? "academic_year" : key === "reference_number" ? "reference_number" : key === "list_date" ? "date" : key === "expected_total" ? "printed_total" : key === "expected_count" ? "row_count" : key] != null && (
+                  <span className="muted small">Detected from file</span>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className={`notice ${countMismatch || amountMismatch ? "notice-warning" : "notice-success"}`}>
+            Rows read: {dataRows.length} vs expected: {details.expected_count || "—"} · Summed amount: {amountSum.toLocaleString(undefined, { minimumFractionDigits: 2 })} vs printed: {details.expected_total || "—"}
+            {countMismatch || amountMismatch ? (
+              <label className="choice"><input type="checkbox" checked={confirmedMismatch} onChange={(event) => setConfirmedMismatch(event.target.checked)} /> I reviewed the mismatch and want to continue.</label>
+            ) : " — Match"}
+          </div>
+
+          <h2>3. Which column is which?</h2>
 
           <div className="form-grid">
             <div>
@@ -276,8 +353,8 @@ export default function AgencyListsPage() {
             <button className="button button-secondary" onClick={reset}>
               Choose another file
             </button>
-            <button className="button button-primary" onClick={process} disabled={!ready || processing}>
-              {processing ? "Processing..." : `3. Process ${dataRows.length} rows`}
+            <button className="button button-primary" onClick={process} disabled={!ready || processing || ((countMismatch || amountMismatch) && !confirmedMismatch)}>
+              {processing ? "Processing..." : `4. Process ${dataRows.length} rows`}
             </button>
           </div>
         </section>
@@ -388,6 +465,7 @@ function HistoryTable({ history }) {
             <tr>
               <th>Uploaded</th>
               <th>Program</th>
+              <th>Period</th>
               <th>Agency</th>
               <th>File</th>
               <th>By</th>
@@ -403,6 +481,7 @@ function HistoryTable({ history }) {
               <tr key={item.id}>
                 <td>{formatDateTime(item.created_at)}</td>
                 <td>{item.scholarship?.name}</td>
+                <td>{[item.semester, item.school_year && `AY ${item.school_year}`, item.batch].filter(Boolean).join(" ") || "—"}</td>
                 <td>{item.agency_name}</td>
                 <td>{item.file_name}</td>
                 <td>{item.uploader?.name || "—"}</td>
@@ -424,7 +503,7 @@ function HistoryTable({ history }) {
       {open && (
         <Modal size="large" title={`Upload: ${open.file_name}`} onClose={() => setOpen(null)}>
           <p className="muted">
-            {open.scholarship?.name} · {open.agency_name} · {formatDateTime(open.created_at)} by {open.uploader?.name}
+            {open.scholarship?.name} · {[open.semester, open.school_year && `AY ${open.school_year}`, open.batch].filter(Boolean).join(" ") || "No period"} · {open.agency_name} · {formatDateTime(open.created_at)} by {open.uploader?.name}
           </p>
           <Summary upload={open} />
           <Details details={open.details} />

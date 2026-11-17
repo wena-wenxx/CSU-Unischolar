@@ -39,5 +39,5 @@ export async function readListFile(file) {
   const width = Math.max(0, ...rows.map((row) => row.length));
   rows = rows.map((row) => [...row.map((cell) => String(cell ?? "")), ...Array(width - row.length).fill("")]);
 
-  return { rows, warnings: data.warnings || [] };
+  return { rows, warnings: data.warnings || [], metadata: data.metadata || {} };
 }

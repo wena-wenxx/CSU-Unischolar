@@ -10,6 +10,7 @@ use App\Models\ApplicationStatusLog;
 use App\Models\ScholarRecord;
 use App\Models\Scholarship;
 use App\Models\Student;
+use App\Models\Setting;
 use App\Support\ApplicationNotifier;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -67,10 +68,27 @@ class AgencyListController extends Controller
             'agency_name' => 'required|string|max:255',
             'file_name' => 'required|string|max:255',
             'rows' => 'required|array|min:1|max:5000',
+            'school_year' => ['nullable', 'regex:/^\d{4}-\d{4}$/'],
+            'semester' => 'nullable|in:'.implode(',', Setting::SEMESTERS),
+            'batch' => 'nullable|string|max:100',
+            'reference_number' => 'nullable|string|max:255',
+            'list_date' => 'nullable|date',
+            'expected_count' => 'nullable|integer|min:0|max:5000',
+            'expected_total' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string|max:5000',
+            'confirmed_mismatch' => 'nullable|accepted',
             'rows.*.row' => 'required|integer|min:1',
             'rows.*.student_id' => 'nullable|string|max:50',
             'rows.*.approval_date' => 'nullable|string|max:50',
+            'rows.*.amount' => 'nullable|numeric|min:0',
         ]);
+
+        $countMismatch = $data['expected_count'] !== null && (int) $data['expected_count'] !== count($data['rows']);
+        $amounts = collect($data['rows'])->map(fn ($row) => (float) ($row['amount'] ?? 0))->sum();
+        $amountMismatch = $data['expected_total'] !== null && abs($amounts - (float) $data['expected_total']) > 0.01;
+        if (($countMismatch || $amountMismatch) && empty($data['confirmed_mismatch'])) {
+            return response()->json(['message' => 'Confirm the count or total mismatch before processing this list.'], 422);
+        }
 
         $scholarship = Scholarship::findOrFail($data['scholarship_id']);
         $staffId = $request->user()->id;
@@ -99,6 +117,14 @@ class AgencyListController extends Controller
             'unmatched_count' => $counts['unmatched'],
             'error_count' => $counts['error'],
             'details' => $details,
+            'school_year' => $data['school_year'] ?? null,
+            'semester' => $data['semester'] ?? null,
+            'batch' => $data['batch'] ?? null,
+            'reference_number' => $data['reference_number'] ?? null,
+            'list_date' => $data['list_date'] ?? null,
+            'expected_count' => $data['expected_count'] ?? null,
+            'expected_total' => $data['expected_total'] ?? null,
+            'notes' => $data['notes'] ?? null,
         ]);
 
         // E-mails go out after the database work is saved.
@@ -112,7 +138,7 @@ class AgencyListController extends Controller
         $matched = $counts['approved'] + $counts['created'] + $counts['already'];
 
         ActivityLog::record($request->user(), 'agency_list.uploaded',
-            "Uploaded approved list {$data['file_name']} for {$scholarship->name}: {$counts['approved']} approved, {$counts['created']} added, {$counts['unmatched']} unmatched.", $upload);
+            "Uploaded approved list {$data['file_name']} for {$scholarship->name} ({$this->periodLabel($data)}): {$counts['approved']} approved, {$counts['created']} added, {$counts['unmatched']} unmatched.", $upload);
 
         return response()->json([
             'message' => "Matched {$matched} student(s), {$counts['unmatched']} unmatched, {$counts['error']} error(s). {$emailed} approval e-mail(s) sent.",
@@ -209,5 +235,13 @@ class AgencyListController extends Controller
         }
 
         return $text." (list: {$file}).";
+    }
+
+    private function periodLabel(array $data): string
+    {
+        $semester = $data['semester'] ?? '';
+        $schoolYear = $data['school_year'] ?? '';
+        $batch = $data['batch'] ?? '';
+        return trim(implode(' ', array_filter([$semester, $schoolYear ? 'AY '.$schoolYear : '', $batch])));
     }
 }

@@ -430,6 +430,7 @@ class ExternalGranteeController extends Controller
             'rows' => $response->json('rows') ?? [],
             'method' => $response->json('method'),
             'warnings' => $response->json('warnings') ?? [],
+            'metadata' => $response->json('metadata') ?? [],
         ]);
     }
 }
