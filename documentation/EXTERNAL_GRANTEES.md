@@ -24,6 +24,11 @@ The reader finds the header row (Name, Student ID, Surname, Given Name, M.I., â€
 a title. Without a header row, it guesses: a cell with a Student ID (like `2024-10123`), and a cell that looks like a
 name. School years such as `2026-2027` are never taken as IDs.
 
+Approved Lists PDF reading also checks the embedded text layer for OCR corruption. Suspicious layers are rendered at
+200 DPI and sent to the local PaddleOCR installation; instruction, signature, and total pages are excluded from rows.
+Known government forms can return detected reference, date, term, batch, academic year, and printed total metadata.
+These are suggestions only: staff review every row and explicitly confirm a count or amount mismatch before processing.
+
 **Honest limits:**
 - Scanned lists and photos depend on OCR. Letters and columns can be misread, so every line is shown to staff
   before saving, with a warning.

@@ -13,6 +13,12 @@ from list_reader import (
     normalize_id,
     parse_records,
     read_table,
+    bad_text_layer,
+    classify_page,
+    detect_form_template,
+    extract_metadata,
+    validate_document_rows,
+    _find_header,
 )
 
 STUDENTS = [
@@ -48,6 +54,47 @@ def test_group_boxes_rebuilds_rows_and_columns():
     ]
     rows = group_boxes(boxes)
     assert rows == [["1", "2024-10123", "Dela Cruz, Juan"], ["2", "2025-11456", "Garcia, Maria"]]
+
+
+def test_bad_embedded_text_layer_is_detected():
+    words = [(0, 0, 10, 10, "Republic"), (12, 0, 20, 10, "ol"), (22, 0, 32, 10, "th€"), (34, 0, 44, 10, "Phllippines")]
+    assert bad_text_layer(words)
+
+
+def test_page_classification_skips_non_table_pages():
+    assert classify_page("Instructions: complete all fields before signing") == "instruction"
+    assert classify_page("Certified correct. Signature of authorized representative") == "signature"
+    assert classify_page("Control Number Student Number Juan 00001") == "table"
+
+
+def test_tes_template_and_metadata_are_detected():
+    text = (
+        "CONSOLIDATED CONTINUING TES GRANTEES DETAILS\n"
+        "TES Billing Details Reference Number: CARAGA-CSU-MAIN-2026-1-1-B2\n"
+        "Date: November 3, 2026 First Semester AY 2026-2027 Batch 2 "
+        "Program: TES Total Amount: 1,310,000.00"
+    )
+    template = detect_form_template(text)
+    metadata = extract_metadata(text, template)
+    assert template == "tes_continuing_form_2_annex_2"
+    assert metadata["reference_number"] == "CARAGA-CSU-MAIN-2026-1-1-B2"
+    assert metadata["date"] == "2026-11-03"
+    assert metadata["semester"] == "1st Semester"
+    assert metadata["academic_year"] == "2026-2027"
+    assert metadata["printed_total"] == 1310000.0
+
+
+def test_document_totals_and_duplicates_are_warnings():
+    rows = [["00001", "231-01872", "TES-20240808-172600000000-027269", "10000.00"],
+            ["00001", "231-01872", "TES-20240808-172600000000-027269", "9000.00"]]
+    checks = validate_document_rows(rows, {"printed_total": 20000.0})
+    assert checks["row_count"] == 2
+    assert any("Duplicate" in warning for warning in checks["warnings"])
+    assert any("printed total" in warning for warning in checks["warnings"])
+
+
+def test_generic_header_detection_uses_known_labels_not_first_row():
+    assert _find_header(["Instructions", "Student Number", "Last Name", "First Name"])
 
 
 # ---------- parsing ----------

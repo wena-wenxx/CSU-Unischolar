@@ -39,6 +39,7 @@ import zipfile
 import statistics
 import tempfile
 import unicodedata
+from datetime import datetime
 
 from rapidfuzz import fuzz
 
@@ -58,7 +59,166 @@ HEADER_PATTERNS = {
     "last": re.compile(r"^(last\s*name|surname|family\s*name|apelyido)$", re.I),
     "first": re.compile(r"^(first\s*name|given\s*name|pangalan)$", re.I),
     "middle": re.compile(r"^(middle\s*(name|initial)?|m\.?\s*i\.?)$", re.I),
+    "control_number": re.compile(r"^(control\s*(number|no\.?)|no\.?)$", re.I),
+    "award_number": re.compile(r"^(tes\s*)?award\s*(number|no\.?)$", re.I),
+    "birthdate": re.compile(r"^(date\s*of\s*birth|birthdate|birth\s*date)$", re.I),
+    "amount": re.compile(r"^(tes\s*)?amount$", re.I),
+    "total_amount": re.compile(r"^(total\s*(tes\s*)?amount|total)$", re.I),
 }
+
+# Government forms are configured here so another form can be added without
+# changing the PDF reader's control flow.
+FORM_TEMPLATES = {
+    "tes_continuing_form_2_annex_2": {
+        "labels": (
+            "consolidated continuing tes grantees details",
+            "tes billing details reference number",
+        ),
+        "columns": (
+            "control_number", "student_id", "award_number", "last", "first",
+            "middle", "sex", "birthdate", "program", "year_level", "email",
+            "phone", "batch", "amount", "pwd", "total_amount",
+        ),
+        "control_re": re.compile(r"^\d{5}$"),
+        "student_re": re.compile(r"^\d{3}-\d{5}$"),
+        "award_re": re.compile(r"^TES-\d{8}-\d{12}-\d{6}$", re.I),
+    },
+}
+
+_REFERENCE_RE = re.compile(r"\b([A-Z]{2,}(?:-[A-Z0-9]+){3,})\b", re.I)
+_DATE_RE = re.compile(
+    r"\b((?:January|February|March|April|May|June|July|August|September|October|November|December)"
+    r"\s+\d{1,2},\s+\d{4})\b", re.I)
+_AY_RE = re.compile(r"\b(?:AY|A\.Y\.?|Academic Year)\s*[:.]?\s*(\d{4}\s*-\s*\d{4})\b", re.I)
+_TOTAL_RE = re.compile(r"(?:printed\s+)?total(?:\s+amount)?\s*[:\-]?\s*(?:PHP|₱)?\s*([\d,]+(?:\.\d{2})?)", re.I)
+
+
+def bad_text_layer(words):
+    """Return True when embedded PDF text looks like low-quality OCR."""
+    texts = [str(w[4] if len(w) > 4 else w).strip() for w in words if str(w[4] if len(w) > 4 else w).strip()]
+    joined = " ".join(texts)
+    if "\ufffd" in joined or "�" in joined:
+        return True
+    if len(texts) < 3:
+        return True
+    tokens = re.findall(r"[A-Za-zÀ-ÿ0-9'€$₱.-]+", " ".join(texts))
+    if not tokens:
+        return True
+    odd = sum(
+        1 for token in tokens
+        if (len(token) > 2 and not re.search(r"[AEIOUaeiou]", token)
+            and not re.fullmatch(r"\d+(?:[.,-]\d+)*", token))
+        or re.search(r"[€$₱]{2,}|[^\w\s.,'()/:-]", token)
+    )
+    return odd / max(1, len(tokens)) >= 0.18
+
+
+is_bad_text_layer = bad_text_layer
+
+
+def classify_page(text, rows=None):
+    """Classify a page before rows are admitted to the table."""
+    text = _clean(text).lower()
+    rows = rows or []
+    if any(_find_header(row) for row in rows) or re.search(r"\b\d{5}\b", text):
+        return "table"
+    if any(label in text for label in ("instruction", "how to accomplish", "reminders")):
+        return "instruction"
+    if any(label in text for label in ("signature", "certified correct", "approved by")):
+        return "signature"
+    if re.search(r"\bgrand\s+total\b|\btotal\s+amount\b", text) and not re.search(r"\bcontrol\s*(number|no)", text):
+        return "total"
+    return "other"
+
+
+def detect_form_template(text, rows=None):
+    """Return a configured form name when its identifying labels are present."""
+    haystack = " ".join([text or ""] + [" ".join(row) for row in (rows or [])]).lower()
+    for name, template in FORM_TEMPLATES.items():
+        if sum(label in haystack for label in template["labels"]) >= 1:
+            return name
+    return None
+
+
+def extract_metadata(text, template=None):
+    """Extract review-only metadata; missing values remain None."""
+    source = text or ""
+    date_value = None
+    date_match = _DATE_RE.search(source)
+    if date_match:
+        try:
+            date_value = datetime.strptime(date_match.group(1).title(), "%B %d, %Y").date().isoformat()
+        except ValueError:
+            date_value = date_match.group(1)
+    ay_match = _AY_RE.search(source)
+    semester = None
+    semester_match = re.search(r"\b(1st|1|first|2nd|2|second)\s+semester\b|\b(summer)\b", source, re.I)
+    if semester_match:
+        value = next((v for v in semester_match.groups() if v), "").lower()
+        semester = "Summer" if value == "summer" else ("1st Semester" if value in ("1st", "1", "first") else "2nd Semester")
+    batch_match = re.search(r"\b(batch\s+\d+)\b", source, re.I)
+    program_match = re.search(r"\bprogram\s*[:\-]\s*([A-Za-z][A-Za-z ]+)", source, re.I)
+    campus_match = re.search(r"\bcampus\s*[:\-]\s*([^\n,;]+)", source, re.I)
+    total_match = _TOTAL_RE.search(source)
+    return {
+        "template": template,
+        "reference_number": _REFERENCE_RE.search(source).group(1).upper() if _REFERENCE_RE.search(source) else None,
+        "date": date_value,
+        "program": program_match.group(1).strip() if program_match else ("TES" if template else None),
+        "batch": batch_match.group(1).title() if batch_match else None,
+        "semester": semester,
+        "academic_year": ay_match.group(1).replace(" ", "") if ay_match else None,
+        "campus": campus_match.group(1).strip() if campus_match else None,
+        "printed_total": float(total_match.group(1).replace(",", "")) if total_match else None,
+    }
+
+
+def validate_document_rows(rows, metadata=None, template=None):
+    """Return non-blocking document checks and per-row confidence."""
+    metadata = metadata or {}
+    warnings = []
+    amounts = []
+    controls, students, awards = set(), set(), set()
+    for row in rows:
+        raw = " ".join(row)
+        control = next((c for c in row if re.fullmatch(r"\d{5}", c)), "")
+        student = next((c for c in row if re.fullmatch(r"\d{3}-\d{5}", c)), "")
+        award = next((c for c in row if re.fullmatch(r"TES-\d{8}-\d{12}-\d{6}", c, re.I)), "")
+        amount = next((c for c in reversed(row) if re.fullmatch(r"[\d,]+\.\d{2}", c)), "")
+        if control and control in controls:
+            warnings.append(f"Duplicate control number: {control}.")
+        if student and student in students:
+            warnings.append(f"Duplicate student number: {student}.")
+        if award and award in awards:
+            warnings.append(f"Duplicate TES award number: {award}.")
+        controls.add(control) if control else None
+        students.add(student) if student else None
+        awards.add(award) if award else None
+        if amount and re.search(r"\d", amount):
+            amounts.append(float(amount.replace(",", "")))
+    if metadata.get("printed_total") is not None and abs(sum(amounts) - metadata["printed_total"]) > 0.01:
+        warnings.append(f"Rows sum to {sum(amounts):,.2f}, but the printed total is {metadata['printed_total']:,.2f}.")
+    if metadata.get("expected_count") is not None and len(rows) != metadata["expected_count"]:
+        warnings.append(f"Read {len(rows)} rows, but the document expects {metadata['expected_count']}.")
+    return {"warnings": list(dict.fromkeys(warnings)), "row_confidence": [
+        "matched" if (re.search(r"\d{3}-\d{5}", " ".join(row)) and any(row)) else "check" for row in rows
+    ], "row_count": len(rows), "summed_amount": round(sum(amounts), 2)}
+
+
+def _merge_template_rows(rows, template):
+    """Keep data rows and join wrapped cells for a configured form."""
+    config = FORM_TEMPLATES.get(template)
+    if not config:
+        return rows
+    merged = []
+    for row in rows:
+        first = next((cell for cell in row if re.fullmatch(r"\d{5}", cell)), "")
+        is_control = first and 1 <= int(first) <= 500
+        if is_control:
+            merged.append(list(row))
+        elif merged:
+            merged[-1].extend(cell for cell in row if cell)
+    return merged
 
 # Cells that are clearly not a person's name (when there is no header row).
 NOT_A_NAME = re.compile(
@@ -382,28 +542,48 @@ def _read_pdf(path):
     except ImportError:  # older PyMuPDF
         import fitz
 
-    rows, layout, used_ocr = [], [], False
+    rows, layout, used_ocr, page_texts = [], [], False, []
     with fitz.open(path) as doc:
         for page in doc:
             words = page.get_text("words")  # (x0, y0, x1, y1, word, block, line, word_no)
-            if len(words) >= 3:
+            embedded = " ".join(w[4] for w in words)
+            use_ocr = bad_text_layer(words)
+            page_rows = page_layout = []
+            if not use_ocr and len(words) >= 3:
                 page_rows, page_layout = group_boxes([(w[0], w[1], w[2], w[3], w[4]) for w in words], True)
-                rows.extend(page_rows)
-                layout.extend(page_layout)
+            else:
+                # Render suspicious layers as well as truly scanned pages.
+                pix = page.get_pixmap(dpi=200)
+                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                    tmp_path = tmp.name
+                try:
+                    pix.save(tmp_path)
+                    try:
+                        page_rows, page_layout = group_boxes(ocr_boxes(tmp_path), True)
+                        embedded = " ".join(cell for row in page_rows for cell in row)
+                        used_ocr = True
+                    except (ImportError, RuntimeError):
+                        # Keep the embedded layer as a best-effort fallback when
+                        # the optional offline OCR package is not installed.
+                        page_rows, page_layout = group_boxes(
+                            [(w[0], w[1], w[2], w[3], w[4]) for w in words], True)
+                finally:
+                    os.remove(tmp_path)
+            page_texts.append(embedded)
+            if classify_page(embedded, page_rows) in ("instruction", "signature", "total"):
                 continue
-            # Scanned page: render it and read it with OCR.
-            pix = page.get_pixmap(dpi=200)
-            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-                tmp_path = tmp.name
-            try:
-                pix.save(tmp_path)
-                page_rows, page_layout = group_boxes(ocr_boxes(tmp_path), True)
-                rows.extend(page_rows)
-                layout.extend(page_layout)
-                used_ocr = True
-            finally:
-                os.remove(tmp_path)
-    return rows, layout, "ocr" if used_ocr else "pdf-text"
+            rows.extend(page_rows)
+            layout.extend(page_layout)
+            if len(rows) >= MAX_ROWS:
+                break
+    text = "\n".join(page_texts)
+    template = detect_form_template(text, rows)
+    if template:
+        rows = _merge_template_rows(rows, template)
+        layout = [None] * len(rows)
+    metadata = extract_metadata(text, template)
+    checks = validate_document_rows(rows, metadata, template)
+    return rows[:MAX_ROWS], layout[:MAX_ROWS], "ocr" if used_ocr else "pdf-text", metadata | checks
 
 
 def read_table(path, filename=""):
@@ -411,6 +591,7 @@ def read_table(path, filename=""):
     ext = os.path.splitext(filename or path)[1].lower()
     warnings = []
     layout = None   # cell positions (PDF and pictures only)
+    metadata = {}
 
     if ext == ".csv":
         rows, method = _read_csv(path), "csv"
@@ -420,7 +601,7 @@ def read_table(path, filename=""):
         rows, method = _read_docx(path)
         method = "word-" + method
     elif ext == ".pdf":
-        rows, layout, method = _read_pdf(path)
+        rows, layout, method, metadata = _read_pdf(path)
     elif ext in (".png", ".jpg", ".jpeg"):
         rows, layout = group_boxes(ocr_boxes(path), True)
         method = "ocr"
@@ -437,7 +618,16 @@ def read_table(path, filename=""):
     if len(kept) > MAX_ROWS:
         warnings.append(f"Only the first {MAX_ROWS} rows were read.")
         kept = kept[:MAX_ROWS]
-    return {"rows": [r for r, _ in kept], "layout": [l for _, l in kept], "method": method, "warnings": warnings}
+    filtered_rows = [r for r, _ in kept]
+    checks = validate_document_rows(filtered_rows, metadata, metadata.get("template"))
+    warnings.extend(checks["warnings"])
+    return {
+        "rows": filtered_rows,
+        "layout": [l for _, l in kept],
+        "method": method,
+        "warnings": list(dict.fromkeys(warnings)),
+        "metadata": {**metadata, **checks},
+    }
 
 
 # --------------------------------------------------------------------- parsing
@@ -681,7 +871,7 @@ def extract_and_match(path, filename, students, threshold=80):
     if not records:
         warnings.append("No grantee lines were found in this file.")
     rows = match_records(records, students, threshold)
-    return {"method": table["method"], "warnings": warnings, "rows": rows, "summary": summarize(rows)}
+    return {"method": table["method"], "warnings": warnings, "rows": rows, "metadata": table.get("metadata", {}), "summary": summarize(rows)}
 
 
 def table_rows(path, filename):
@@ -703,4 +893,4 @@ def table_rows(path, filename):
                     _align(row, layout[i], starts) if i > index and layout[i] and len(layout[i]) == len(row) else row
                     for i, row in enumerate(rows)
                 ]
-    return {"rows": rows, "method": table["method"], "warnings": table["warnings"]}
+    return {"rows": rows, "method": table["method"], "warnings": table["warnings"], "metadata": table.get("metadata", {})}
