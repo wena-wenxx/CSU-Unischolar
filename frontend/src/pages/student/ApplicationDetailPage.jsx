@@ -19,6 +19,14 @@ import StatusTimeline from "../../components/StatusTimeline";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 
+function validateDocumentUpload(file) {
+  if (!file) return "Choose a file first.";
+  if (file.size <= 0) return "The selected file is empty.";
+  if (file.size > 10 * 1024 * 1024) return "The file is larger than 10 MB. Choose a smaller PDF or image.";
+  if (!/\.(pdf|jpe?g|png)$/i.test(file.name)) return "Choose a PDF, JPG, JPEG or PNG file.";
+  return "";
+}
+
 /*
   One application:
   1. a checklist with one row per required document (upload each one),
@@ -37,6 +45,7 @@ export default function ApplicationDetailPage() {
   const [files, setFiles] = useState({}); // requirement id -> chosen File
   const [inputKeys, setInputKeys] = useState({}); // to clear a file input after upload
   const [uploadingId, setUploadingId] = useState(null);
+  const [checkingId, setCheckingId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState([]); // My Documents, grouped by type
 
@@ -64,6 +73,11 @@ export default function ApplicationDetailPage() {
       toast.error(`Choose a file for "${requirement.name}" first.`);
       return;
     }
+    const fileError = validateDocumentUpload(file);
+    if (fileError) {
+      toast.error(fileError);
+      return;
+    }
 
     const formData = new FormData();
     formData.append("file", file);
@@ -85,6 +99,28 @@ export default function ApplicationDetailPage() {
       toast.error(errMsg(err, "Document upload failed."));
     } finally {
       setUploadingId(null);
+    }
+  }
+
+  async function runDocumentCheck(document) {
+    setCheckingId(document.id);
+
+    try {
+      const { data: result } = await api.post(`/documents/${document.id}/validate`);
+      await load();
+
+      if (result.document?.status === "validated") {
+        toast.success("AI check finished. No obvious issues were found.");
+      } else if (result.document?.status === "flagged") {
+        toast.info("AI check found possible issues for OAS staff to review.");
+      } else {
+        toast.info(result.message || "The file could not be read automatically.");
+      }
+    } catch (err) {
+      toast.error(errMsg(err, "The AI check could not run."));
+      await load();
+    } finally {
+      setCheckingId(null);
     }
   }
 
@@ -321,6 +357,23 @@ export default function ApplicationDetailPage() {
                     >
                       {uploadingId === requirement.id ? "Please wait..." : document ? "Replace" : "Upload"}
                     </button>
+
+                    {document && ["uploaded", "needs_review", "flagged", "processing"].includes(document.status) && (
+                      <button
+                        type="button"
+                        className="button button-small button-secondary"
+                        onClick={() => runDocumentCheck(document)}
+                        disabled={uploadingId !== null || checkingId !== null}
+                      >
+                        {checkingId === document.id
+                          ? "Checking..."
+                          : document.status === "needs_review"
+                            ? "Retry AI check"
+                            : document.status === "flagged"
+                              ? "Re-run AI check"
+                              : "Run AI check"}
+                      </button>
+                    )}
 
                     {savedFor(requirement) && (
                       <button

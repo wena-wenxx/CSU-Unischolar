@@ -45,12 +45,14 @@ export default function AgencyListsPage() {
   const [dateColumn, setDateColumn] = useState("");
   const [fileKey, setFileKey] = useState(0);
   const [processing, setProcessing] = useState(false);
+  const [reading, setReading] = useState(false);
   const [result, setResult] = useState(null);
   const [metadata, setMetadata] = useState({});
   const [details, setDetails] = useState({
     school_year: "",
     semester: "",
     batch: "",
+    campus: "",
     reference_number: "",
     list_date: "",
     expected_count: "",
@@ -106,6 +108,7 @@ export default function AgencyListsPage() {
     setResult(null);
 
     if (!file) return;
+    setReading(true);
 
     try {
       const { rows: parsed, warnings, metadata: detected } = await readListFile(file);
@@ -123,6 +126,7 @@ export default function AgencyListsPage() {
         school_year: detected?.academic_year || old.school_year || defaults.current_school_year || "",
         semester: detected?.semester || old.semester || defaults.current_semester || "",
         batch: detected?.batch || old.batch || "",
+        campus: detected?.campus || old.campus || "",
         reference_number: detected?.reference_number || "",
         list_date: detected?.date || "",
         expected_count: detected?.row_count ? String(detected.row_count) : "",
@@ -134,6 +138,8 @@ export default function AgencyListsPage() {
     } catch (err) {
       toast.error(errMsg(err, err.message || "The file could not be read."));
       setFileKey((k) => k + 1);
+    } finally {
+      setReading(false);
     }
   }
 
@@ -259,12 +265,13 @@ export default function AgencyListsPage() {
 
           <div className="full-column">
             <label htmlFor="agency-file">Approved list (Excel, CSV, Word or PDF)</label>
-            <input id="agency-file" key={fileKey} type="file" accept={LIST_ACCEPT} onChange={readFile} />
+            <input id="agency-file" key={fileKey} type="file" accept={LIST_ACCEPT} onChange={readFile} disabled={reading} />
             <p className="muted small">
               Excel (.xlsx), CSV, Word (.docx), PDF or a photo. PDFs and photos are read by the AI service, so keep it
               running for those. The list needs a column with the Student ID; an approval date column is optional. Old
               .xls/.doc files: open them and Save As .xlsx/.docx first.
             </p>
+            {reading && <p className="muted small"><strong>Reading and organizing the file...</strong></p>}
           </div>
         </div>
       </section>
@@ -274,9 +281,10 @@ export default function AgencyListsPage() {
           <h2>2. List details</h2>
           <div className="form-grid">
             {[
-              ["school_year", "School year", "text"],
+              ["school_year", "Academic year", "select"],
               ["semester", "Semester", "select"],
-              ["batch", "Batch", "text"],
+              ["batch", "TES batch", "select"],
+              ["campus", "HEI campus", "text"],
               ["reference_number", "Agency reference number", "text"],
               ["list_date", "List date", "date"],
               ["expected_count", "Expected number of grantees", "number"],
@@ -285,7 +293,21 @@ export default function AgencyListsPage() {
             ].map(([key, label, type]) => (
               <div key={key}>
                 <label htmlFor={`list-${key}`}>{label}</label>
-                {type === "select" ? (
+                {key === "school_year" ? (
+                  <select id={`list-${key}`} value={details[key]} onChange={(event) => setDetails({ ...details, [key]: event.target.value })}>
+                    <option value="">Choose academic year</option>
+                    {["2024-2025", "2025-2026", "2026-2027", "2027-2028", "2028-2029", "2029-2030"].map((year) =>
+                      <option key={year} value={year}>{year}</option>
+                    )}
+                  </select>
+                ) : key === "batch" ? (
+                  <select id={`list-${key}`} value={details[key]} onChange={(event) => setDetails({ ...details, [key]: event.target.value })}>
+                    <option value="">Choose batch</option>
+                    {Array.from({ length: 12 }, (_, i) => `Batch ${i + 1}`).map((batch) =>
+                      <option key={batch} value={batch}>{batch}</option>
+                    )}
+                  </select>
+                ) : type === "select" ? (
                   <select id={`list-${key}`} value={details[key]} onChange={(event) => setDetails({ ...details, [key]: event.target.value })}>
                     <option value="">Choose semester</option>
                     <option>1st Semester</option><option>2nd Semester</option><option>Summer</option>
@@ -293,7 +315,7 @@ export default function AgencyListsPage() {
                 ) : (
                   <input id={`list-${key}`} type={type} value={details[key]} onChange={(event) => setDetails({ ...details, [key]: event.target.value })} />
                 )}
-                {metadata[key === "school_year" ? "academic_year" : key === "reference_number" ? "reference_number" : key === "list_date" ? "date" : key === "expected_total" ? "printed_total" : key === "expected_count" ? "row_count" : key] != null && (
+                {metadata[key === "school_year" ? "academic_year" : key === "reference_number" ? "reference_number" : key === "list_date" ? "date" : key === "campus" ? "campus" : key === "expected_total" ? "printed_total" : key === "expected_count" ? "row_count" : key] != null && (
                   <span className="muted small">Detected from file</span>
                 )}
               </div>

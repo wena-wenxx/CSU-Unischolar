@@ -66,6 +66,7 @@ class AgencyListController extends Controller
         $data = $request->validate([
             'scholarship_id' => 'required|exists:scholarships,id',
             'agency_name' => 'required|string|max:255',
+            'campus' => 'nullable|string|max:255',
             'file_name' => 'required|string|max:255',
             'rows' => 'required|array|min:1|max:5000',
             'school_year' => ['nullable', 'regex:/^\d{4}-\d{4}$/'],
@@ -124,6 +125,7 @@ class AgencyListController extends Controller
         $upload = AgencyListUpload::create([
             'scholarship_id' => $scholarship->id,
             'agency_name' => $data['agency_name'],
+            'campus' => $data['campus'] ?? null,
             'file_name' => $data['file_name'],
             'uploaded_by' => $staffId,
             'total_rows' => count($data['rows']),

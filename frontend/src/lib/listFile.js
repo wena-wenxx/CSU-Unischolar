@@ -15,6 +15,13 @@ export const LIST_ACCEPT = ".csv,.xlsx,.docx,.pdf,.png,.jpg,.jpeg";
 export async function readListFile(file) {
   const name = file.name.toLowerCase();
 
+  if (file.size <= 0) {
+    throw new Error("The selected file is empty.");
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    throw new Error("The file is larger than 20 MB. Compress or split it, then try again.");
+  }
+
   if (name.endsWith(".csv")) {
     const text = await file.text();
     return { rows: parseCSV(text), warnings: [] };

@@ -11,6 +11,14 @@ import { useToast } from "../../lib/toast";
 import PageHeader from "../../components/PageHeader";
 import Loading from "../../components/Loading";
 
+function validateDocumentUpload(file) {
+  if (!file) return "Choose a file first.";
+  if (file.size <= 0) return "The selected file is empty.";
+  if (file.size > 10 * 1024 * 1024) return "The file is larger than 10 MB. Choose a smaller PDF or image.";
+  if (!/\.(pdf|jpe?g|png)$/i.test(file.name)) return "Choose a PDF, JPG, JPEG or PNG file.";
+  return "";
+}
+
 /*
   My Documents: every file the student has uploaded, by type.
   - shows whether each file is still valid (not expired),
@@ -47,6 +55,11 @@ export default function MyDocumentsPage() {
   async function save(type, current) {
     const file = files[type];
     if (!file) return;
+    const fileError = validateDocumentUpload(file);
+    if (fileError) {
+      toast.error(fileError);
+      return;
+    }
 
     const form = new FormData();
     form.append("file", file);
@@ -217,7 +230,7 @@ export default function MyDocumentsPage() {
                   <span className="muted small">Choose a file to {current ? "replace this copy" : "upload it"}.</span>
                 )}
 
-                {current && row && current.status === "uploaded" && (
+                {current && row && ["uploaded", "needs_review", "flagged", "processing"].includes(current.status) && (
                   <button
                     type="button"
                     className="button button-small button-secondary"
@@ -226,7 +239,11 @@ export default function MyDocumentsPage() {
                   >
                     {busy === `check-${row.id}`
                       ? "Checking..."
-                      : "Check with AI"}
+                      : current.status === "needs_review"
+                        ? "Retry AI check"
+                        : current.status === "flagged"
+                          ? "Re-run AI check"
+                          : "Run AI check"}
                   </button>
                 )}
               </div>
