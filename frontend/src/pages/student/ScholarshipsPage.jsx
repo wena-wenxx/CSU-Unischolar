@@ -26,6 +26,7 @@ export default function ScholarshipsPage() {
   const [category, setCategory] = useState("all");
   const [sort, setSort] = useState("deadline");
   const [openOnly, setOpenOnly] = useState(false);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     Promise.all([api.get("/scholarships"), api.get("/my-applications"), api.get("/profile")])
@@ -49,9 +50,23 @@ export default function ScholarshipsPage() {
   const applicationFor = (scholarshipId) => myApplications.find((a) => a.scholarship_id === scholarshipId);
 
   const inCategory = scholarships.filter((s) => category === "all" || s.category === category);
+  const searchText = search.trim().toLowerCase();
+  const matchesSearch = (scholarship) => {
+    if (!searchText) return true;
+
+    const requirementText = (scholarship.requirements || [])
+      .flatMap((requirement) => [requirement.name, requirement.description])
+      .filter(Boolean)
+      .join(" ");
+
+    return [scholarship.name, scholarship.provider, scholarship.description, requirementText]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(searchText));
+  };
+  const matchingCategory = inCategory.filter(matchesSearch);
   // Agency-direct programs are listed once, compactly, under the cards.
-  const direct = inCategory.filter(isAgencyDirect).sort((a, b) => a.name.localeCompare(b.name));
-  const shown = inCategory
+  const direct = matchingCategory.filter(isAgencyDirect).sort((a, b) => a.name.localeCompare(b.name));
+  const shown = matchingCategory
     .filter((s) => !isAgencyDirect(s))
     .filter((s) => !openOnly || s.availability === "open")
     .sort((a, b) => {
@@ -74,6 +89,22 @@ export default function ScholarshipsPage() {
       )}
 
       <div className="card filter-card">
+        <div className="search-filter">
+          <label htmlFor="scholarship-search">Search scholarships</label>
+          <input
+            id="scholarship-search"
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Name, provider, or keyword"
+          />
+          {search && (
+            <button type="button" className="button button-small button-secondary" onClick={() => setSearch("")}>
+              Clear
+            </button>
+          )}
+        </div>
+
         <div className="filter-row" role="group" aria-label="Program type">
           {[["all", "All"], ...Object.entries(CATEGORY_LABELS)].filter(([key]) => countIn(key) > 0).map(([key, label]) => (
             <button

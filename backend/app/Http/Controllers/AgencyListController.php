@@ -76,16 +76,32 @@ class AgencyListController extends Controller
             'expected_count' => 'nullable|integer|min:0|max:5000',
             'expected_total' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string|max:5000',
-            'confirmed_mismatch' => 'nullable|accepted',
+            'confirmed_mismatch' => 'nullable|boolean',
             'rows.*.row' => 'required|integer|min:1',
             'rows.*.student_id' => 'nullable|string|max:50',
             'rows.*.approval_date' => 'nullable|string|max:50',
             'rows.*.amount' => 'nullable|numeric|min:0',
+            'rows.*.control_number' => 'nullable|string|max:50',
+            'rows.*.award_number' => 'nullable|string|max:255',
+            'rows.*.last_name' => 'nullable|string|max:255',
+            'rows.*.first_name' => 'nullable|string|max:255',
+            'rows.*.middle_name' => 'nullable|string|max:255',
+            'rows.*.sex' => 'nullable|string|max:20',
+            'rows.*.birthdate' => 'nullable|string|max:50',
+            'rows.*.program' => 'nullable|string|max:255',
+            'rows.*.year_level' => 'nullable|string|max:20',
+            'rows.*.email' => 'nullable|string|max:255',
+            'rows.*.phone' => 'nullable|string|max:50',
+            'rows.*.batch' => 'nullable|string|max:100',
+            'rows.*.pwd' => 'nullable|string|max:10',
+            'rows.*.total_amount' => 'nullable|numeric|min:0',
         ]);
 
-        $countMismatch = $data['expected_count'] !== null && (int) $data['expected_count'] !== count($data['rows']);
+        $expectedCount = $data['expected_count'] ?? null;
+        $expectedTotal = $data['expected_total'] ?? null;
+        $countMismatch = $expectedCount !== null && (int) $expectedCount !== count($data['rows']);
         $amounts = collect($data['rows'])->map(fn ($row) => (float) ($row['amount'] ?? 0))->sum();
-        $amountMismatch = $data['expected_total'] !== null && abs($amounts - (float) $data['expected_total']) > 0.01;
+        $amountMismatch = $expectedTotal !== null && abs($amounts - (float) $expectedTotal) > 0.01;
         if (($countMismatch || $amountMismatch) && empty($data['confirmed_mismatch'])) {
             return response()->json(['message' => 'Confirm the count or total mismatch before processing this list.'], 422);
         }
@@ -149,6 +165,16 @@ class AgencyListController extends Controller
     private function processRow(array $row, Scholarship $scholarship, int $staffId, array $data, array &$seen): array
     {
         $line = ['row' => $row['row'], 'student_id' => trim((string) ($row['student_id'] ?? ''))];
+        foreach ([
+            'control_number', 'award_number', 'last_name', 'first_name', 'middle_name',
+            'sex', 'birthdate', 'program', 'year_level', 'email', 'phone', 'batch',
+            'pwd', 'amount', 'total_amount',
+        ] as $field) {
+            $value = trim((string) ($row[$field] ?? ''));
+            if ($value !== '') {
+                $line[$field] = $value;
+            }
+        }
         // "2026-00001", "2026 00001" and 202600001 (Excel turns the ID into a number) are the same student.
         $schoolId = EnrollmentList::normalizeId($line['student_id']);
 

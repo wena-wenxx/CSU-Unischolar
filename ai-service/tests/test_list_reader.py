@@ -18,6 +18,8 @@ from list_reader import (
     detect_form_template,
     extract_metadata,
     validate_document_rows,
+    _parse_general_payroll,
+    _parse_tes_continuing,
     _find_header,
 )
 
@@ -82,6 +84,20 @@ def test_tes_template_and_metadata_are_detected():
     assert metadata["semester"] == "1st Semester"
     assert metadata["academic_year"] == "2026-2027"
     assert metadata["printed_total"] == 1310000.0
+
+
+def test_tes_metadata_accepts_academic_year_without_ay_prefix():
+    text = (
+        "CONSOLIDATED CONTINUING TES GRANTEES DETAILS\n"
+        "TES Batch 2 - First Semester, Academic Year 2026-2027\n"
+        "Total TES Billing 20,000.00"
+    )
+    template = detect_form_template(text)
+    metadata = extract_metadata(text, template)
+    assert template == "tes_continuing_form_2_annex_2"
+    assert metadata["batch"] == "Batch 2"
+    assert metadata["semester"] == "1st Semester"
+    assert metadata["academic_year"] == "2026-2027"
 
 
 def test_document_totals_and_duplicates_are_warnings():
@@ -246,3 +262,85 @@ def test_table_rows_for_column_picking(tmp_path):
     path.write_text("Student Number,Name,Course\n2024-10123,Dela Cruz Juan,BSIT\n", encoding="utf-8")
     result = table_rows(str(path), "enrolled.csv")
     assert result["rows"] == [["Student Number", "Name", "Course"], ["2024-10123", "Dela Cruz Juan", "BSIT"]]
+
+
+def test_tes_continuing_form_is_parsed_as_named_columns():
+    text = "\n".join([
+        "TES CONTINUING Form 2 - Annex 2",
+        "CONSOLIDATED CONTINUING TES GRANTEES DETAILS",
+        "TES Billing Details Reference Number: CARAGA-CSU-MAIN-2026-1-1-B2",
+        "00001 231-01872 TES-20240808-172600000000-027269",
+        "DELA CRUZ, JUAN GABALES FEMALE",
+        "BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY",
+        "3 09939838295 juan@example.com TES Batch 2 10,000.00 NO 10,000.00",
+        "00002 231-01873 TES-20240808-172600000000-027270",
+        "GARCIA MARIA REYES FEMALE",
+        "BACHELOR OF SCIENCE IN NURSING",
+        "2 09939838296 maria@example.com TES Batch 2 10,000.00 YES 10,000.00",
+        "TOTAL TES BILLING 20,000.00",
+    ])
+
+    rows = _parse_tes_continuing(text)
+    assert rows[0][1] == "Student Number"
+    assert rows[0][15] == "TOTAL AMOUNT"
+    assert rows[1][:3] == ["00001", "231-01872", "TES-20240808-172600000000-027269"]
+    assert rows[1][3] == "DELA CRUZ"
+    assert rows[1][4] == "JUAN"
+    assert rows[1][5] == "GABALES"
+    assert rows[1][6] == "FEMALE"
+    assert rows[1][10] == "juan@example.com"
+    assert rows[1][13] == "10,000.00"
+    assert rows[1][14] == "NO"
+    assert rows[2][1] == "231-01873"
+    assert rows[2][14] == "YES"
+
+
+def test_tes_footer_does_not_replace_the_last_row_total():
+    text = "\n".join([
+        "CONSOLIDATED CONTINUING TES GRANTEES DETAILS",
+        "00001 231-01872 TES-20240808-172600000000-027269 DELA CRUZ, JUAN GABALES FEMALE",
+        "10,000.00 NO 10,000.00",
+        "00002 231-01873 TES-20240808-172600000000-027270 GARCIA, MARIA REYES FEMALE",
+        "10,000.00 YES 10,000.00",
+        "TOTAL TES BILLING 20,000.00",
+    ])
+    rows = _parse_tes_continuing(text)
+    assert rows[1][15] == "10,000.00"
+    assert rows[2][15] == "10,000.00"
+    checks = validate_document_rows(rows, {"printed_total": 20000.0}, "tes_continuing_form_2_annex_2")
+    assert checks["summed_amount"] == 20000.0
+    assert checks["warnings"] == []
+
+
+def test_general_payroll_pdf_is_parsed_as_structured_grantee_rows(tmp_path):
+    text = "\n".join([
+        "GENERAL PAYROLL",
+        "General Form No.(6 A)",
+        "Sheet No: 1",
+        "WITH ATM",
+        "Release of TES GRANTEES BATCH 1 balance",
+        "2nd Semester AY 2025-2026 Stipend",
+        "No. ID NO. NAME 1st SEM. 2nd SEM.",
+        "1 2025-86966",
+        "AQUINO, PAOLO P.",
+        "20,000.00",
+        "20,000.00",
+        "20,000.00",
+        "2 2024-44321",
+        "CABAHUG, APRIL A.",
+        "20,000.00",
+        "20,000.00",
+        "20,000.00",
+        "***NOTHING FOLLOWS*** TOTAL 40,000.00",
+    ])
+
+    rows, printed_total = _parse_general_payroll(text)
+    assert printed_total == 40000.0
+    assert rows[0] == [
+        "Sheet", "ATM Status", "No.", "Student ID", "Name",
+        "1st Semester", "2nd Semester", "Net Amount",
+    ]
+    assert rows[1] == [
+        "1", "WITH ATM", "1", "2025-86966", "AQUINO, PAOLO P.",
+        "20,000.00", "20,000.00", "20,000.00",
+    ]

@@ -120,6 +120,51 @@ def student_id_found(expected_id: str, text: str) -> bool:
     return bool(a) and a in b
 
 
+DATE_PATTERNS = (
+    r"\b(?:January|February|March|April|May|June|July|August|September|October|November|December)"
+    r"\s+\d{1,2},?\s+\d{4}\b",
+    r"\b\d{1,2}[/-]\d{1,2}[/-]\d{4}\b",
+    r"\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b",
+)
+
+AUTHORITY_PATTERNS = (
+    ("Philippine Statistics Authority", r"\b(?:PSA|Philippine Statistics Authority)\b"),
+    ("Bureau of Internal Revenue", r"\b(?:BIR|Bureau of Internal Revenue)\b"),
+    ("Civil Registrar", r"\b(?:Civil Registrar|Office of the Civil Registrar)\b"),
+    ("Barangay", r"\bBarangay\b"),
+)
+
+
+def extract_structured_fields(text: str, kind: str | None) -> dict:
+    """Best-effort extraction; values remain reviewable and are never used as an approval verdict."""
+    source = text or ""
+    dates = []
+    for pattern in DATE_PATTERNS:
+        dates.extend(re.findall(pattern, source, re.I))
+    dates = list(dict.fromkeys(dates))
+
+    authorities = []
+    for label, pattern in AUTHORITY_PATTERNS:
+        if re.search(pattern, source, re.I):
+            authorities.append(label)
+
+    income_match = re.search(
+        r"\b(?:taxable income|annual income|gross income|family income)\b[^0-9]*(PHP|₱)?\s*([\d,]+(?:\.\d{2})?)",
+        source,
+        re.I,
+    )
+    document_date = dates[0] if dates else None
+    return {
+        "document_kind": kind,
+        "dates": dates,
+        "document_date": document_date,
+        "issuing_authorities": authorities,
+        "extracted_family_income": (
+            income_match.group(2).replace(",", "") if income_match else None
+        ),
+    }
+
+
 def validate_text(text: str, expected_name: str = "", expected_student_id: str = "",
                   document_label: str = "", expected_last_name: str = "") -> dict:
     """Turn extracted text into flags. Returns the dict Laravel stores."""
@@ -191,5 +236,11 @@ def validate_text(text: str, expected_name: str = "", expected_student_id: str =
             "name_checked": "surname" if surname_only else "full name",
             "keywords_found": hits,
             "text_length": len(text.strip()),
+            **extract_structured_fields(text, kind),
+            "review_status": (
+                "needs_manual_review"
+                if has_missing or has_wrong or has_name_mismatch
+                else "no_obvious_issues"
+            ),
         },
     }

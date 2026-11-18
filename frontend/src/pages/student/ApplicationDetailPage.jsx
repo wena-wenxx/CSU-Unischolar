@@ -5,6 +5,7 @@ import {
   STATUS_HELP,
   availabilityInfo,
   enrollmentText,
+  fileUrl,
   formatDate,
   missingRequirements,
   studentDocumentState,
@@ -277,9 +278,21 @@ export default function ApplicationDetailPage() {
                     {requirement.is_required && <span className="required">Required</span>}
                   </strong>
 
-                  <span className="muted small">
-                    {document ? document.original_filename : requirement.description || "Not uploaded yet"}
-                  </span>
+                  {document ? (
+                    <>
+                      <a className="small" href={fileUrl(document)} target="_blank" rel="noreferrer">
+                        {document.original_filename}
+                      </a>
+                      <span className="muted small">
+                        Document type: {document.document_type || requirement.name}
+                        {" · "}Uploaded {formatDate(document.created_at)}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="muted small">
+                      {requirement.description || "Not uploaded yet"}
+                    </span>
+                  )}
                 </div>
 
                 <span className={`status status-${state.tone}`}>{state.label}</span>

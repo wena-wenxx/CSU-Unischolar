@@ -140,6 +140,29 @@ def test_correct_birth_certificate_has_no_flags():
     assert r["extracted_data"]["document_kind"] == "birth_certificate"
 
 
+def test_birth_certificate_structured_fields_include_authority_and_date():
+    text = (
+        "Philippine Statistics Authority PSA "
+        "Office of the Civil Registrar General "
+        "CERTIFICATE OF LIVE BIRTH Child: MARIA SANTOS Date: November 3, 2004"
+    )
+    r = validate_text(text, "Maria Santos", "2026-00100", "Birth Certificate")
+    fields = r["extracted_data"]
+    assert "Philippine Statistics Authority" in fields["issuing_authorities"]
+    assert "November 3, 2004" in fields["dates"]
+    assert fields["document_date"] == "November 3, 2004"
+
+
+def test_itr_structured_fields_preserve_extracted_income_for_review():
+    text = (
+        "BUREAU OF INTERNAL REVENUE Annual Income Tax Return "
+        "Taxpayer: MARIA SANTOS Taxable Income PHP 120,000.00"
+    )
+    r = validate_text(text, "Maria Santos", "2026-00100", "Parents' Income Tax Return",
+                      expected_last_name="Santos")
+    assert r["extracted_data"]["extracted_family_income"] == "120000.00"
+
+
 def test_birth_certificate_does_not_need_student_id():
     r = validate_text(BIRTH, "Maria Santos", "2026-00100", "Birth Certificate")
     assert not r["has_missing_information"]

@@ -161,6 +161,13 @@ export default function AgencyListsPage() {
     setProcessing(true);
 
     try {
+      const fieldColumn = (names) => {
+        const index = headers.findIndex((header) => names.some((name) =>
+          header.toLowerCase().replace(/[^a-z]/g, "") === name.toLowerCase().replace(/[^a-z]/g, "")
+        ));
+        return index >= 0 ? index : null;
+      };
+      const valueAt = (row, index) => index === null ? null : (row[index] || "").trim() || null;
       const payload = {
         scholarship_id: Number(scholarshipId),
         agency_name: agency.trim(),
@@ -171,9 +178,23 @@ export default function AgencyListsPage() {
         confirmed_mismatch: confirmedMismatch,
         rows: dataRows.map((row, i) => ({
           row: firstDataLine + i,
-          student_id: (row[Number(idColumn)] || "").trim(),
-          approval_date: dateColumn === "" ? null : (row[Number(dateColumn)] || "").trim() || null,
-          amount: (row[amountColumn] || "").replaceAll(",", "").trim() || null,
+          student_id: valueAt(row, Number(idColumn)),
+          approval_date: dateColumn === "" ? null : valueAt(row, Number(dateColumn)),
+          amount: valueAt(row, amountColumn)?.replaceAll(",", "") || null,
+          control_number: valueAt(row, fieldColumn(["Control Number"])),
+          award_number: valueAt(row, fieldColumn(["TES Award Number"])),
+          last_name: valueAt(row, fieldColumn(["Last Name"])),
+          first_name: valueAt(row, fieldColumn(["Given Name", "First Name"])),
+          middle_name: valueAt(row, fieldColumn(["Middle Initial", "Middle Name"])),
+          sex: valueAt(row, fieldColumn(["Sex at Birth", "Sex"])),
+          birthdate: valueAt(row, fieldColumn(["Birthdate", "Date of Birth"])),
+          program: valueAt(row, fieldColumn(["Degree Program", "Program", "Course"])),
+          year_level: valueAt(row, fieldColumn(["Year Level", "Year"])),
+          email: valueAt(row, fieldColumn(["Email Address", "Email"])),
+          phone: valueAt(row, fieldColumn(["Phone Number", "Phone", "Mobile Number"])),
+          batch: valueAt(row, fieldColumn(["TES Batch", "Batch"])),
+          pwd: valueAt(row, fieldColumn(["PWD", "Person with Disability"])),
+          total_amount: valueAt(row, fieldColumn(["TOTAL AMOUNT", "Total Amount"]))?.replaceAll(",", "") || null,
         })),
       };
 

@@ -1681,6 +1681,27 @@ tbody tr:hover {
   flex-wrap: wrap;
 }
 
+.search-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.search-filter input {
+  flex: 1 1 260px;
+  min-width: 0;
+  max-width: 520px;
+}
+
+.application-remarks {
+  max-width: 360px;
+  margin-top: 4px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .filter-card select {
   width: auto;
 }

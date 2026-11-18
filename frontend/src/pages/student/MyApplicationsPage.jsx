@@ -100,6 +100,12 @@ export default function MyApplicationsPage() {
                     <td>
                       <StatusBadge status={application.status} />
                       <div className="muted small status-meaning">{STATUS_HELP[application.status]?.text}</div>
+                      {["needs_action", "rejected"].includes(application.status) && application.remarks && (
+                        <div className="muted small application-remarks">
+                          <strong>{application.status === "needs_action" ? "Correction request:" : "Remarks:"}</strong>{" "}
+                          {application.remarks}
+                        </div>
+                      )}
                     </td>
 
                     <td>{timeAgo(application.updated_at)}</td>
