@@ -14,3 +14,7 @@ backend/database/migrations_backup_*/
 Thumbs.db
 # Frontend build output (made by "npm run build"; Vercel builds it itself)
 frontend/dist/
+# REAL files with students' personal data (TES billing, real CORs, survey answers): never in Git.
+private-test-data/
+*.survey.csv
+ai-service/tests/output/

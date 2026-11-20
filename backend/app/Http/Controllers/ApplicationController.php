@@ -72,11 +72,24 @@ class ApplicationController extends Controller
             $student->id
         )
             ->where('scholarship_id', $scholarship->id)
+            ->thisSchoolYear()
             ->exists();
 
         if ($alreadyApplied) {
             return response()->json([
-                'message' => 'You already applied to this scholarship.'
+                'message' => 'You already applied to this scholarship for school year '.\App\Models\ExternalGrantee::currentSchoolYear().'.'
+            ], 422);
+        }
+
+        // An application from an earlier school year that is still being processed comes first.
+        $stillOpen = Application::where('student_id', $student->id)
+            ->where('scholarship_id', $scholarship->id)
+            ->whereNotIn('status', ['approved', 'rejected'])
+            ->first();
+
+        if ($stillOpen) {
+            return response()->json([
+                'message' => "You still have an application for this scholarship from school year {$stillOpen->school_year} ({$stillOpen->status}). Open it from My Applications."
             ], 422);
         }
 

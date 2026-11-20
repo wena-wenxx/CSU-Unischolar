@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
-import { enrollmentText, formatDate, fullName } from "../../lib/format";
+import { downloadCSV, enrollmentText, formatDate, formatMoney, fullName } from "../../lib/format";
 import { useToast } from "../../lib/toast";
 import Modal from "../../components/Modal";
 import { useConfirm } from "../../lib/confirm";
@@ -88,6 +88,34 @@ export default function StaffScholarRecordsPage() {
 
   // Long lists: 25 rows first, then Show more (resets on another tab, filter or search).
   const page = usePaged(shownRecords, `${activeProgram}|${shownRecords.length}|${shownRecords[0]?.id}`);
+
+  // The award column appears only when some grantee in view came from an agency list with award numbers.
+  const showAward = shownRecords.some((r) => r.award_number);
+
+  function exportShown() {
+    const program = activeProgram === "all" ? "all-programs" : String(shownRecords[0]?.scholarship?.short_name || "program");
+    const name = `scholar-records-${program.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadCSV(
+      name,
+      shownRecords.map((r) => ({
+        "Control No.": r.control_number || "",
+        "Student ID": r.student?.student_id || "",
+        "Last name": r.student?.last_name || "",
+        "First name": r.student?.first_name || "",
+        "Middle name": r.student?.middle_name || "",
+        Course: r.student?.course || "",
+        "Year level": r.student?.year_level || "",
+        Scholarship: r.scholarship?.name || "",
+        Status: r.status,
+        Enrolled: r.currently_enrolled ? "Yes" : "No",
+        ATM: r.atm_label || "",
+        "Award number": r.award_number || "",
+        "Amount on agency list": r.award_amount ?? "",
+        Batch: r.award_batch || "",
+        "Tagged on": r.grantee_tagged_at ? String(r.grantee_tagged_at).slice(0, 10) : "",
+      }))
+    );
+  }
 
   if (loading) return <Loading />;
 
@@ -197,6 +225,9 @@ export default function StaffScholarRecordsPage() {
           </select>
 
           <span className="sheet-meta muted">{shownRecords.length} shown, A–Z</span>
+          <button className="button button-small button-secondary" onClick={exportShown} disabled={shownRecords.length === 0}>
+            Export CSV
+          </button>
         </div>
 
         {shownRecords.length === 0 ? (
@@ -215,6 +246,7 @@ export default function StaffScholarRecordsPage() {
                   <th>ATM funds</th>
                   <th>If no ATM</th>
                   <th>Tagged</th>
+                  {showAward && <th title="From the agency's list (e.g. the TES billing file)">Award no.</th>}
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -245,6 +277,18 @@ export default function StaffScholarRecordsPage() {
                     </td>
                     <td>{record.has_atm ? "—" : record.atm_note || "—"}</td>
                     <td>{formatDate(record.grantee_tagged_at)}</td>
+                    {showAward && (
+                      <td className="small" title={record.award_amount ? `Amount on the list: ${formatMoney(record.award_amount)}` : undefined}>
+                        {record.award_number ? (
+                          <>
+                            {record.control_number && <span className="muted">#{record.control_number} </span>}
+                            {record.award_number}
+                          </>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    )}
                     <td>
                       <div className="button-row">
                         <button className="button button-small button-secondary" onClick={() => setEditingAtm(record)}>

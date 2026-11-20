@@ -228,3 +228,67 @@ def test_recommendation_letter_is_recognised():
 def test_recommendation_uploaded_as_good_moral_is_flagged():
     r = validate_text(RECOMMENDATION, "Maria Santos", "2026-00100", "Certificate of Good Moral Character")
     assert r["has_wrong_document"]
+
+
+# ---- school year of a COR, birth certificate parents, password (added after the TES review) ----
+
+COR_TEXT = ("CARAGA STATE UNIVERSITY CERTIFICATE OF REGISTRATION Student No. 2026-00101 "
+            "Name: SANTOS, MARIA C. First Semester AY {year} Subject Units Total Units 21")
+
+
+def test_school_years_are_read_in_their_usual_forms():
+    from validation import school_years_in
+    assert school_years_in("AY 2024 - 2025") == ["2024-2025"]
+    assert school_years_in("SY 2025-26 and 2026-2027") == ["2026-2027", "2025-2026"]
+    assert school_years_in("born 2004-2005?") == ["2004-2005"]
+    assert school_years_in("2026-00101") == []          # a Student ID is not a school year
+
+
+def test_a_cor_from_an_old_school_year_is_flagged():
+    r = validate_text(COR_TEXT.format(year="2024-2025"), "Maria Santos", "2026-00101",
+                      "Certificate of Registration (COR)", current_school_year="2026-2027")
+    assert r["has_missing_information"]
+    assert any("school year 2024-2025, not the current 2026-2027" in f for f in r["flags"])
+
+
+def test_a_cor_for_the_current_school_year_passes():
+    r = validate_text(COR_TEXT.format(year="2026-2027"), "Maria Santos", "2026-00101",
+                      "Certificate of Registration (COR)", current_school_year="2026-2027")
+    assert r["is_complete"] and not r["flags"]
+
+
+def test_a_birth_certificate_of_a_sibling_does_not_pass_on_the_parents_names():
+    # The student is MARIA SANTOS; this is her brother's certificate, and their mother is also called
+    # MARIA SANTOS. A name found only in the parents' part must not count as the student's.
+    text = ("Republic of the Philippines PHILIPPINE STATISTICS AUTHORITY CERTIFICATE OF LIVE BIRTH "
+            "1. NAME (First) PEDRO (Middle) CRUZ (Last) SANTOS 2. SEX MALE 3. DATE OF BIRTH March 3, 2006 "
+            "MOTHER 6. MAIDEN NAME (First) MARIA (Middle) LOPEZ (Last) SANTOS "
+            "FATHER 13. NAME (First) JOSE (Middle) REYES (Last) SANTOS")
+    r = validate_text(text, "Maria Santos", "2026-00101", "Birth Certificate")
+    assert r["has_name_mismatch"]
+    assert any("parents' part" in f for f in r["flags"])
+
+
+def test_the_students_own_birth_certificate_still_passes():
+    text = ("PHILIPPINE STATISTICS AUTHORITY CERTIFICATE OF LIVE BIRTH 1. NAME (First) MARIA (Middle) CRUZ "
+            "(Last) SANTOS 2. SEX FEMALE MOTHER 6. MAIDEN NAME (First) ANA (Middle) LOPEZ (Last) CRUZ "
+            "FATHER 13. NAME (First) JOSE (Middle) REYES (Last) SANTOS")
+    r = validate_text(text, "Maria Santos", "2026-00101", "Birth Certificate")
+    assert not r["has_name_mismatch"] and r["is_complete"]
+
+
+def test_names_close_and_far():
+    cor = COR_TEXT.format(year="2026-2027")
+    same_surname = validate_text(cor.replace("SANTOS, MARIA", "SANTOS, PEDRO"), "Maria Santos", "2026-00101",
+                                 "Certificate of Registration (COR)")
+    other_surname = validate_text(cor.replace("SANTOS, MARIA", "REYES, MARIA"), "Maria Santos", "2026-00101",
+                                  "Certificate of Registration (COR)")
+    one_letter = validate_text(cor.replace("SANTOS, MARIA", "SANTOS, MARlA"), "Maria Santos", "2026-00101",
+                               "Certificate of Registration (COR)")
+    assert same_surname["has_name_mismatch"]          # a sibling's COR
+    assert other_surname["has_name_mismatch"]
+    # one wrong letter (an OCR slip or a typo) is not "not found": it goes to the "similar, please check"
+    # band with its score, so staff look at it
+    assert one_letter["has_name_mismatch"]
+    assert any("similar but not exact" in f for f in one_letter["flags"])
+    assert 85 <= one_letter["confidence_score"] < 95

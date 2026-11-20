@@ -140,7 +140,14 @@ class ScholarRecordController extends Controller
                 'grantee_tagged_at' => now(),
                 'remarks' =>
                     $data['remarks'] ?? null,
-            ]
+            ] + array_filter([
+                // carried over from the agency's approved list, when there was one
+                // (a value already on the record is kept when the application has none)
+                'control_number' => $application->agency_control_number,
+                'award_number' => $application->agency_award_number,
+                'award_amount' => $application->agency_amount,
+                'award_batch' => $application->agency_batch,
+            ], fn ($value) => $value !== null && $value !== '')
         );
 
         ApplicationStatusLog::record($application, 'grantee_tagged', null, $request->user()->id, 'approved');

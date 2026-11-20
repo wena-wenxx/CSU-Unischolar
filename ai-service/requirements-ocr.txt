@@ -1,5 +1,8 @@
 # PaddleOCR + PaddlePaddle - install SEPARATELY from requirements.txt, in a
 # Python 3.11 or 3.12 environment. As of now these do NOT reliably support
 # Python 3.13. See "AI service setup" in the guide for exact steps.
+#
+# PaddleOCR also installs OpenCV (opencv-contrib-python) and NumPy. The scanned
+# TES billing reader (ruled_table.py) uses them to find the table lines.
 paddlepaddle
 paddleocr

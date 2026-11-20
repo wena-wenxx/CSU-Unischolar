@@ -21,8 +21,13 @@ class ScholarRecord extends Model
     protected $fillable = [
         'student_id', 'scholarship_id', 'status', 'currently_enrolled', 'has_atm', 'atm_funds', 'atm_note',
         'grantee_tagged_at', 'remarks',
+        // from the agency's approved list (e.g. the CHED TES billing file)
+        'control_number', 'award_number', 'award_amount', 'award_batch',
     ];
-    protected $casts = ['currently_enrolled' => 'boolean', 'has_atm' => 'boolean', 'grantee_tagged_at' => 'datetime'];
+    protected $casts = [
+        'currently_enrolled' => 'boolean', 'has_atm' => 'boolean', 'grantee_tagged_at' => 'datetime',
+        'award_amount' => 'decimal:2',
+    ];
 
     protected $appends = ['atm_label'];
 

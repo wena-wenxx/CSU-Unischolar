@@ -92,6 +92,9 @@ def extract_text(path: str, filename: str = "") -> dict:
     try:
         if ext == ".pdf":
             doc = fitz.open(path)
+            if getattr(doc, "needs_pass", False):
+                return {"text": "", "engine": None, "ocr_status": "failed",
+                        "error": "the PDF is password-protected; ask the student for a copy without a password"}
             parts, used_ocr = [], False
             for page in doc:
                 text = page.get_text().strip()

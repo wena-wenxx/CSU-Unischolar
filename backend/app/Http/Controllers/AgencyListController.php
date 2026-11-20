@@ -40,6 +40,8 @@ class AgencyListController extends Controller
     /** Applications approved by this upload (they get an e-mail afterwards). */
     private array $approvedApplications = [];
 
+    private ?int $uploadId = null;
+
     private function staffOnly(Request $request): void
     {
         if ($request->user()->role !== 'staff') {
@@ -78,10 +80,13 @@ class AgencyListController extends Controller
             'expected_total' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string|max:5000',
             'confirmed_mismatch' => 'nullable|boolean',
+            'confirmed_duplicate' => 'nullable|boolean',
             'rows.*.row' => 'required|integer|min:1',
             'rows.*.student_id' => 'nullable|string|max:50',
             'rows.*.approval_date' => 'nullable|string|max:50',
-            'rows.*.amount' => 'nullable|numeric|min:0',
+            // Amounts read from a scan can be unreadable ("10,0O0.0p"): such a value is kept out of the
+            // award details instead of stopping the whole list.
+            'rows.*.amount' => 'nullable',
             'rows.*.control_number' => 'nullable|string|max:50',
             'rows.*.award_number' => 'nullable|string|max:255',
             'rows.*.last_name' => 'nullable|string|max:255',
@@ -95,13 +100,13 @@ class AgencyListController extends Controller
             'rows.*.phone' => 'nullable|string|max:50',
             'rows.*.batch' => 'nullable|string|max:100',
             'rows.*.pwd' => 'nullable|string|max:10',
-            'rows.*.total_amount' => 'nullable|numeric|min:0',
+            'rows.*.total_amount' => 'nullable',
         ]);
 
         $expectedCount = $data['expected_count'] ?? null;
         $expectedTotal = $data['expected_total'] ?? null;
         $countMismatch = $expectedCount !== null && (int) $expectedCount !== count($data['rows']);
-        $amounts = collect($data['rows'])->map(fn ($row) => (float) ($row['amount'] ?? 0))->sum();
+        $amounts = collect($data['rows'])->map(fn ($row) => is_numeric($row['amount'] ?? null) ? (float) $row['amount'] : 0)->sum();
         $amountMismatch = $expectedTotal !== null && abs($amounts - (float) $expectedTotal) > 0.01;
         if (($countMismatch || $amountMismatch) && empty($data['confirmed_mismatch'])) {
             return response()->json(['message' => 'Confirm the count or total mismatch before processing this list.'], 422);
@@ -110,40 +115,67 @@ class AgencyListController extends Controller
         $scholarship = Scholarship::findOrFail($data['scholarship_id']);
         $staffId = $request->user()->id;
 
+        // The same list processed twice (same program, file and period) is almost always a mistake.
+        $earlier = AgencyListUpload::where('scholarship_id', $scholarship->id)
+            ->where('file_name', $data['file_name'])
+            ->where('school_year', $data['school_year'] ?? null)
+            ->where('semester', $data['semester'] ?? null)
+            ->where('batch', $data['batch'] ?? null)
+            ->latest()
+            ->first();
+        if ($earlier && empty($data['confirmed_duplicate'])) {
+            return response()->json([
+                'message' => "This list ({$data['file_name']}) was already processed for {$scholarship->name} on "
+                    .$earlier->created_at->format('F j, Y g:i A').'. Process it again only if the agency sent a corrected list.',
+                'duplicate_of' => $earlier->id,
+            ], 409);
+        }
+
         $counts = ['approved' => 0, 'created' => 0, 'already' => 0, 'unmatched' => 0, 'error' => 0];
         $details = [];
         $seen = [];
+        $upload = null;
 
-        DB::transaction(function () use ($data, $scholarship, $staffId, &$counts, &$details, &$seen) {
+        DB::transaction(function () use ($data, $scholarship, $staffId, &$counts, &$details, &$seen, &$upload) {
+            // The upload is saved first so every application can point to the list it came from.
+            $upload = AgencyListUpload::create([
+                'scholarship_id' => $scholarship->id,
+                'agency_name' => $data['agency_name'],
+                'campus' => $data['campus'] ?? null,
+                'file_name' => $data['file_name'],
+                'uploaded_by' => $staffId,
+                'total_rows' => count($data['rows']),
+                'approved_count' => 0, 'created_count' => 0, 'already_count' => 0,
+                'unmatched_count' => 0, 'error_count' => 0,
+                'details' => [],
+                'school_year' => $data['school_year'] ?? null,
+                'semester' => $data['semester'] ?? null,
+                'batch' => $data['batch'] ?? null,
+                'reference_number' => $data['reference_number'] ?? null,
+                'list_date' => $data['list_date'] ?? null,
+                'expected_count' => $data['expected_count'] ?? null,
+                'expected_total' => $data['expected_total'] ?? null,
+                'notes' => $data['notes'] ?? null,
+            ]);
+            $this->uploadId = $upload->id;
+
             foreach ($data['rows'] as $row) {
                 $result = $this->processRow($row, $scholarship, $staffId, $data, $seen);
-                $counts[$result['result']]++;
+                // "check" (Student ID found but the name on the list is different) changes nothing,
+                // so it is counted with the rows that need attention.
+                $counts[$result['result'] === 'check' ? 'error' : $result['result']]++;
                 $details[] = $result;
             }
-        });
 
-        $upload = AgencyListUpload::create([
-            'scholarship_id' => $scholarship->id,
-            'agency_name' => $data['agency_name'],
-            'campus' => $data['campus'] ?? null,
-            'file_name' => $data['file_name'],
-            'uploaded_by' => $staffId,
-            'total_rows' => count($data['rows']),
-            'approved_count' => $counts['approved'],
-            'created_count' => $counts['created'],
-            'already_count' => $counts['already'],
-            'unmatched_count' => $counts['unmatched'],
-            'error_count' => $counts['error'],
-            'details' => $details,
-            'school_year' => $data['school_year'] ?? null,
-            'semester' => $data['semester'] ?? null,
-            'batch' => $data['batch'] ?? null,
-            'reference_number' => $data['reference_number'] ?? null,
-            'list_date' => $data['list_date'] ?? null,
-            'expected_count' => $data['expected_count'] ?? null,
-            'expected_total' => $data['expected_total'] ?? null,
-            'notes' => $data['notes'] ?? null,
-        ]);
+            $upload->update([
+                'approved_count' => $counts['approved'],
+                'created_count' => $counts['created'],
+                'already_count' => $counts['already'],
+                'unmatched_count' => $counts['unmatched'],
+                'error_count' => $counts['error'],
+                'details' => $details,
+            ]);
+        });
 
         // E-mails go out after the database work is saved.
         $emailed = 0;
@@ -197,6 +229,13 @@ class AgencyListController extends Controller
 
         $line['student'] = trim("{$student->first_name} {$student->last_name}");
 
+        // The Student ID matched. If the list also has a name, it must be the same person: a misread or
+        // mistyped ID could otherwise approve the wrong student.
+        $nameProblem = self::nameDiffers($row, $student);
+        if ($nameProblem) {
+            return $line + ['result' => 'check', 'note' => $nameProblem.' Nothing was changed: check the Student ID on the list.'];
+        }
+
         $otherGrant = $student->otherActiveScholarship($scholarship->id);
 
         if ($otherGrant) {
@@ -205,17 +244,41 @@ class AgencyListController extends Controller
 
         $approvalNote = $this->approvalNote($row['approval_date'] ?? null, $data['agency_name'], $data['file_name']);
 
+        // The application of the list's school year; otherwise one still in process from before;
+        // otherwise the student may already be a grantee of this program (a continuing grantee).
+        $year = $data['school_year'] ?? \App\Models\ExternalGrantee::currentSchoolYear();
         $application = Application::where('student_id', $student->id)
             ->where('scholarship_id', $scholarship->id)
-            ->first();
+            ->where('school_year', $year)
+            ->first()
+            ?? Application::where('student_id', $student->id)
+                ->where('scholarship_id', $scholarship->id)
+                ->whereNotIn('status', ['approved', 'rejected', 'draft'])
+                ->latest('id')
+                ->first();
+
+        if (!$application && $student->scholarRecords()->where('scholarship_id', $scholarship->id)->where('status', 'active')->exists()) {
+            $latest = Application::where('student_id', $student->id)->where('scholarship_id', $scholarship->id)->latest('id')->first();
+            $award = $this->awardDetails($row);
+            if ($latest && $award) {
+                $latest->update($award);
+                $this->copyToScholarRecord($latest, $award);
+            }
+
+            return $line + ['result' => 'already', 'note' => 'Continuing grantee of this program; status not changed.'.($award ? ' Award details from the list were saved.' : '')];
+        }
+
+        $award = $this->awardDetails($row);
 
         if (!$application) {
             $application = Application::create([
                 'student_id' => $student->id,
                 'scholarship_id' => $scholarship->id,
+                'school_year' => $year,
                 'status' => 'approved',
                 'remarks' => 'Added from agency list. '.$approvalNote,
-            ]);
+            ] + $award);
+            $this->copyToScholarRecord($application, $award);
 
             ApplicationStatusLog::record($application, 'approved', 'Added from the agency\'s approved list. '.$approvalNote, $staffId, null);
             $this->approvedApplications[] = $application;
@@ -224,7 +287,13 @@ class AgencyListController extends Controller
         }
 
         if ($application->status === 'approved') {
-            return $line + ['result' => 'already', 'note' => 'Already approved; nothing changed.'];
+            // The status stays; a newer list (e.g. the next TES billing batch) still updates the award details.
+            if ($award) {
+                $application->update($award);
+                $this->copyToScholarRecord($application, $award);
+            }
+
+            return $line + ['result' => 'already', 'note' => 'Already approved; status not changed.'.($award ? ' Award details from the list were saved.' : '')];
         }
 
         if (in_array($application->status, ['draft', 'rejected'], true)) {
@@ -242,12 +311,18 @@ class AgencyListController extends Controller
             'remarks' => $approvalNote,
             'enrollment_verified' => false,
             'enrollment_verified_at' => null,
-        ]);
+        ] + $award);
+        $this->copyToScholarRecord($application, $award);
 
         ApplicationStatusLog::record($application, 'approved', $approvalNote, $staffId, $previous);
         $this->approvedApplications[] = $application;
 
-        return $line + ['result' => 'approved', 'note' => "Changed from {$previous} to approved. Verify enrollment next."];
+        // The agency's decision is recorded, but OAS should know when it had not finished its own check.
+        $early = in_array($previous, ['submitted', 'under_review', 'needs_action'], true)
+            ? " Note: OAS had not finished checking this application's documents (it was {$previous}); check them."
+            : '';
+
+        return $line + ['result' => 'approved', 'note' => "Changed from {$previous} to approved. Verify enrollment next.".$early];
     }
 
     private function approvalNote(?string $date, string $agency, string $file): string
@@ -263,6 +338,82 @@ class AgencyListController extends Controller
         }
 
         return $text." (list: {$file}).";
+    }
+
+    /** Control number, award number, amount and batch from the list row (only the ones that are there). */
+    private function awardDetails(array $row): array
+    {
+        $amount = collect([$row['total_amount'] ?? null, $row['amount'] ?? null])->first(fn ($v) => is_numeric($v));
+
+        return array_filter([
+            'agency_control_number' => isset($row['control_number']) ? mb_substr(trim((string) $row['control_number']), 0, 20) : null,
+            'agency_award_number' => isset($row['award_number']) ? mb_substr(trim((string) $row['award_number']), 0, 60) : null,
+            'agency_amount' => is_numeric($amount) && (float) $amount >= 0 ? round((float) $amount, 2) : null,
+            'agency_batch' => isset($row['batch']) ? mb_substr(trim((string) $row['batch']), 0, 30) : null,
+        ], fn ($value) => $value !== null && $value !== '') + ($this->uploadId ? ['agency_list_upload_id' => $this->uploadId] : []);
+    }
+
+    /** A student who is already a grantee also gets the new details on the scholar record. */
+    private function copyToScholarRecord(Application $application, array $award): void
+    {
+        $values = array_filter([
+            'control_number' => $award['agency_control_number'] ?? null,
+            'award_number' => $award['agency_award_number'] ?? null,
+            'award_amount' => $award['agency_amount'] ?? null,
+            'award_batch' => $award['agency_batch'] ?? null,
+        ], fn ($value) => $value !== null);
+
+        if ($values) {
+            ScholarRecord::where('student_id', $application->student_id)
+                ->where('scholarship_id', $application->scholarship_id)
+                ->update($values);
+        }
+    }
+
+    /**
+     * null when the name on the list fits the student, otherwise a sentence saying what differs.
+     * Accents, capitals, dots and the order of given names do not matter (ÑUÑEZ = Nunez).
+     */
+    public static function nameDiffers(array $row, Student $student): ?string
+    {
+        $listLast = self::plain($row['last_name'] ?? '');
+        $listFirst = self::plain($row['first_name'] ?? '');
+        if ($listLast === '' && $listFirst === '') {
+            return null;            // the list has no name: only the Student ID can be checked
+        }
+
+        $last = self::plain($student->last_name);
+        $first = self::plain($student->first_name);
+
+        $lastOk = $listLast === '' || self::similar($listLast, $last) >= 80;
+        $firstOk = $listFirst === '' || self::similar($listFirst, $first) >= 75
+            || collect(explode(' ', $listFirst))->contains(fn ($w) => strlen($w) > 2 && str_contains(' '.$first.' ', ' '.$w.' '));
+
+        if ($lastOk && $firstOk) {
+            return null;
+        }
+
+        $onList = trim(($row['first_name'] ?? '').' '.($row['last_name'] ?? ''));
+
+        return "The Student ID belongs to {$student->first_name} {$student->last_name}, but the list says \"{$onList}\".";
+    }
+
+    private static function plain(?string $text): string
+    {
+        $text = \Illuminate\Support\Str::ascii((string) $text);
+        $text = strtoupper(preg_replace('/[^A-Za-z ]+/', ' ', $text));
+
+        return trim(preg_replace('/\s+/', ' ', $text));
+    }
+
+    private static function similar(string $a, string $b): float
+    {
+        if ($a === $b) {
+            return 100.0;
+        }
+        similar_text($a, $b, $percent);
+
+        return $percent;
     }
 
     private function periodLabel(array $data): string

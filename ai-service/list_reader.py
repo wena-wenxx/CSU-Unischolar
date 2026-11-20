@@ -915,13 +915,14 @@ def _tes_layout_rows(page):
         else:
             award = ""
 
+        # Only an amount that was really read is kept (never a guessed "10,000.00").
         amount = re.sub(r"\s+", "", values["amount"]).replace("O", "0").replace("o", "0")
         amount = re.sub(r"[^0-9,.]", "", amount)
-        amount = "10,000.00" if re.search(r"(10|100)[,.]?(000|,000)", amount) or re.search(r"\d", amount) else ""
+        amount = amount if re.fullmatch(r"\d{1,3}(?:,\d{3})*\.\d{2}", amount) else ""
 
         total = re.sub(r"\s+", "", values["total"]).replace("O", "0").replace("o", "0")
         total = re.sub(r"[^0-9,.]", "", total)
-        total = "10,000.00" if re.search(r"\d", total) else ""
+        total = total if re.fullmatch(r"\d{1,3}(?:,\d{3})*\.\d{2}", total) else ""
 
         batch_match = re.search(r"batch\s+(\d+)", page.get_text("text"), re.I)
 
@@ -1029,10 +1030,7 @@ def _read_pdf(path):
             else:
                 rows = _parse_tes_continuing(text)
             printed_total = None
-            normalized_text = text.replace("i,310", "1,310").replace("I,310", "1,310")
-            normalized_text = normalized_text.replace("r.310", "1,310").replace("m0.", "000.")
-            normalized_text = normalized_text.replace("t,ll0.0OO.0O", "1,110,000.00")
-            totals = re.findall(r"\b\d{1,3}(?:,\d{3})*\.\d{2}\b", normalized_text)
+            totals = re.findall(r"\b\d{1,3}(?:,\d{3})*\.\d{2}\b", text)
             candidates = [float(value.replace(",", "")) for value in totals]
             if candidates:
                 printed_total = max(candidates)
@@ -1064,6 +1062,137 @@ def _read_pdf(path):
     return rows[:MAX_ROWS], layout[:MAX_ROWS], "ocr" if used_ocr else "pdf-text", metadata | checks
 
 
+def _scanned_ruled_form(path):
+    """The name of a known ruled form (RULED_TEMPLATES) when the PDF is a scan of it, else None."""
+    try:
+        import pymupdf as fitz
+    except ImportError:
+        import fitz
+    import ruled_table
+
+    with fitz.open(path) as doc:
+        if getattr(doc, "needs_pass", False):
+            raise ValueError("the PDF is password-protected; ask for a copy without a password")
+        text, scanned = [], False
+        for page in doc:
+            words = page.get_text("words")
+            text.append(page.get_text("text"))
+            if len(page.get_images(full=True)) >= 1 and (bad_text_layer(words) or len(words) < 20):
+                scanned = True
+            elif len(page.get_images(full=True)) == 1 and float(page.rect.width) >= 700:
+                scanned = True       # one full-page picture with a hidden OCR layer
+    joined = " ".join(text).lower()
+    for name, template in ruled_table.RULED_TEMPLATES.items():
+        hits = sum(label in joined for label in template["labels"])
+        awards = len(re.findall(r"[a-z]{1,3}s?-\s*\d{8}\s*-", joined))
+        if scanned and (hits or awards >= 3):
+            return name
+    if scanned:
+        # The scanner's hidden text can be too garbled to find the title: look at the table lines instead.
+        return _ruled_by_lines(path)
+    return None
+
+
+def _ruled_by_lines(path):
+    """The known form whose column lines match a page of this PDF (looked at in a small picture), else None."""
+    try:
+        import pymupdf as fitz
+    except ImportError:
+        import fitz
+    try:
+        import cv2  # comes with PaddleOCR (opencv); without it this look is skipped
+    except ImportError:
+        return None
+    import ruled_table
+
+    with fitz.open(path) as doc:
+        for index in range(min(3, len(doc))):
+            pix = doc[index].get_pixmap(dpi=100)
+            fd, png = tempfile.mkstemp(suffix=".png")
+            os.close(fd)
+            try:
+                pix.save(png)
+                gray = cv2.imread(png, cv2.IMREAD_GRAYSCALE)
+                _rows, cols, _angle, straight = ruled_table.find_grid(gray)
+            finally:
+                os.remove(png)
+            for name, template in ruled_table.RULED_TEMPLATES.items():
+                _spans, hits = ruled_table.fit_columns(cols, template["lines"], straight.shape[1])
+                if hits >= len(template["lines"]) - 3:
+                    return name
+    return None
+
+
+def _read_ruled(path, template):
+    """Scanned CHED form -> the same shape as read_table(), plus per-cell flags. None if no OCR engine."""
+    import ruled_table
+
+    if not ruled_table.ocr_engines_available():
+        return None
+    return _shape_ruled(ruled_table.read_document(path, template), template)
+
+
+def _shape_ruled(doc, template):
+    warnings = ["This is a scan, so it was read with OCR (" + str(doc["engine"]) + "). Highlighted cells were "
+                "hard to read: check them against the paper and correct them before processing."]
+    warnings += doc["warnings"]
+    metadata = dict(doc["metadata"])
+    metadata["template"] = template
+    metadata["row_count"] = len(doc["rows"])
+    metadata["pages"] = doc["pages"]
+    if metadata.get("batch") and not str(metadata["batch"]).lower().startswith("batch"):
+        metadata["batch"] = f"Batch {metadata['batch']}"
+    return {
+        "rows": [doc["header"]] + doc["rows"],
+        "cells": [None] + doc["cells"],
+        "layout": [None] * (len(doc["rows"]) + 1),
+        "method": "ocr-" + str(doc["engine"]),
+        "warnings": warnings,
+        "metadata": metadata,
+    }
+
+
+def _ruled_picture(path):
+    """A photo of one page of a known CHED form (its table lines are found) -> ruled reading, else None."""
+    import ruled_table
+
+    if not ruled_table.ocr_engines_available():
+        return None
+    try:
+        import cv2
+
+        original = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+    except Exception:
+        return None
+    # A phone photo can be sideways: try it as it is, then turned a quarter both ways.
+    for turn in (None, cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE):
+        gray = original if turn is None else cv2.rotate(original, turn)
+        _rows, cols, _angle, straight = ruled_table.find_grid(gray)
+        for name, template in ruled_table.RULED_TEMPLATES.items():
+            # quick look first: does the picture have this form's column lines? (no OCR yet)
+            _spans, hits = ruled_table.fit_columns(cols, template["lines"], straight.shape[1])
+            if hits < len(template["lines"]) - 4:
+                continue
+            target = path
+            if turn is not None:
+                fd, target = tempfile.mkstemp(suffix=".png")
+                os.close(fd)
+                cv2.imwrite(target, gray)
+            try:
+                doc = ruled_table.read_document(target, name)
+            except Exception:
+                return None
+            finally:
+                if target != path:
+                    os.remove(target)
+            if turn is not None:
+                doc["warnings"].insert(0, "The picture was sideways; it was turned before reading.")
+            good = [r for r in doc["rows"] if re.fullmatch(r"\d{5}", r[0] or "")]
+            if good and len(good) >= max(1, len(doc["rows"]) // 2):
+                return _shape_ruled(doc, name)
+    return None
+
+
 def read_table(path, filename=""):
     """Returns {"rows": [[cell, ...]], "method": str, "warnings": [str]}."""
     ext = os.path.splitext(filename or path)[1].lower()
@@ -1078,6 +1207,15 @@ def read_table(path, filename=""):
     elif ext == ".docx":
         rows, method = _read_docx(path)
         method = "word-" + method
+    elif ext == ".pdf" and (ruled_form := _scanned_ruled_form(path)):
+        ruled = _read_ruled(path, ruled_form)
+        if ruled is None:
+            rows, layout, method, metadata = _read_pdf(path)
+            warnings.append("This is a scanned CHED form, but no OCR program is installed, so the scanner's own "
+                            "text was used. It has many mistakes: install PaddleOCR (pip install -r "
+                            "requirements-ocr.txt) and read the file again, or check every row by hand.")
+        else:
+            return ruled
     elif ext == ".pdf":
         rows, layout, method, metadata = _read_pdf(path)
         original_name = filename or path
@@ -1092,6 +1230,8 @@ def read_table(path, filename=""):
                     for row in rows:
                         if len(row) > 12 and not row[12]:
                             row[12] = batch_number
+    elif ext in (".png", ".jpg", ".jpeg") and (ruled := _ruled_picture(path)):
+        return ruled
     elif ext in (".png", ".jpg", ".jpeg"):
         rows, layout = group_boxes(ocr_boxes(path), True)
         method = "ocr"
@@ -1372,6 +1512,9 @@ def table_rows(path, filename):
     header), so an empty cell does not shift the rest of the row.
     """
     table = read_table(path, filename)
+    if table.get("cells"):
+        return {"rows": table["rows"], "cells": table["cells"], "method": table["method"],
+                "warnings": table["warnings"], "metadata": table.get("metadata", {})}
     rows, layout = table["rows"], table.get("layout") or []
     if rows and any(layout):
         top = [(len(r), i) for i, r in enumerate(rows[:30]) if layout[i]]

@@ -36,7 +36,7 @@ export function byLastName(a, b) {
   return x.localeCompare(y);
 }
 
-// "Binag, Gleslimie B."
+// "Contiga, Wena Rose N."
 export function lastFirst(student) {
   if (!student) return "—";
   return [student.last_name, [student.first_name, student.middle_name].filter(Boolean).join(" ")].filter(Boolean).join(", ");

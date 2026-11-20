@@ -53,3 +53,17 @@ def test_a_renamed_old_file_gets_a_clear_message(tmp_path):
     fake.write_bytes(b"\xd0\xcf\x11\xe0" + b"\0" * 100)     # how an old .xls starts
     with pytest.raises(ValueError, match="Save As"):
         L._read_xlsx_builtin(str(fake))
+
+
+def test_a_password_protected_pdf_gets_a_clear_message(monkeypatch, tmp_path):
+    import ocr_engine
+
+    class Locked:
+        needs_pass = True
+
+    monkeypatch.setattr(ocr_engine.fitz, "open", lambda path: Locked())
+    path = tmp_path / "locked.pdf"
+    path.write_bytes(b"%PDF-1.4")
+    result = ocr_engine.extract_text(str(path), "locked.pdf")
+    assert result["ocr_status"] == "failed"
+    assert "password-protected" in result["error"]

@@ -375,6 +375,14 @@ class RecommendationController extends Controller
         ]);
 
         [$scholarship, $recommendations] = $this->notificationRecipients($request, $data);
+
+        // An "opportunity" notice only makes sense while students can still apply (or, for an
+        // agency-direct program, while it is active). A closed or finished program gets no notice.
+        if (!in_array($scholarship->availability, ['open', 'upcoming'], true)) {
+            return response()->json([
+                'message' => "{$scholarship->name} is not open for applications ({$scholarship->availability}), so no notice was sent.",
+            ], 422);
+        }
         $skipDuplicates = (bool) ($data['skip_duplicates'] ?? true);
         $duplicates = ScholarshipNotification::where('scholarship_id', $scholarship->id)
             ->where('type', self::NOTIFICATION_TYPE)
@@ -551,8 +559,8 @@ class RecommendationController extends Controller
         if ($holding = $student->otherActiveScholarship($scholarship->id)) {
             return response()->json(['message' => "{$student->fullName()} already holds {$holding}. Only one active scholarship is allowed."], 422);
         }
-        if (Application::where('student_id', $student->id)->where('scholarship_id', $scholarship->id)->exists()) {
-            return response()->json(['message' => 'This student already has an application for this scholarship.'], 422);
+        if (Application::where('student_id', $student->id)->where('scholarship_id', $scholarship->id)->thisSchoolYear()->exists()) {
+            return response()->json(['message' => 'This student already has an application for this scholarship this school year.'], 422);
         }
         $this->needsReason($r, $note, 'add this student');
 

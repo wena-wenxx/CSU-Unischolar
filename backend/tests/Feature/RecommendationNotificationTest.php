@@ -155,4 +155,18 @@ class RecommendationNotificationTest extends TestCase
             ->assertJsonPath('total', 1)
             ->assertJsonPath('data.0.student.student_id', '2026-70001');
     }
+
+    public function test_no_opportunity_notice_for_a_closed_program(): void
+    {
+        [$staff, , , $scholarship, $recommendation] = $this->fixture();
+        $scholarship->update(['application_end' => now()->subDay()]);
+        Sanctum::actingAs($staff);
+
+        $this->postJson('/api/staff/recommendations/notifications', [
+            'scholarship_id' => $scholarship->id,
+            'recommendation_ids' => [$recommendation->id],
+            'message' => 'Hello [Student Name], you may apply to [Scholarship Name].',
+        ])->assertStatus(422);
+        $this->assertDatabaseCount('scholarship_notifications', 0);
+    }
 }

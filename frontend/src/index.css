@@ -84,8 +84,8 @@
   --print-rule: #bbbbbb;
   --print-border: #cccccc;
 
-  --font-heading: "Segoe UI Historic", sans-serif;
-  --font-body: "Segoe UI Historic", sans-serif;
+  --font-heading: "Segoe UI Historic", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Segoe UI Historic", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
 
   --radius: var(--radius-system);
   --shadow: 0 18px 50px rgba(var(--primary-dark-rgb), 0.14);
@@ -104,7 +104,7 @@
 *,
 *::before,
 *::after {
-  font-family: "Segoe UI Historic", sans-serif !important;
+  font-family: "Segoe UI Historic", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif !important;
 }
 
 body {
@@ -5658,4 +5658,87 @@ tr.group-cont td {
   margin-top: 20px;
   padding-top: 18px;
   border-top: 1px solid #dfe7e2;
+}
+
+/* ---------- Approved list preview (editable, scanned-cell highlights) ---------- */
+.list-preview-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 6px 0 8px;
+}
+
+.list-preview-table {
+  max-height: 460px;
+  overflow: auto;
+}
+
+.list-preview-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-surface);
+}
+
+.list-preview-table td {
+  padding: 0;
+  white-space: nowrap;
+}
+
+.list-preview-table td:first-child {
+  padding: 6px 10px;
+}
+
+.cell-button {
+  display: block;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: text;
+}
+
+.cell-button:hover,
+.cell-button:focus-visible {
+  outline: 2px solid var(--csu-green);
+  outline-offset: -2px;
+}
+
+.cell-input {
+  width: 100%;
+  min-width: 120px;
+  padding: 6px 8px;
+  border: 2px solid var(--csu-green);
+  border-radius: 0;
+  font: inherit;
+}
+
+.cell-check {
+  background: var(--csu-orange-tint);
+  box-shadow: inset 0 0 0 1px var(--csu-orange);
+}
+
+.cell-edited {
+  background: var(--csu-emerald-tint);
+}
+
+.legend {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 4px;
+}
+
+.plain-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.plain-list li + li {
+  margin-top: 2px;
 }

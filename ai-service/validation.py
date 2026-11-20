@@ -58,6 +58,9 @@ def normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+FORM_LABELS = {"FIRST", "MIDDLE", "LAST", "NAME", "GIVEN", "SURNAME", "FAMILY"}
+
+
 def best_name_match(expected_name: str, text: str):
     """
     Slide a small window of words across the document text and keep the best
@@ -68,7 +71,9 @@ def best_name_match(expected_name: str, text: str):
     Returns (score 0-100, best_window_text).
     """
     expected = normalize(expected_name)
-    words = normalize(text).split()
+    # Form labels between the parts of a name ("NAME (First) MARIA (Middle) CRUZ (Last) SANTOS" on a
+    # PSA birth certificate) and item numbers are skipped, so the name parts sit next to each other.
+    words = [w for w in normalize(text).split() if w not in FORM_LABELS and not w.isdigit()]
     if not expected or not words:
         return 0.0, ""
 
@@ -165,9 +170,28 @@ def extract_structured_fields(text: str, kind: str | None) -> dict:
     }
 
 
+def school_years_in(text: str) -> list:
+    """School years written on a document: '2024-2025', 'AY 2024 - 2025', 'SY 2024-25'. Newest first."""
+    found = []
+    for a, b in re.findall(r"\b(20\d{2})\s*[-–/]\s*(20\d{2}|\d{2})\b", text or ""):
+        a = int(a)
+        b = int(b) if len(b) == 4 else 2000 + int(b)
+        if b == a + 1:
+            found.append(f"{a}-{b}")
+    return sorted(set(found), reverse=True)
+
+
+# On a birth certificate the parents' names come after these words; the child's own name comes first.
+PARENT_PART = re.compile(r"\b(MOTHER|FATHER|MAIDEN\s+NAME|INFORMANT)\b", re.I)
+
+
 def validate_text(text: str, expected_name: str = "", expected_student_id: str = "",
-                  document_label: str = "", expected_last_name: str = "") -> dict:
-    """Turn extracted text into flags. Returns the dict Laravel stores."""
+                  document_label: str = "", expected_last_name: str = "",
+                  current_school_year: str = "") -> dict:
+    """
+    Turn extracted text into flags. Returns the dict Laravel stores.
+    current_school_year (e.g. "2026-2027"): a COR for another school year is flagged.
+    """
     flags = []
     text = text or ""
     readable = len(text.strip()) >= MIN_TEXT_CHARS
@@ -190,9 +214,22 @@ def validate_text(text: str, expected_name: str = "", expected_student_id: str =
         target = (expected_last_name or "").strip() or (expected_name.strip().split() or [""])[-1]
     else:
         target = expected_name
+    parents_only = False
     if target.strip() and readable:
         name_score, name_window = best_name_match(target, text)
-        if name_score >= NAME_MATCH_MIN:
+        if kind == "birth_certificate" and name_score >= NAME_MATCH_MIN:
+            # The name must be in the CHILD's part, not built from the parents' names further down.
+            cut = PARENT_PART.search(text)
+            if cut and cut.start() > 0:
+                child_score, child_window = best_name_match(target, text[:cut.start()])
+                if child_score < NAME_MATCH_MIN:
+                    parents_only = True
+                    name_score, name_window = child_score, child_window
+        if parents_only:
+            has_name_mismatch = True
+            flags.append("The applicant's name was not found as the child's name on this birth certificate "
+                         f"(best match {name_score}%); it appears only in the parents' part. Check whose certificate this is.")
+        elif name_score >= NAME_MATCH_MIN:
             pass
         elif surname_only:
             has_name_mismatch = True
@@ -211,6 +248,13 @@ def validate_text(text: str, expected_name: str = "", expected_student_id: str =
         if not id_found and kind_shows_student_id(kind):
             has_missing = True
             flags.append("Student ID number was not found on the document.")
+
+    # 3b) a COR must be for the current school year
+    years = school_years_in(text) if readable else []
+    current = (current_school_year or "").strip()
+    if kind == "registration" and current and years and current not in years:
+        has_missing = True
+        flags.append(f"This COR is for school year {years[0]}, not the current {current}. Ask for the current COR.")
 
     # 4) wrong document?
     hits = []
@@ -236,6 +280,7 @@ def validate_text(text: str, expected_name: str = "", expected_student_id: str =
             "name_checked": "surname" if surname_only else "full name",
             "keywords_found": hits,
             "text_length": len(text.strip()),
+            "school_years": years,
             **extract_structured_fields(text, kind),
             "review_status": (
                 "needs_manual_review"

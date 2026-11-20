@@ -9,20 +9,75 @@ class Application extends Model
     protected $fillable = [
         'student_id',
         'scholarship_id',
+        'school_year',
         'status',
         'remarks',
         'submitted_at',
         'forwarded_at',
         'enrollment_verified',
         'enrollment_verified_at',
+        // from the agency's approved list (e.g. CHED TES billing file)
+        'agency_control_number',
+        'agency_award_number',
+        'agency_amount',
+        'agency_batch',
+        'agency_list_upload_id',
     ];
 
     protected $casts = [
+        'agency_amount' => 'decimal:2',
         'submitted_at' => 'datetime',
         'forwarded_at' => 'datetime',
         'enrollment_verified' => 'boolean',
         'enrollment_verified_at' => 'datetime',
     ];
+
+    /** A new application belongs to the school year in which it is started (one per program per year). */
+    protected static function booted(): void
+    {
+        static::creating(function (Application $application) {
+            if (empty($application->school_year)) {
+                $application->school_year = $application->created_at
+                    ? self::schoolYearOf($application->created_at)
+                    : ExternalGrantee::currentSchoolYear();
+            }
+        });
+    }
+
+    /** "2026-2027" for any date (a school year starts in August). */
+    public static function schoolYearOf($date): string
+    {
+        $date = \Illuminate\Support\Carbon::parse($date);
+        $start = $date->month >= 8 ? $date->year : $date->year - 1;
+
+        return $start.'-'.($start + 1);
+    }
+
+    /** Rows inserted directly (e.g. the bulk demo seeder) get the school year of their start date. */
+    public static function fillMissingSchoolYears(): int
+    {
+        $count = 0;
+        foreach (self::whereNull('school_year')->get(['id', 'created_at']) as $application) {
+            $application->timestamps = false;
+            $application->update(['school_year' => self::schoolYearOf($application->created_at ?? now())]);
+            $count++;
+        }
+
+        return $count;
+    }
+
+    // Lets the student pages tell this year's application from an old one.
+    protected $appends = ['this_school_year'];
+
+    public function getThisSchoolYearAttribute(): bool
+    {
+        return $this->school_year === ExternalGrantee::currentSchoolYear();
+    }
+
+    public function scopeThisSchoolYear($query)
+    {
+        return $query->where('school_year', ExternalGrantee::currentSchoolYear());
+    }
 
     public function student()
     {

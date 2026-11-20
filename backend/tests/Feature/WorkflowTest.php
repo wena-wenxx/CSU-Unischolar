@@ -78,7 +78,7 @@ class WorkflowTest extends TestCase
 
         $this->postJson('/api/applications', ['scholarship_id' => $program->id])->assertSuccessful();
         $this->postJson('/api/applications', ['scholarship_id' => $program->id])
-            ->assertStatus(422)->assertJsonFragment(['message' => 'You already applied to this scholarship.']);
+            ->assertStatus(422)->assertJsonPath('message', fn ($m) => str_starts_with($m, 'You already applied to this scholarship'));
         $this->assertSame(1, Application::count());
     }
 

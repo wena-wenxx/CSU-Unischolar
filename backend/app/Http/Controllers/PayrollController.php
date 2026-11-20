@@ -144,7 +144,9 @@ class PayrollController extends Controller
             ->values();
 
         $rows = $records->map(function (ScholarRecord $record) use ($data, $period) {
-            $amount = $data['amount'] ?? $record->scholarship?->amount;
+            // An amount typed for this payroll wins; otherwise the amount on the agency's list (e.g. the TES
+            // billing file) for this grantee; otherwise the program's amount.
+            $amount = $data['amount'] ?? ($record->award_amount !== null ? (float) $record->award_amount : $record->scholarship?->amount);
             $reason = null;
 
             if ($record->scholarship?->application_mode === 'agency_direct') {

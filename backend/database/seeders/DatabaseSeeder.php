@@ -12,7 +12,7 @@ use Illuminate\Database\Seeder;
  * Demo logins:
  *   Admin        admin@carsu.edu.ph                             / Admin@12345
  *   Staff        oas.staff@carsu.edu.ph                         / Staff@12345
- *   Test student wenarose.contiga@carsu.edu.ph / Student@12345
+ *   Test student wenarose.contiga@carsu.edu.ph (real, with permission) / Student@12345
  *   Named demo   student1@carsu.edu.ph ... student10@carsu.edu.ph / Student@12345
  *   Bulk demo    s<student id without dash>@demo.carsu.edu.ph   / Student@12345
  *                (e.g. the student 2024-10123 logs in as s202410123@demo.carsu.edu.ph)
@@ -39,6 +39,9 @@ class DatabaseSeeder extends Seeder
             StatusLogSeeder::class,   // step-by-step history of every application
             PortalDemoSeeder::class,  // announcements + one profile correction request
         ]);
+
+        // Bulk applications were inserted directly; give each the school year it was started in.
+        \App\Models\Application::fillMissingSchoolYears();
 
         // Bulk documents were inserted directly; record which student owns each.
         \App\Models\Document::backfillOwners();

@@ -413,7 +413,10 @@ class ExternalGranteeController extends Controller
         }
 
         try {
-            $response = Http::timeout(300)
+            // A scanned CHED form is read page by page with OCR: allow up to 10 minutes.
+            // (On Windows, PHP counts waiting time too, so the script's own limit is raised as well.)
+            @set_time_limit(660);
+            $response = Http::timeout(600)
                 ->attach('file', file_get_contents($file->getRealPath()), $file->getClientOriginalName())
                 ->post(rtrim(config('services.ai.url'), '/').'/read-table');
         } catch (\Throwable $e) {
@@ -428,6 +431,8 @@ class ExternalGranteeController extends Controller
 
         return response()->json([
             'rows' => $response->json('rows') ?? [],
+            // Scanned forms: per-cell confidence and notes, so staff can see which cells to check.
+            'cells' => $response->json('cells'),
             'method' => $response->json('method'),
             'warnings' => $response->json('warnings') ?? [],
             'metadata' => $response->json('metadata') ?? [],

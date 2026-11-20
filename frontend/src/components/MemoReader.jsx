@@ -40,6 +40,10 @@ export default function MemoReader({ form, onApply, onClose }) {
   const [picked, setPicked] = useState({});
 
   async function read() {
+    // Same limits as the server: 10 MB, PDF / Word / TXT / photo.
+    if (file && file.size > 10 * 1024 * 1024) return toast.error("The memo file is larger than 10 MB. Choose a smaller file.");
+    if (file && file.size === 0) return toast.error("The memo file is empty.");
+    if (file && !/\.(pdf|docx|txt|png|jpe?g)$/i.test(file.name)) return toast.error("Choose a PDF, Word (.docx), TXT, PNG or JPG file.");
     setBusy(true);
     try {
       const body = new FormData();
@@ -123,7 +127,7 @@ export default function MemoReader({ form, onApply, onClose }) {
             onChange={(event) => setText(event.target.value)}
             placeholder="Paste the eligibility part of the memo here…"
           />
-          <label htmlFor="memo-file">…or choose the memo file (PDF, Word .docx, TXT or a photo)</label>
+          <label htmlFor="memo-file">…or choose the memo file (PDF, Word .docx, TXT or a photo, up to 10 MB)</label>
           <input id="memo-file" type="file" accept=".pdf,.docx,.txt,.png,.jpg,.jpeg" onChange={(event) => setFile(event.target.files?.[0] || null)} />
         </div>
       ) : (

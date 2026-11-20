@@ -9,14 +9,24 @@ import { useConfirm } from "../../lib/confirm";
 import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
+import ListPreview from "../../components/ListPreview";
 
 const RESULT_LABELS = {
   approved: ["Approved", "success"],
   created: ["New approved application", "success"],
   already: ["Already approved", "neutral"],
   unmatched: ["Unmatched", "warning"],
+  check: ["Check: name differs", "warning"],
   error: ["Error", "danger"],
 };
+
+// "TES", "CMSP"... read from the file, compared with the program chosen.
+function programMismatch(detected, program) {
+  if (!detected || !program) return false;
+  const want = String(detected).toUpperCase();
+  const have = `${program.short_name || ""} ${program.name || ""}`.toUpperCase();
+  return !have.includes(want);
+}
 
 // Guess which column holds what, from the header names.
 function guessColumn(headers, patterns) {
@@ -40,6 +50,9 @@ export default function AgencyListsPage() {
   const [agency, setAgency] = useState("");
   const [fileName, setFileName] = useState("");
   const [rows, setRows] = useState([]);
+  const [cells, setCells] = useState(null);
+  const [fileWarnings, setFileWarnings] = useState([]);
+  const [method, setMethod] = useState("");
   const [hasHeader, setHasHeader] = useState(true);
   const [idColumn, setIdColumn] = useState("");
   const [dateColumn, setDateColumn] = useState("");
@@ -111,13 +124,15 @@ export default function AgencyListsPage() {
     setReading(true);
 
     try {
-      const { rows: parsed, warnings, metadata: detected } = await readListFile(file);
+      const { rows: parsed, cells: cellInfo, warnings, metadata: detected, method: how } = await readListFile(file);
       if (parsed.length === 0) {
         toast.error("The file is empty.");
         return;
       }
-      warnings.forEach((warning) => toast.info(warning));
+      setFileWarnings(warnings);
+      setMethod(how);
       setRows(parsed);
+      setCells(cellInfo);
       setFileName(file.name);
       setMetadata(detected || {});
       setConfirmedMismatch(false);
@@ -125,11 +140,12 @@ export default function AgencyListsPage() {
         ...old,
         school_year: detected?.academic_year || old.school_year || defaults.current_school_year || "",
         semester: detected?.semester || old.semester || defaults.current_semester || "",
-        batch: detected?.batch || old.batch || "",
+        batch: detected?.batch ? (/^batch/i.test(detected.batch) ? detected.batch : `Batch ${detected.batch}`) : old.batch || "",
         campus: detected?.campus || old.campus || "",
         reference_number: detected?.reference_number || "",
         list_date: detected?.date || "",
-        expected_count: detected?.row_count ? String(detected.row_count) : "",
+        // what the FILE says (printed total ÷ amount), not how many rows were read
+        expected_count: detected?.expected_count ? String(detected.expected_count) : "",
         expected_total: detected?.printed_total != null ? String(detected.printed_total) : "",
       }));
       const head = parsed[0].map((h) => String(h).trim());
@@ -143,8 +159,23 @@ export default function AgencyListsPage() {
     }
   }
 
+  // A cell corrected by staff in the preview.
+  function editCell(r, c, value) {
+    const line = r + (hasHeader ? 1 : 0);
+    setRows((old) => old.map((row, i) => (i === line ? row.map((cell, j) => (j === c ? value : cell)) : row)));
+    setCells((old) => {
+      if (!old) return old;
+      return old.map((row, i) =>
+        i === line ? (row || []).map((info, j) => (j === c ? { ...info, check: false, edited: true } : info)) : row
+      );
+    });
+  }
+
   function reset() {
     setRows([]);
+    setCells(null);
+    setFileWarnings([]);
+    setMethod("");
     setFileName("");
     setIdColumn("");
     setDateColumn("");
@@ -153,16 +184,18 @@ export default function AgencyListsPage() {
     setFileKey((k) => k + 1);
   }
 
-  async function process() {
+  async function process(confirmedDuplicate = false) {
     const program = scholarships.find((s) => String(s.id) === scholarshipId);
 
-    const ok = await confirm({
-      title: `Process ${dataRows.length} rows?`,
-      message: `Students on this list will be marked approved for "${program?.name}". Applications that are rejected, drafts, or students who already hold another active scholarship are NOT changed; they are listed as errors for you to check.`,
-      confirmLabel: "Process list",
-    });
+    if (!confirmedDuplicate) {
+      const ok = await confirm({
+        title: `Process ${dataRows.length} rows?`,
+        message: `Students on this list will be marked approved for "${program?.name}". Applications that are rejected, drafts, students who already hold another active scholarship, and rows whose name does not match the Student ID are NOT changed; they are listed for you to check.${cellsLeft ? ` ${cellsLeft} highlighted cell(s) were not checked yet.` : ""}`,
+        confirmLabel: "Process list",
+      });
 
-    if (!ok) return;
+      if (!ok) return;
+    }
 
     setProcessing(true);
 
@@ -174,6 +207,11 @@ export default function AgencyListsPage() {
         return index >= 0 ? index : null;
       };
       const valueAt = (row, index) => index === null ? null : (row[index] || "").trim() || null;
+      // "10,000.00" -> 10000; anything that is not a number (an unreadable scan) -> null
+      const money = (text) => {
+        const plain = String(text ?? "").replaceAll(",", "").trim();
+        return /^\d+(\.\d+)?$/.test(plain) ? plain : null;
+      };
       const payload = {
         scholarship_id: Number(scholarshipId),
         agency_name: agency.trim(),
@@ -182,11 +220,12 @@ export default function AgencyListsPage() {
         expected_count: details.expected_count === "" ? null : Number(details.expected_count),
         expected_total: details.expected_total === "" ? null : Number(details.expected_total),
         confirmed_mismatch: confirmedMismatch,
+        confirmed_duplicate: confirmedDuplicate,
         rows: dataRows.map((row, i) => ({
           row: firstDataLine + i,
           student_id: valueAt(row, Number(idColumn)),
           approval_date: dateColumn === "" ? null : valueAt(row, Number(dateColumn)),
-          amount: valueAt(row, amountColumn)?.replaceAll(",", "") || null,
+          amount: money(valueAt(row, amountColumn)),
           control_number: valueAt(row, fieldColumn(["Control Number"])),
           award_number: valueAt(row, fieldColumn(["TES Award Number"])),
           last_name: valueAt(row, fieldColumn(["Last Name"])),
@@ -200,7 +239,7 @@ export default function AgencyListsPage() {
           phone: valueAt(row, fieldColumn(["Phone Number", "Phone", "Mobile Number"])),
           batch: valueAt(row, fieldColumn(["TES Batch", "Batch"])),
           pwd: valueAt(row, fieldColumn(["PWD", "Person with Disability"])),
-          total_amount: valueAt(row, fieldColumn(["TOTAL AMOUNT", "Total Amount"]))?.replaceAll(",", "") || null,
+          total_amount: money(valueAt(row, fieldColumn(["TOTAL AMOUNT", "Total Amount"]))),
         })),
       };
 
@@ -210,6 +249,16 @@ export default function AgencyListsPage() {
       reset();
       load();
     } catch (err) {
+      if (err.response?.status === 409 && !confirmedDuplicate) {
+        setProcessing(false);
+        const again = await confirm({
+          title: "This list was already processed",
+          message: `${err.response.data?.message || ""} Process it again?`,
+          confirmLabel: "Process again",
+        });
+        if (again) return process(true);
+        return;
+      }
       toast.error(errMsg(err, "Unable to process the list."));
     } finally {
       setProcessing(false);
@@ -218,7 +267,7 @@ export default function AgencyListsPage() {
 
   function downloadTemplate() {
     downloadCSV("agency-approved-list-template.csv", [
-      { Student_ID: "2026-00001", Last_Name: "Binag", First_Name: "Gleslimie", Approval_Date: "2026-10-15" },
+      { Student_ID: "2026-00001", Last_Name: "Navarro", First_Name: "Juan", Approval_Date: "2026-10-15" },
     ]);
   }
 
@@ -229,6 +278,10 @@ export default function AgencyListsPage() {
   const countMismatch = details.expected_count !== "" && Number(details.expected_count) !== dataRows.length;
   const amountSum = dataRows.reduce((sum, row) => sum + (Number(String(row[amountColumn] || "").replaceAll(",", "")) || 0), 0);
   const amountMismatch = details.expected_total !== "" && Math.abs(amountSum - Number(details.expected_total)) > 0.01;
+  const chosenProgram = scholarships.find((s) => String(s.id) === scholarshipId);
+  const wrongProgram = programMismatch(metadata.program, chosenProgram);
+  const pastYear = details.school_year && defaults.current_school_year && details.school_year < defaults.current_school_year;
+  const cellsLeft = (cells || []).slice(hasHeader ? 1 : 0).reduce((sum, row) => sum + (row || []).filter((c) => c?.check).length, 0);
 
   return (
     <div>
@@ -279,6 +332,31 @@ export default function AgencyListsPage() {
       {rows.length > 0 && (
         <section className="card">
           <h2>2. List details</h2>
+          {method && method.startsWith("ocr") && (
+            <p className="muted small">
+              This file is a scan, so it was read with OCR. Check the highlighted cells in step 3 against the paper.
+            </p>
+          )}
+          {(fileWarnings.length > 0 || wrongProgram || pastYear) && (
+            <div className="alert alert-warning">
+              <strong>Check before processing:</strong>
+              <ul className="plain-list">
+                {wrongProgram && (
+                  <li>
+                    The file looks like a <strong>{metadata.program}</strong> list, but you chose “{chosenProgram?.name}”.
+                  </li>
+                )}
+                {pastYear && (
+                  <li>
+                    Academic year {details.school_year} is a past year (current: {defaults.current_school_year}).
+                  </li>
+                )}
+                {fileWarnings.map((warning, i) => (
+                  <li key={i}>{warning}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="form-grid">
             {[
               ["school_year", "Academic year", "select"],
@@ -315,13 +393,13 @@ export default function AgencyListsPage() {
                 ) : (
                   <input id={`list-${key}`} type={type} value={details[key]} onChange={(event) => setDetails({ ...details, [key]: event.target.value })} />
                 )}
-                {metadata[key === "school_year" ? "academic_year" : key === "reference_number" ? "reference_number" : key === "list_date" ? "date" : key === "campus" ? "campus" : key === "expected_total" ? "printed_total" : key === "expected_count" ? "row_count" : key] != null && (
+                {metadata[key === "school_year" ? "academic_year" : key === "reference_number" ? "reference_number" : key === "list_date" ? "date" : key === "campus" ? "campus" : key === "expected_total" ? "printed_total" : key === "expected_count" ? "expected_count" : key] != null && (
                   <span className="muted small">Detected from file</span>
                 )}
               </div>
             ))}
           </div>
-          <div className={`notice ${countMismatch || amountMismatch ? "notice-warning" : "notice-success"}`}>
+          <div className={`alert ${countMismatch || amountMismatch ? "alert-warning" : "alert-success"}`}>
             Rows read: {dataRows.length} vs expected: {details.expected_count || "—"} · Summed amount: {amountSum.toLocaleString(undefined, { minimumFractionDigits: 2 })} vs printed: {details.expected_total || "—"}
             {countMismatch || amountMismatch ? (
               <label className="choice"><input type="checkbox" checked={confirmedMismatch} onChange={(event) => setConfirmedMismatch(event.target.checked)} /> I reviewed the mismatch and want to continue.</label>
@@ -362,41 +440,23 @@ export default function AgencyListsPage() {
           </div>
 
           <p className="muted small">
-            {fileName}: {dataRows.length} student row{dataRows.length === 1 ? "" : "s"}. First rows:
+            {fileName}: {dataRows.length} student row{dataRows.length === 1 ? "" : "s"}.
           </p>
 
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>Row</th>
-                  {headers.map((h, i) => (
-                    <th key={i} className={String(i) === idColumn ? "col-picked" : ""}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {dataRows.slice(0, 5).map((row, r) => (
-                  <tr key={r}>
-                    <td>{firstDataLine + r}</td>
-                    {headers.map((_, i) => (
-                      <td key={i} className={String(i) === idColumn ? "col-picked" : ""}>
-                        {row[i]}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ListPreview
+            headers={headers}
+            rows={dataRows}
+            cells={cells ? (hasHeader ? cells.slice(1) : cells) : null}
+            firstLine={firstDataLine}
+            pickedColumn={idColumn}
+            onEdit={editCell}
+          />
 
           <div className="button-row">
             <button className="button button-secondary" onClick={reset}>
               Choose another file
             </button>
-            <button className="button button-primary" onClick={process} disabled={!ready || processing || ((countMismatch || amountMismatch) && !confirmedMismatch)}>
+            <button className="button button-primary" onClick={() => process()} disabled={!ready || processing || ((countMismatch || amountMismatch) && !confirmedMismatch)}>
               {processing ? "Processing..." : `4. Process ${dataRows.length} rows`}
             </button>
           </div>
@@ -441,7 +501,7 @@ function Summary({ upload }) {
 
 function Details({ details }) {
   // Problems first, so staff see what needs attention.
-  const order = { error: 0, unmatched: 1, created: 2, approved: 3, already: 4 };
+  const order = { error: 0, check: 1, unmatched: 2, created: 3, approved: 4, already: 5 };
   const sorted = [...(details || [])].sort((a, b) => order[a.result] - order[b.result] || a.row - b.row);
 
   return (

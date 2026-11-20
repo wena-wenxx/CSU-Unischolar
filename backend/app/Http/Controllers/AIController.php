@@ -78,6 +78,8 @@ class AIController extends Controller
                         // Parents' documents (e.g. ITR) only show the surname.
                         'expected_last_name' => $student->last_name,
                         'document_label' => $documentLabel,
+                        // A COR from another school year is flagged.
+                        'current_school_year' => \App\Models\ExternalGrantee::currentSchoolYear(),
                     ]
                 );
         } catch (\Throwable $e) {

@@ -126,7 +126,13 @@ export function downloadCSV(filename, rows) {
     headers.join(","),
     ...rows.map((row) =>
       headers
-        .map((header) => `"${String(row[header] ?? "").replaceAll('"', '""')}"`)
+        .map((header) => {
+          const value = String(row[header] ?? "");
+          // Excel drops leading zeros (control no. 00001, phone 0917...) and turns long numbers into
+          // 1.72E+11. Writing ="00001" keeps them exactly as text.
+          if (/^0\d+$/.test(value) || /^\d{12,}$/.test(value)) return `"=""${value}"""`;
+          return `"${value.replaceAll('"', '""')}"`;
+        })
         .join(",")
     ),
   ].join("\n");

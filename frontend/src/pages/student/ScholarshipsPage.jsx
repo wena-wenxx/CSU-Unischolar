@@ -8,6 +8,8 @@ import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 
+const FINISHED = ["approved", "rejected"];
+
 const SORTS = {
   deadline: "Closing soonest",
   amount: "Highest amount",
@@ -47,7 +49,10 @@ export default function ScholarshipsPage() {
 
   if (loading) return <Loading />;
 
-  const applicationFor = (scholarshipId) => myApplications.find((a) => a.scholarship_id === scholarshipId);
+  // This school year's application, or an older one that is still being processed (an old finished one
+  // does not stop the student from applying again this year).
+  const applicationFor = (scholarshipId) =>
+    myApplications.find((a) => a.scholarship_id === scholarshipId && (a.this_school_year || !FINISHED.includes(a.status)));
 
   const inCategory = scholarships.filter((s) => category === "all" || s.category === category);
   const searchText = search.trim().toLowerCase();

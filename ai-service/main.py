@@ -71,6 +71,8 @@ async def validate_document(
     document_label: str = Form(""),
     # Older name for document_label, still accepted.
     document_type: str = Form(""),
+    # e.g. "2026-2027": a COR for another school year is flagged.
+    current_school_year: str = Form(""),
 ):
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file supplied.")
@@ -126,6 +128,7 @@ async def validate_document(
         expected_student_id=expected_student_id,
         document_label=label,
         expected_last_name=expected_last_name,
+        current_school_year=current_school_year,
     )
 
     extracted_data = result["extracted_data"]
@@ -223,7 +226,15 @@ async def read_table_endpoint(file: UploadFile = File(...)):
     try:
         result = table_rows(temp_path, file.filename)
     except Exception as e:
-        raise HTTPException(status_code=422, detail=f"The file could not be read ({type(e).__name__}: {e}).")
+        text = str(e)
+        if "password" in text.lower() or "encrypt" in text.lower():
+            detail = "The PDF is password-protected. Ask for a copy without a password."
+        elif suffix == ".pdf":
+            detail = ("The PDF could not be opened: it may be damaged, or it is not really a PDF. Open it on your "
+                      f"computer to check, or ask for a new copy. ({type(e).__name__}: {text[:150]})")
+        else:
+            detail = f"The file could not be read ({type(e).__name__}: {text[:150]})."
+        raise HTTPException(status_code=422, detail=detail)
     finally:
         try:
             os.remove(temp_path)

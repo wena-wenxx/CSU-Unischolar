@@ -110,7 +110,7 @@ export function appliedLabel(status) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-// "Binag, Gleslimie" from a student object.
+// "Contiga, Wena Rose" from a student object.
 export function studentLabel(student) {
   if (!student) return "—";
   return `${student.last_name}, ${student.first_name}`;
