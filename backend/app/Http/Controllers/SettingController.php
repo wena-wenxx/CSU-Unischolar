@@ -25,7 +25,7 @@ class SettingController extends Controller
     }
 
     /*
-    | GET /office-contact  (no login needed; round 12)
+    | GET /office-contact  (no login needed)
     | Only the OAS public contact details, for the login page
     | ("Forgot your password?" / "Need help?").
     */
@@ -38,6 +38,14 @@ class SettingController extends Controller
             'oas_location' => $values['oas_location'],
             'oas_email' => $values['oas_email'],
             'oas_phone' => $values['oas_phone'],
+            // Demo accounts for testing; only when DEMO_LOGIN_ACCOUNTS=true in .env.
+            'demo_accounts' => config('demo.show_on_login') ? [
+                ['role' => 'OAS staff', 'email' => 'oas.staff@carsu.edu.ph', 'password' => 'Staff@12345'],
+                ['role' => 'Admin', 'email' => 'admin@carsu.edu.ph', 'password' => 'Admin@12345'],
+                ['role' => 'Student: '.config('demo.test_student.first_name').' '.config('demo.test_student.last_name'),
+                    'email' => config('demo.test_student.email'), 'password' => 'Student@12345'],
+                ['role' => 'Student: Juan Navarro (fictional)', 'email' => 'student1@carsu.edu.ph', 'password' => 'Student@12345'],
+            ] : [],
         ]);
     }
 }

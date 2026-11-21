@@ -14,6 +14,8 @@ import StatusBadge from "../../components/StatusBadge";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 import SheetTabs from "../../components/SheetTabs";
+import SearchField from "../../components/SearchField";
+import { matchesWords, searchWords } from "../../lib/search";
 import { byLastName, lastFirst, programTabs } from "../../lib/programs";
 
 /*
@@ -93,7 +95,7 @@ export default function StaffPayrollPage() {
     load();
   }, [load]);
 
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const words = searchWords(query);
 
   const filtered = payroll.filter((item) => {
     const record = item.scholar_record;
@@ -101,7 +103,7 @@ export default function StaffPayrollPage() {
     if (periodFilter !== "all" && !same(item.period, periodFilter)) return false;
     if (atmFilter !== "all" && atmGroup(record) !== atmFilter) return false;
     const haystack = `${lastFirst(record?.student)} ${record?.student?.student_id || ""}`.toLowerCase();
-    return words.every((word) => haystack.includes(word));
+    return matchesWords(haystack, words);
   });
   // One tab per program (like sheets in Excel); each list is A to Z.
   const tabs = programTabs(filtered, (item) => item.scholar_record?.scholarship);
@@ -208,16 +210,7 @@ export default function StaffPayrollPage() {
         </div>
 
         <div className="inline-form table-search payroll-filters">
-          <label htmlFor="payroll-search" className="sr-only">
-            Search
-          </label>
-          <input
-            id="payroll-search"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search name or student ID"
-          />
+          <SearchField id="payroll-search" label="Search" value={query} onChange={setQuery} placeholder="Search name or student ID" />
 
           <label htmlFor="payroll-period-filter" className="sr-only">
             Period

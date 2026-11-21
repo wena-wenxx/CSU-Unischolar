@@ -58,8 +58,10 @@ class DataBankController extends Controller
             ->when($words, function ($query) use ($words) {
                 foreach ($words as $word) {
                     $like = '%'.$word.'%';
-                    $query->where(function ($w) use ($like) {
+                    $digits = preg_replace('/\D/', '', $word);
+                    $query->where(function ($w) use ($like, $digits) {
                         $w->where('student_id', 'like', $like)
+                            ->when(strlen($digits) >= 4, fn ($d) => $d->orWhereRaw("replace(student_id, '-', '') like ?", ['%'.$digits.'%']))
                             ->orWhere('first_name', 'like', $like)
                             ->orWhere('middle_name', 'like', $like)
                             ->orWhere('last_name', 'like', $like)

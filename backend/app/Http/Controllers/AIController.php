@@ -103,6 +103,15 @@ class AIController extends Controller
 
         $result = $response->json();
 
+        // An old certificate (e.g. an indigency issued two years ago) is flagged for staff.
+        $outdated = \App\Support\DocumentAge::outdatedFlag(
+            $document->typeName(),
+            (array) ($result['extracted_data']['dates'] ?? [])
+        );
+        if ($outdated) {
+            $result['flags'] = array_merge((array) ($result['flags'] ?? []), [$outdated]);
+        }
+
         $validation = ValidationResult::updateOrCreate(
             ['document_id' => $document->id],
             [
@@ -124,6 +133,7 @@ class AIController extends Controller
         if (($result['ocr_status'] ?? 'ok') !== 'ok') {
             $status = 'needs_review';
         } elseif (
+            $outdated ||
             !$validation->is_complete ||
             $validation->has_name_mismatch ||
             $validation->has_missing_information ||

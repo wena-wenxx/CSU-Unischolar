@@ -10,7 +10,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 
 /*
-| php artisan demo:approved-lists   (round 12)
+| php artisan demo:approved-lists
 |
 | Writes SAMPLE "approved by the agency" lists to test Staff -> Approved
 | Lists with each file type the page accepts:

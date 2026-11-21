@@ -1,5 +1,5 @@
 /*
-  Video guides on the Help page (round 17). Recorded from the real system with fictional demo data:
+  Video guides on the Help page. Recorded from the real system with fictional demo data:
   a gold arrow and a caption show each step. Files: frontend/public/tutorials/*.mp4 (no sound; captions are in the video).
   Chapters: seconds from the start -> title (clicking one jumps there).
   To re-record after the screens change, see documentation/TUTORIAL_VIDEOS.md.

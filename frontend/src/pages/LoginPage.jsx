@@ -168,6 +168,29 @@ export default function LoginPage() {
           </form>
 
 
+          {contact?.demo_accounts?.length > 0 && (
+            <details className="login-demo">
+              <summary>Demo accounts (testing only)</summary>
+              <ul>
+                {contact.demo_accounts.map((account) => (
+                  <li key={account.email}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmail(account.email);
+                        setPassword(account.password);
+                      }}
+                    >
+                      <strong>{account.role}</strong>
+                      <span>{account.email}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <small className="muted">Click one to fill in the e-mail and password.</small>
+            </details>
+          )}
+
           <p className="login-card-footer">{CARD_FOOTER}</p>
         </section>
 

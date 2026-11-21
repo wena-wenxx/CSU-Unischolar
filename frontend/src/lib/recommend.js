@@ -59,7 +59,7 @@ export const SCORE_GROUPS = [
   ["follow", "Needs follow-up (below 70%)", "follow_up"],
 ];
 
-// AI field fit (round 12): ranks and explains only; the rules decide eligibility.
+// AI field fit: ranks and explains only; the rules decide eligibility.
 export const FIT_LEVELS = {
   high: ["Matches the field", "success"],
   medium: ["Close to the field", "neutral"],
@@ -110,7 +110,7 @@ export function appliedLabel(status) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-// "Contiga, Wena Rose" from a student object.
+// "Navarro, Juan" from a student object.
 export function studentLabel(student) {
   if (!student) return "—";
   return `${student.last_name}, ${student.first_name}`;

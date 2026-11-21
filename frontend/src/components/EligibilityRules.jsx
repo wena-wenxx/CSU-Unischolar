@@ -3,7 +3,7 @@ import MemoReader from "./MemoReader";
 
 /*
   Eligibility rules of one scholarship, used by AI Recommendations.
-  "Read the program memo with AI" fills them in from a memo (round 12);
+  "Read the program memo with AI" fills them in from a memo;
   staff check every value and press Save.
   Empty = no rule. Students are checked against every rule that is set;
   each rule is a "must-have".

@@ -84,6 +84,7 @@ class ExternalGranteeController extends Controller
                     $like = '%'.$word.'%';
                     $q->where(fn ($w) => $w->where('extracted_name', 'like', $like)
                         ->orWhere('extracted_student_id', 'like', $like)
+                        ->when(strlen(preg_replace('/\D/', '', $word)) >= 4, fn ($d) => $d->orWhereHas('student', fn ($s) => $s->whereRaw("replace(student_id, '-', '') like ?", ['%'.preg_replace('/\D/', '', $word).'%'])))
                         ->orWhereHas('student', fn ($s) => $s->where('student_id', 'like', $like)
                             ->orWhere('first_name', 'like', $like)
                             ->orWhere('last_name', 'like', $like)));

@@ -52,7 +52,7 @@ DOC_KINDS = [
 
 
 def normalize(text: str) -> str:
-    """UPPERCASE, remove punctuation, collapse spaces. 'Contiga, Wena' -> 'CONTIGA WENA'"""
+    """UPPERCASE, remove punctuation, collapse spaces. 'Navarro, Juan' -> 'NAVARRO JUAN'"""
     text = (text or "").upper()
     text = re.sub(r"[^A-Z0-9\s]", " ", text)
     return re.sub(r"\s+", " ", text).strip()
@@ -65,9 +65,9 @@ def best_name_match(expected_name: str, text: str):
     """
     Slide a small window of words across the document text and keep the best
     fuzzy score.
-    - Word order does not matter ('CONTIGA WENA' == 'WENA CONTIGA').
-    - A middle name on the document is allowed ('WENA ROSE CONTIGA' still
-      matches 'Wena Contiga'): we also try dropping extra words from the window.
+    - Word order does not matter ('NAVARRO JUAN' == 'JUAN NAVARRO').
+    - A middle name on the document is allowed ('JUAN LOPEZ NAVARRO' still
+      matches 'Juan Navarro'): we also try dropping extra words from the window.
     Returns (score 0-100, best_window_text).
     """
     expected = normalize(expected_name)
@@ -130,6 +130,9 @@ DATE_PATTERNS = (
     r"\s+\d{1,2},?\s+\d{4}\b",
     r"\b\d{1,2}[/-]\d{1,2}[/-]\d{4}\b",
     r"\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b",
+    r"\b\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b",
+    # "this 7th day of July, 2022" (barangay, BIR and school certifications)
+    r"\b\d{1,2}(?:st|nd|rd|th|[^\s\d]{1,2})?\s+day\s+of\s+(?:January|February|March|April|May|June|July|August|September|October|November|December),?\s+\d{4}\b",
 )
 
 AUTHORITY_PATTERNS = (
@@ -154,7 +157,7 @@ def extract_structured_fields(text: str, kind: str | None) -> dict:
             authorities.append(label)
 
     income_match = re.search(
-        r"\b(?:taxable income|annual income|gross income|family income)\b[^0-9]*(PHP|₱)?\s*([\d,]+(?:\.\d{2})?)",
+        r"\b(?:taxable income|annual income|gross income|family income|income of)\b[^0-9]{0,15}(PHP|₱|P)?\s*([\d,]+(?:\.\d{2})?)",
         source,
         re.I,
     )
@@ -179,6 +182,30 @@ def school_years_in(text: str) -> list:
         if b == a + 1:
             found.append(f"{a}-{b}")
     return sorted(set(found), reverse=True)
+
+
+# A parent's document (BIR certification, ITR) often names the child it was issued for:
+# "... for scholarship purposes of his/her son/daughter GLESLIMIE B. BINAG".
+RELATION_WORDS = {"SON", "DAUGHTER", "CHILD", "GUARDIAN", "HIS", "HER", "OF", "THE", "MY", "AND", "OR"}
+
+
+def child_named_on_parent_document(text: str):
+    """The child's name written on a parent's document, or None. Used to spot a sibling's copy."""
+    words = normalize(text).split()
+    for i, word in enumerate(words):
+        if word not in {"SON", "DAUGHTER", "CHILD", "GUARDIAN"}:
+            continue
+        j = i + 1
+        while j < len(words) and words[j] in RELATION_WORDS:
+            j += 1
+        name = []
+        for w in words[j:j + 4]:
+            if not w.isalpha() or w in {"DONE", "THIS", "ISSUED", "GIVEN", "FOR", "WHO", "IS", "A"}:
+                break
+            name.append(w)
+        if len([w for w in name if len(w) > 1]) >= 2:
+            return " ".join(name)
+    return None
 
 
 # On a birth certificate the parents' names come after these words; the child's own name comes first.
@@ -229,6 +256,14 @@ def validate_text(text: str, expected_name: str = "", expected_student_id: str =
             has_name_mismatch = True
             flags.append("The applicant's name was not found as the child's name on this birth certificate "
                          f"(best match {name_score}%); it appears only in the parents' part. Check whose certificate this is.")
+        elif surname_only and name_score >= NAME_MATCH_MIN:
+            # The surname is there. If the document also names the child it was issued for, it must be
+            # the applicant (a brother's or sister's copy has the same surname).
+            child = child_named_on_parent_document(text)
+            if child and best_name_match(expected_name, child)[0] < NAME_SIMILAR_MIN:
+                has_name_mismatch = True
+                flags.append(f"This parent's document was issued for '{child}', not for the applicant. "
+                             "It may belong to a brother or sister; check it.")
         elif name_score >= NAME_MATCH_MIN:
             pass
         elif surname_only:

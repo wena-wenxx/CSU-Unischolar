@@ -6,6 +6,8 @@ import { startApplication } from "../../lib/applications";
 import { useToast } from "../../lib/toast";
 import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
+import SearchField from "../../components/SearchField";
+import { matchesWords, searchWords } from "../../lib/search";
 import Loading from "../../components/Loading";
 
 const FINISHED = ["approved", "rejected"];
@@ -55,18 +57,18 @@ export default function ScholarshipsPage() {
     myApplications.find((a) => a.scholarship_id === scholarshipId && (a.this_school_year || !FINISHED.includes(a.status)));
 
   const inCategory = scholarships.filter((s) => category === "all" || s.category === category);
-  const searchText = search.trim().toLowerCase();
+  const words = searchWords(search);
   const matchesSearch = (scholarship) => {
-    if (!searchText) return true;
+    if (!words.length) return true;
 
     const requirementText = (scholarship.requirements || [])
       .flatMap((requirement) => [requirement.name, requirement.description])
       .filter(Boolean)
       .join(" ");
 
-    return [scholarship.name, scholarship.provider, scholarship.description, requirementText]
+    return matchesWords([scholarship.name, scholarship.short_name, scholarship.provider, scholarship.description, requirementText]
       .filter(Boolean)
-      .some((value) => String(value).toLowerCase().includes(searchText));
+      .join(" "), words);
   };
   const matchingCategory = inCategory.filter(matchesSearch);
   // Agency-direct programs are listed once, compactly, under the cards.
@@ -96,18 +98,7 @@ export default function ScholarshipsPage() {
       <div className="card filter-card">
         <div className="search-filter">
           <label htmlFor="scholarship-search">Search scholarships</label>
-          <input
-            id="scholarship-search"
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Name, provider, or keyword"
-          />
-          {search && (
-            <button type="button" className="button button-small button-secondary" onClick={() => setSearch("")}>
-              Clear
-            </button>
-          )}
+          <SearchField id="scholarship-search" label="Search scholarships" value={search} onChange={setSearch} placeholder="Name, provider, or keyword" />
         </div>
 
         <div className="filter-row" role="group" aria-label="Program type">

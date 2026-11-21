@@ -2,7 +2,7 @@
 
 /* =========================================================
    CARAGA STATE UNIVERSITY — ScholarGuide theme
-   All system text uses Segoe UI Historic.
+   All system text uses Segoe UI (Windows), with the phone/Mac system font as fallback.
 
    SYSTEM VARIABLES (change the look of the whole system here):
      --primary-color  Deep CSU Forest Green   #004d26
@@ -84,8 +84,8 @@
   --print-rule: #bbbbbb;
   --print-border: #cccccc;
 
-  --font-heading: "Segoe UI Historic", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-body: "Segoe UI Historic", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-heading: "Segoe UI", "Segoe UI Historic", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Segoe UI", "Segoe UI Historic", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
 
   --radius: var(--radius-system);
   --shadow: 0 18px 50px rgba(var(--primary-dark-rgb), 0.14);
@@ -104,7 +104,7 @@
 *,
 *::before,
 *::after {
-  font-family: "Segoe UI Historic", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  font-family: "Segoe UI", "Segoe UI Historic", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif !important;
 }
 
 body {
@@ -4697,7 +4697,7 @@ tbody tr:nth-child(even) {
   }
 }
 
-/* Profile photo (round 12) */
+/* Profile photo */
 .avatar-photo {
   overflow: hidden;
   padding: 0;
@@ -5741,4 +5741,96 @@ tr.group-cont td {
 
 .plain-list li + li {
   margin-top: 2px;
+}
+
+/* ---------- Search field (same on every list) ---------- */
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.search-field-box {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.search-field-box input {
+  width: 100%;
+  padding-left: 34px;
+}
+
+.search-field-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.search-field .button {
+  flex: none;
+}
+
+/* CSU e-mail under the name and ID in the sidebar (like the student portal). */
+.profile-text .profile-email {
+  text-transform: none !important;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted) !important;
+  max-width: 100%;
+}
+
+/* Demo accounts on the login page (only when DEMO_LOGIN_ACCOUNTS=true). */
+.login-demo {
+  margin-top: 14px;
+  text-align: left;
+  font-size: 13px;
+}
+
+.login-demo summary {
+  cursor: pointer;
+  color: var(--csu-green);
+  font-weight: 600;
+}
+
+.login-demo ul {
+  list-style: none;
+  margin: 8px 0 4px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.login-demo li button {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  color: var(--text-strong);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.login-demo li button:hover,
+.login-demo li button:focus-visible {
+  border-color: var(--csu-green);
+  background: var(--csu-green-tint);
+}
+
+.login-demo li span {
+  color: var(--text-muted);
+  font-size: 12px;
 }

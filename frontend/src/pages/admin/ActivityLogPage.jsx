@@ -120,11 +120,16 @@ export default function ActivityLogPage() {
             type="search"
             value={filters.q}
             onChange={(event) => change("q", event.target.value)}
-            placeholder="Search a name or words (e.g. Contiga, payroll)"
+            placeholder="Search a name or words (e.g. Navarro, payroll)"
           />
           <button className="button button-primary" disabled={loading}>
             Search
           </button>
+          {filters.q && (
+            <button type="button" className="button button-secondary" onClick={() => { const next = { ...filters, q: "" }; setFilters(next); fetchPage(1, next); }}>
+              Clear
+            </button>
+          )}
         </form>
 
         <div className="inline-form bank-filters">

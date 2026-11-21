@@ -389,7 +389,7 @@ function AccountModal({ initial, isStudent, isSelf, onClose, onSaved }) {
             </div>
             <div>
               <label htmlFor="acc-sid">Student ID</label>
-              <input id="acc-sid" value={form.student_id} onChange={field("student_id")} required maxLength={50} placeholder="e.g. 221-00462" />
+              <input id="acc-sid" value={form.student_id} onChange={field("student_id")} required maxLength={50} placeholder="e.g. 2026-00001" />
             </div>
             <div>
               <label htmlFor="acc-email">E-mail (login)</label>

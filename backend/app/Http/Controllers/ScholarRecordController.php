@@ -102,13 +102,13 @@ class ScholarRecordController extends Controller
 
         if ($application->status !== 'approved') {
             return response()->json([
-                'message' => 'Only approved applications can become scholar records.'
+                'message' => 'Only approved applications can become scholar records. First record the agency\'s approval: Applications → open the student → Approved by agency (or upload the agency\'s list in Approved Lists).'
             ], 422);
         }
 
         if (!$application->enrollment_verified) {
             return response()->json([
-                'message' => 'Verify this student\'s enrollment before tagging them as a grantee.'
+                'message' => 'Verify this student\'s enrollment before tagging them as a grantee: Applications → open the student → Verify enrollment (or Enrollment → Verify All Enrollments).'
             ], 422);
         }
 
@@ -154,7 +154,7 @@ class ScholarRecordController extends Controller
         ActivityLog::record($request->user(), 'grantee.tagged', 'Tagged '.trim(($application->student?->first_name ?? '').' '.($application->student?->last_name ?? '')).' as grantee of '.$application->scholarship?->name.'.', $record);
 
         return response()->json([
-            'message' => 'Student tagged as grantee.',
+            'message' => 'Student tagged as grantee. Next: Payroll → Prepare payroll when the stipend period starts.',
             'scholar_record' => $record->load([
                 'student',
                 'scholarship'

@@ -140,6 +140,14 @@ class DemoDataSeeder extends Seeder
     private function seedPrograms(): void
     {
         foreach (self::PROGRAMS as [$name, $short, $provider, $category, $mode, $amount, $start, $end, $status, $description, $requirements]) {
+            // The demo must still work weeks after these dates were written (the defense, OAS try-outs):
+            // an active program whose application period already ended is moved forward so that it
+            // closes about 45 days from today. Closed programs keep their real past dates.
+            if ($status === 'active' && $end && $end < now()->toDateString()) {
+                $shift = now()->startOfDay()->diffInDays(\Illuminate\Support\Carbon::parse($end)->startOfDay(), true) + 45;
+                $start = \Illuminate\Support\Carbon::parse($start)->addDays($shift)->min(now())->toDateString();
+                $end = \Illuminate\Support\Carbon::parse($end)->addDays($shift)->toDateString();
+            }
             $scholarship = Scholarship::firstOrCreate(
                 ['name' => $name],
                 [

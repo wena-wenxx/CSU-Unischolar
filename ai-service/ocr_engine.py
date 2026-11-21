@@ -1,9 +1,9 @@
 """
 Text extraction.
 - PDF with real text  -> read the text directly (fast, no OCR needed)
-- Scanned PDF / image -> PaddleOCR
-If PaddleOCR is not installed, the service still runs; images just come
-back with ocr_status = 'failed' and OAS staff review them manually.
+- Scanned PDF / image -> PaddleOCR (or Tesseract when PaddleOCR is not installed)
+If neither is installed, the service still runs; images come back with
+ocr_status = 'failed' and OAS staff review them manually.
 """
 import os
 import tempfile
@@ -71,9 +71,34 @@ def collect_texts(result) -> list:
     return texts
 
 
+def _tesseract_text(path: str) -> str:
+    """Second choice when PaddleOCR is not installed: Tesseract (needs the Tesseract program + pytesseract)."""
+    import pytesseract
+    from PIL import Image, ImageOps
+
+    image = ImageOps.exif_transpose(Image.open(path)).convert("L")
+    if max(image.size) < 1800:          # small phone photos read better a little larger
+        scale = 1800 / max(image.size)
+        image = image.resize((int(image.width * scale), int(image.height * scale)))
+    return pytesseract.image_to_string(image, config="--psm 3")
+
+
+def ocr_engine_name() -> str:
+    if get_ocr() is not None:
+        return "paddleocr"
+    try:
+        import pytesseract
+        pytesseract.get_tesseract_version()
+        return "tesseract"
+    except Exception:
+        return ""
+
+
 def _ocr_image(path: str):
     ocr = get_ocr()
     if ocr is None:
+        if ocr_engine_name() == "tesseract":
+            return _tesseract_text(path)
         raise RuntimeError(_ocr_error or "PaddleOCR is not installed")
     try:
         if hasattr(ocr, "predict"):
@@ -110,11 +135,11 @@ def extract_text(path: str, filename: str = "") -> dict:
                         used_ocr = True
                     finally:
                         os.remove(tmp_path)
-            return {"text": "\n".join(parts), "engine": "paddleocr" if used_ocr else "pdf-text",
+            return {"text": "\n".join(parts), "engine": (ocr_engine_name() or "ocr") if used_ocr else "pdf-text",
                     "ocr_status": "ok", "error": None}
 
         # images
-        return {"text": _ocr_image(path), "engine": "paddleocr", "ocr_status": "ok", "error": None}
+        return {"text": _ocr_image(path), "engine": ocr_engine_name() or "ocr", "ocr_status": "ok", "error": None}
 
     except Exception as e:
         return {"text": "", "engine": None, "ocr_status": "failed", "error": f"{type(e).__name__}: {e}"}

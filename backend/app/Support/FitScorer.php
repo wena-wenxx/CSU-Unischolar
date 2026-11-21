@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /*
-| AI field fit (round 12): asks the AI service how well each active
+| AI field fit: asks the AI service how well each active
 | scholarship fits each student's field of study, and saves the answer in
 | program_fits. The AI service uses a pretrained sentence-embedding model
 | (or TF-IDF when the model is not installed); see ai-service/fit_matcher.py.

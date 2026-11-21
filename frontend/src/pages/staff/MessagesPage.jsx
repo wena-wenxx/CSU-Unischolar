@@ -117,6 +117,11 @@ export default function MessagesPage() {
             placeholder="Search a student, Student ID or words"
           />
           <button className="button button-primary">Search</button>
+          {query && (
+            <button type="button" className="button button-secondary" onClick={() => { setQuery(""); fetchMessages(status, ""); }}>
+              Clear
+            </button>
+          )}
         </form>
 
         {data.messages.length === 0 ? (

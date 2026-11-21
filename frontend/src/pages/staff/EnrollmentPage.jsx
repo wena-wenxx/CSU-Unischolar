@@ -178,7 +178,7 @@ export default function EnrollmentPage() {
 
   function downloadTemplate() {
     downloadCSV("registrar-enrollment-list-template.csv", [
-      { Student_ID: "221-00462", Last_Name: "Contiga", First_Name: "Wena Rose", Course: "BS Information Technology" },
+      { Student_ID: "2026-00001", Last_Name: "Navarro", First_Name: "Juan", Course: "BS Information Technology" },
     ]);
   }
 

@@ -98,7 +98,8 @@ class ContactController extends Controller
                 ->orWhere('message', 'like', "%{$q}%")
                 ->orWhereHas('student', fn ($s) => $s->where('last_name', 'like', "%{$q}%")
                     ->orWhere('first_name', 'like', "%{$q}%")
-                    ->orWhere('student_id', 'like', "%{$q}%"))))
+                    ->orWhere('student_id', 'like', "%{$q}%")
+                    ->when(strlen(preg_replace('/\D/', '', $q)) >= 4, fn ($d) => $d->orWhereRaw("replace(student_id, '-', '') like ?", ['%'.preg_replace('/\D/', '', $q).'%'])))))
             ->orderByRaw("case when status = 'open' then 0 else 1 end")
             ->oldest()   // oldest open message first: answer in order
             ->limit(200)

@@ -8,8 +8,9 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
 /**
- * Test student (REAL, used with her permission):
- *   Wena Rose N. Contiga · 221-00462 · wenarose.contiga@carsu.edu.ph
+ * Test student (REAL, used with her permission): Gleslimie B. Binag.
+ *   Her e-mail, Student ID, course and photo come from .env (config/demo.php), so her real details
+ *   never go to GitHub. Without them in .env, clearly fake placeholders are used.
  *   Use this account for e-mail tests, login demos and screenshots.
  *   She starts with NO applications so the full flow can be shown live.
  *
@@ -45,35 +46,42 @@ class StudentSeeder extends Seeder
         [10, '2026-00010', 'Grace', 'Lim', 'Bachelor of Science in Chemistry', '2nd Year', 'College of Mathematics and Natural Sciences'],
     ];
 
-    public const TEST_STUDENT_EMAIL = 'wenarose.contiga@carsu.edu.ph';
 
     public function run(): void
     {
         $staffId = User::where('role', 'staff')->value('id');
 
-        $wena = User::updateOrCreate(
-            ['email' => self::TEST_STUDENT_EMAIL],
+        $real = config('demo.test_student');
+        $tester = User::updateOrCreate(
+            ['email' => $real['email']],
             [
-                'name' => 'Wena Rose Contiga',
+                'name' => trim("{$real['first_name']} {$real['middle_name']} {$real['last_name']}"),
                 'password' => Hash::make('Student@12345'),
                 'role' => 'student',
             ]
         );
 
         Student::updateOrCreate(
-            ['student_id' => '221-00462'],
+            ['student_id' => $real['student_id']],
             [
-                'user_id' => $wena->id,
-                'first_name' => 'Wena Rose',
-                'middle_name' => 'N.',
-                'last_name' => 'Contiga',
-                'sex' => 'Female',
-                'course' => 'Bachelor of Science in Information Technology',
-                'year_level' => '4th Year',
-                'college' => 'College of Computing and Information Sciences',
+                'user_id' => $tester->id,
+                'first_name' => $real['first_name'],
+                'middle_name' => $real['middle_name'],
+                'last_name' => $real['last_name'],
+                'sex' => $real['sex'],
+                'course' => $real['course'],
+                'year_level' => $real['year_level'],
+                'college' => $real['college'],
                 'contact_number' => null,
             ]
         );
+
+        // Her photo for the sidebar, copied from this computer (public storage, not in GitHub).
+        if ($real['photo'] && is_file($real['photo'])) {
+            $path = 'avatars/test-student.'.strtolower(pathinfo($real['photo'], PATHINFO_EXTENSION) ?: 'jpg');
+            \Illuminate\Support\Facades\Storage::disk('public')->put($path, file_get_contents($real['photo']));
+            $tester->update(['photo_path' => $path]);
+        }
 
         foreach (self::STUDENTS as [$number, $studentId, $first, $last, $course, $yearLevel, $college]) {
 

@@ -43,7 +43,7 @@ class EnrollmentController extends Controller
 
         if ($application->status !== 'approved') {
             return response()->json([
-                'message' => 'Only approved applications can undergo enrollment verification.'
+                'message' => 'Only approved applications can undergo enrollment verification. Record the agency\'s approval first (Approved by agency, or Approved Lists).'
             ], 422);
         }
 
@@ -54,7 +54,7 @@ class EnrollmentController extends Controller
         return response()->json([
             'message' => $enrolled
                 ? 'Enrollment verified. You can now tag this student as a grantee.'
-                : 'Recorded: student is NOT currently enrolled.',
+                : 'Recorded: student is NOT currently enrolled. The student is not tagged and gets no payroll; check again when the Registrar sends a newer list (Enrollment).',
             'enrollment_verified' => $application->enrollment_verified,
             'enrollment_verified_at' => $application->enrollment_verified_at,
             'application' => $application->fresh()->load([

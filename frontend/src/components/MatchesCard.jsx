@@ -4,7 +4,7 @@ import api from "../services/api";
 import { formatDate } from "../lib/format";
 
 /*
-  Student dashboard: "Scholarships that fit you" (round 12).
+  Student dashboard: "Scholarships that fit you".
   Programs whose rules the student meets (or that only need their GWA /
   income), best first, with what is left to do. The AI field fit (round
   12) puts programs for the student's field first and adds agency-direct

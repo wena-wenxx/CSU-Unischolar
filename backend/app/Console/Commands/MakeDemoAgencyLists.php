@@ -72,7 +72,7 @@ class MakeDemoAgencyLists extends Command
         // Agency-direct programs: the agency's own list of grantees.
         $taken = ScholarRecord::where('status', 'active')->pluck('student_id')->all();
         $free = Student::whereNotIn('id', $taken)
-            ->where('student_id', '!=', '221-00462')     // keep the test account free for live demos
+            ->where('student_id', '!=', config('demo.test_student.student_id'))     // keep the test account free for live demos
             ->orderBy('id')
             ->get();
 

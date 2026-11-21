@@ -50,7 +50,7 @@ MAX_ROWS = 5000
 
 LIST_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".csv", ".png", ".jpg", ".jpeg"}
 
-# CSU-style IDs: 221-00462, 2024-10123 (spaces around the dash are tolerated).
+# CSU-style IDs: 221-00001, 2024-10123 (spaces around the dash are tolerated).
 ID_RE = re.compile(r"(?<![\d-])(\d{2,4})\s?-\s?(\d{4,6})(?![\d-])")
 
 HEADER_PATTERNS = {
@@ -589,7 +589,12 @@ def ocr_boxes(image_path):
 
     ocr = ocr_engine.get_ocr()
     if ocr is None:
-        raise RuntimeError(ocr_engine._ocr_error or "PaddleOCR is not installed")
+        # Tesseract (if installed) is the second choice, so scans can still be read.
+        try:
+            import ruled_table
+            return [b[:5] for b in ruled_table._tesseract_boxes(image_path)]
+        except Exception:
+            raise RuntimeError(ocr_engine._ocr_error or "PaddleOCR is not installed")
     try:
         result = ocr.predict(image_path) if hasattr(ocr, "predict") else ocr.ocr(image_path, cls=True)
     except Exception:
@@ -1152,6 +1157,43 @@ def _shape_ruled(doc, template):
     }
 
 
+def _is_scanned_pdf(path):
+    """True when the PDF's pages are pictures (no text, or only a scanner's unreliable text)."""
+    try:
+        import pymupdf as fitz
+    except ImportError:
+        import fitz
+    with fitz.open(path) as doc:
+        pages = list(doc)[:5]
+        return bool(pages) and all(
+            len(page.get_images(full=True)) >= 1 and (bad_text_layer(page.get_text("words")) or len(page.get_text("words")) < 20)
+            for page in pages
+        )
+
+
+def _generic_grid(path):
+    """A scanned list printed with table lines (any layout) -> rows by cell, with unsure cells highlighted."""
+    import ruled_table
+
+    if not ruled_table.ocr_engines_available():
+        return None
+    try:
+        doc = ruled_table.read_generic(path)
+    except Exception:
+        return None
+    if not doc or len(doc["rows"]) < 2:
+        return None
+    return {
+        "rows": doc["rows"],
+        "cells": doc["cells"],
+        "layout": [None] * len(doc["rows"]),
+        "method": "ocr-" + str(doc["engine"]),
+        "warnings": ["This is a scan, so it was read with OCR (" + str(doc["engine"]) + ") cell by cell. Highlighted "
+                     "cells were hard to read: check them against the paper before processing."],
+        "metadata": {"row_count": len(doc["rows"]) - 1},
+    }
+
+
 def _ruled_picture(path):
     """A photo of one page of a known CHED form (its table lines are found) -> ruled reading, else None."""
     import ruled_table
@@ -1216,6 +1258,8 @@ def read_table(path, filename=""):
                             "requirements-ocr.txt) and read the file again, or check every row by hand.")
         else:
             return ruled
+    elif ext == ".pdf" and _is_scanned_pdf(path) and (grid := _generic_grid(path)):
+        return grid
     elif ext == ".pdf":
         rows, layout, method, metadata = _read_pdf(path)
         original_name = filename or path
@@ -1232,6 +1276,8 @@ def read_table(path, filename=""):
                             row[12] = batch_number
     elif ext in (".png", ".jpg", ".jpeg") and (ruled := _ruled_picture(path)):
         return ruled
+    elif ext in (".png", ".jpg", ".jpeg") and (grid := _generic_grid(path)):
+        return grid
     elif ext in (".png", ".jpg", ".jpeg"):
         rows, layout = group_boxes(ocr_boxes(path), True)
         method = "ocr"

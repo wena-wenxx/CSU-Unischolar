@@ -4,7 +4,7 @@ import { useToast } from "../lib/toast";
 import Modal from "./Modal";
 
 /*
-  "Read the memo with AI" (round 12): staff paste a scholarship memo or
+  "Read the memo with AI": staff paste a scholarship memo or
   choose its file; the AI (a local language model through Ollama, or simple
   pattern reading when Ollama is off) suggests the eligibility rules, each
   with the sentence it came from. Staff tick the right ones; they go into

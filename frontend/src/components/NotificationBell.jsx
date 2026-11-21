@@ -133,6 +133,13 @@ export default function NotificationBell() {
                         Apply Now
                       </Link>
                     )}
+                    <Link
+                      className="button button-small button-secondary"
+                      to={`/student/contact?topic=other&subject=${encodeURIComponent(`Question about ${item.scholarship}`)}`}
+                      onClick={() => setOpen(false)}
+                    >
+                      Ask OAS
+                    </Link>
                   </span>
                 </li>
               ))}

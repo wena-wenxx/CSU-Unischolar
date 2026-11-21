@@ -26,7 +26,7 @@ from list_reader import (
 STUDENTS = [
     {"id": 1, "student_id": "2024-10123", "first_name": "Juan", "middle_name": "Santos", "last_name": "Dela Cruz"},
     {"id": 2, "student_id": "2025-11456", "first_name": "Maria", "middle_name": "Reyes", "last_name": "Garcia"},
-    {"id": 3, "student_id": "221-00462", "first_name": "Wena Rose", "middle_name": "Nunez", "last_name": "Contiga"},
+    {"id": 3, "student_id": "221-00999", "first_name": "Liza Mae", "middle_name": "Dizon", "last_name": "Villanueva"},
     {"id": 4, "student_id": "2026-12001", "first_name": "Mark", "middle_name": "", "last_name": "Ramos"},
     {"id": 5, "student_id": "2026-12002", "first_name": "Marc", "middle_name": "", "last_name": "Ramos"},
 ]
@@ -35,7 +35,7 @@ STUDENTS = [
 # ---------- small helpers ----------
 def test_normalize_id_accepts_spaces_and_short_csu_ids():
     assert normalize_id("ID: 2024 - 10123") == "2024-10123"
-    assert normalize_id("221-00462") == "221-00462"
+    assert normalize_id("221-00999") == "221-00999"
     assert normalize_id("09171234567") == ""          # a phone number is not an ID
 
 
@@ -191,7 +191,7 @@ def test_same_student_twice_is_flagged():
 # ---------- whole files ----------
 def test_csv_file(tmp_path):
     path = tmp_path / "list.csv"
-    path.write_text("Student ID,Name\n2024-10123,\"Dela Cruz, Juan S.\"\n221-00462,Contiga Wena Rose\n,Nobody Known Here\n", encoding="utf-8")
+    path.write_text("Student ID,Name\n2024-10123,\"Dela Cruz, Juan S.\"\n221-00999,Villanueva Liza Mae\n,Nobody Known Here\n", encoding="utf-8")
     result = extract_and_match(str(path), "list.csv", STUDENTS)
     assert result["method"] == "csv"
     assert result["summary"] == {"total": 3, "matched": 2, "check": 0, "unmatched": 1, "error": 0}
@@ -219,7 +219,7 @@ def test_word_file_with_table(tmp_path):
     document.add_paragraph("List of Scholars")
     table = document.add_table(rows=1, cols=3)
     table.rows[0].cells[0].text, table.rows[0].cells[1].text, table.rows[0].cells[2].text = "No.", "Name of Scholar", "ID No."
-    for i, (name, sid) in enumerate([("Contiga, Wena Rose N.", "221-00462"), ("Ramos, Mark", "2026-12001")], start=1):
+    for i, (name, sid) in enumerate([("Villanueva, Liza Mae N.", "221-00999"), ("Ramos, Mark", "2026-12001")], start=1):
         cells = table.add_row().cells
         cells[0].text, cells[1].text, cells[2].text = str(i), name, sid
     path = tmp_path / "list.docx"

@@ -112,3 +112,31 @@ def test_a_digit_that_differs_from_every_other_row_is_highlighted():
     R._use_whole_file(rows, cells, {}, R.TES_COLUMNS)
     assert cells[4][1]["check"] and "almost every other row" in cells[4][1]["note"]
     assert not any(c[1]["check"] for i, c in enumerate(cells) if i != 4)
+
+
+def test_any_scanned_list_with_table_lines_is_read_cell_by_cell(tmp_path):
+    """A fictional CMSP list (not a known CHED form), slightly tilted and blurred. Needs an OCR program."""
+    if not R.ocr_engines_available():
+        pytest.skip("no OCR program installed (PaddleOCR or Tesseract)")
+    from PIL import Image, ImageDraw, ImageFilter
+
+    font = T._font(26)
+    rows = [("No.", "Name of Scholar", "Student No.", "Course"), ("1", "NAVARRO, JUAN L.", "2026-00001", "BSIT"),
+            ("2", "SANTOS, MARIA C.", "2026-00002", "BSIT"), ("3", "RAMIREZ, ANA T.", "2026-00003", "BSCS")]
+    img = Image.new("L", (1700, 600), 250)
+    d = ImageDraw.Draw(img)
+    xs = [80, 200, 700, 1050, 1400]
+    for r, row in enumerate(rows):
+        y = 100 + r * 80
+        d.line([(80, y), (1400, y)], fill=30, width=3)
+        for c, value in enumerate(row):
+            d.text((xs[c] + 15, y + 22), value, font=font, fill=20)
+    d.line([(80, 100 + len(rows) * 80), (1400, 100 + len(rows) * 80)], fill=30, width=3)
+    for x in xs:
+        d.line([(x, 100), (x, 100 + len(rows) * 80)], fill=30, width=3)
+    path = str(tmp_path / "cmsp.png")
+    img.rotate(0.6, fillcolor=250).filter(ImageFilter.GaussianBlur(0.6)).save(path)
+
+    doc = R.read_generic(path)
+    assert doc and len(doc["rows"]) == 4
+    assert [r[2] for r in doc["rows"][1:]] == ["2026-00001", "2026-00002", "2026-00003"]

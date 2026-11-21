@@ -335,4 +335,20 @@ class EligibilityEngineTest extends TestCase
         Document::where('student_id', $student->id)->update(['status' => 'validated']);
         $this->assertSame('ready', $this->getJson('/api/student/matches')->json('matches.0.status'));
     }
+
+    public function test_editing_a_program_rescores_without_pressing_recalculate(): void
+    {
+        $student = $this->student(['gwa' => 2.50]);
+        $program = $this->scholarship();                  // max GWA 2.00: the student fails a rule
+        EligibilityEngine::recalculate();
+        $this->assertSame('not_eligible', $this->recommendation($student, $program)->verdict);
+
+        $this->travel(5)->seconds();
+        $program->update(['max_gwa' => 2.75]);            // OAS relaxes the rule
+
+        Sanctum::actingAs(User::factory()->create(['role' => 'staff']));
+        $this->getJson('/api/staff/recommendations')->assertOk();
+
+        $this->assertSame('eligible', $this->recommendation($student, $program)->fresh()->verdict);
+    }
 }

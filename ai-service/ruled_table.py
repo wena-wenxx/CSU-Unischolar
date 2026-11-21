@@ -512,14 +512,19 @@ def _ocr_cell(gray, row_span, col_span, engine, field=""):
     """Read one table cell again on its own (enlarged). -> (text, confidence) or None."""
     import cv2
 
-    # stay clear of the printed borders (they confuse OCR)
-    my = max(6, int((row_span[1] - row_span[0]) * 0.06))
-    mx = max(8, int((col_span[1] - col_span[0]) * 0.06))
+    # a small margin, then any printed border line still in the crop is painted white (lines confuse OCR,
+    # and a wide margin would cut off the first letter of text written close to the line)
+    my = min(12, max(6, int((row_span[1] - row_span[0]) * 0.06)))
+    mx = min(12, max(8, int((col_span[1] - col_span[0]) * 0.06)))
     y0, y1 = int(row_span[0]) + my, int(row_span[1]) - my
     x0, x1 = int(col_span[0]) + mx, int(col_span[1]) - mx
     if y1 - y0 < 8 or x1 - x0 < 8:
         return None
-    crop = gray[y0:y1, x0:x1]
+    crop = gray[y0:y1, x0:x1].copy()
+    ink = cv2.threshold(crop, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+    for size in ((max(15, crop.shape[1] // 2), 1), (1, max(15, int(crop.shape[0] * 0.8)))):
+        lines = cv2.morphologyEx(ink, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, size))
+        crop[lines > 0] = 255
     crop = cv2.resize(crop, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
     crop = cv2.copyMakeBorder(crop, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=255)
     fd, path = tempfile.mkstemp(suffix=".png")
@@ -726,7 +731,8 @@ def _use_whole_file(rows, cells, metadata, columns):
     #    probably misread, so it is highlighted (not changed).
     for key in ("student_id", "award_number"):
         i = idx[key]
-        values = [r[i] for r in rows if r[i]]
+        shape = r"\d{3,4}-\d{5}" if key == "student_id" else r"TES-\d{8}-\d{12}-\d{6}"
+        values = [r[i] for r in rows if re.fullmatch(shape, r[i] or "")]   # only well-formed values vote
         if len(values) < 10:
             continue
         width = max(len(v) for v in values)
@@ -737,7 +743,7 @@ def _use_whole_file(rows, cells, metadata, columns):
                 continue          # this position really varies (e.g. the year part of a Student Number)
             for r, c in zip(rows, cells):
                 v = r[i]
-                if v and len(v) > pos and v[pos] != common:
+                if v and re.fullmatch(shape, v) and len(v) > pos and v[pos] != common:
                     c[i].update(conf=min(c[i]["conf"], 0.6), check=True,
                                 note=(c[i]["note"] + "; " if c[i]["note"] else "") +
                                 f"character {pos + 1} is '{v[pos]}' but almost every other row has '{common}' here")
@@ -807,3 +813,64 @@ def check_rows(rows, metadata, columns=TES_COLUMNS):
     if printed and per:
         metadata["expected_count"] = int(round(printed / per))
     return warnings
+
+
+# ------------------------------------------------------------------ any ruled table (no known form)
+
+def read_generic(path, engine=None, dpi=300, min_rows=2, min_cols=2):
+    """
+    Any scanned list printed as a table with lines (most agency lists are): the cells come from the lines,
+    the words from OCR, and a cell that came out empty or unsure is read again on its own.
+    -> {"rows": [[text]], "cells": [[{conf, note, check}]], "engine": str, "pages": n} or None when no table
+    with lines was found (the caller then falls back to reading words by position).
+    """
+    import cv2
+
+    all_rows, all_cells, used, pages, width = [], [], None, 0, None
+    for _number, png, _layer in _render_pages(path, dpi):
+        gray = cv2.imread(png, cv2.IMREAD_GRAYSCALE)
+        rows_y, cols_x, angle, straight = find_grid(gray)
+        h, w = straight.shape
+        col_spans = [(a, b) for a, b in zip(cols_x, cols_x[1:]) if b - a >= max(25, w // 80)]
+        if len(rows_y) < min_rows + 1 or len(col_spans) < min_cols:
+            continue
+        straight_path = png
+        if angle:
+            fd, straight_path = tempfile.mkstemp(suffix=".png")
+            os.close(fd)
+            cv2.imwrite(straight_path, straight)
+        try:
+            words, used = page_words(straight_path, engine)
+        finally:
+            if straight_path != png:
+                os.remove(straight_path)
+        pages += 1
+        row_spans = list(zip(rows_y, rows_y[1:]))
+        cells = _assign(words, row_spans, col_spans)
+        for r, span in enumerate(row_spans):
+            texts, infos = [], []
+            for c, col in enumerate(col_spans):
+                text, conf = _cell_text(cells.get((r, c), []))
+                if not text or conf < LOW:
+                    again = _ocr_cell(straight, span, col, used)
+                    if again and (not text or again[1] > conf):
+                        text, conf = again
+                text = re.sub(r"\s+", " ", text).strip(" |")
+                texts.append(text)
+                infos.append({"conf": round(conf, 2), "note": "", "check": bool(text) and conf < LOW})
+            if any(texts):
+                if width is None:
+                    width = len(texts)
+                all_rows.append(texts)
+                all_cells.append(infos)
+    if not all_rows:
+        return None
+    # pages with a different number of columns are padded so every row has the same width
+    widest = max(len(r) for r in all_rows)
+    for r, c in zip(all_rows, all_cells):
+        r.extend([""] * (widest - len(r)))
+        c.extend([{"conf": 1.0, "note": "", "check": False}] * (widest - len(c)))
+    # a header repeated on every page is kept only once
+    header = [t.lower() for t in all_rows[0]]
+    keep = [0] + [i for i in range(1, len(all_rows)) if [t.lower() for t in all_rows[i]] != header]
+    return {"rows": [all_rows[i] for i in keep], "cells": [all_cells[i] for i in keep], "engine": used, "pages": pages}

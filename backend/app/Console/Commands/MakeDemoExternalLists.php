@@ -44,7 +44,7 @@ class MakeDemoExternalLists extends Command
             ->merge(Application::where('status', 'approved')->pluck('student_id'))
             ->unique()->all();
 
-        // Fictional bulk demo students with no scholarship (never Wena, the real test account).
+        // Fictional bulk demo students with no scholarship (never the real test account).
         $pool = Student::query()
             ->whereNotIn('id', $taken)
             ->where('student_id', 'like', '20__-_____')       // bulk demo students (2024-12345)

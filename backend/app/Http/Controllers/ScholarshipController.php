@@ -307,6 +307,7 @@ class ScholarshipController extends Controller
 
         $requirement = ScholarshipRequirement::with('scholarship:id,name')->findOrFail($id);
         $requirement->delete();
+        $requirement->scholarship?->touch();   // AI Recommendations re-score on the next visit
         ActivityLog::record($request->user(), 'scholarship.requirement_removed', "Removed requirement \"{$requirement->name}\" from {$requirement->scholarship?->name}.");
 
         return response()->json(['message' => 'Requirement deleted successfully.']);

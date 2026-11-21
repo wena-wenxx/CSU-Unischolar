@@ -12,6 +12,8 @@ import StatusBadge from "../../components/StatusBadge";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 import SheetTabs from "../../components/SheetTabs";
+import SearchField from "../../components/SearchField";
+import { matchesWords, searchWords } from "../../lib/search";
 import { byLastName, lastFirst, programTabs } from "../../lib/programs";
 
 export default function StaffScholarRecordsPage() {
@@ -71,14 +73,14 @@ export default function StaffScholarRecordsPage() {
   }
 
   // Filters first, then one tab per program; every list is A to Z by last name.
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const words = searchWords(query);
   const filtered = records.filter((record) => {
     if (statusFilter !== "all" && record.status !== statusFilter) return false;
     if (atmFilter === "funded" && !(record.has_atm && record.atm_funds === "yes")) return false;
     if (atmFilter === "waiting" && !(record.has_atm && record.atm_funds !== "yes")) return false;
     if (atmFilter === "none" && record.has_atm) return false;
     const haystack = `${lastFirst(record.student)} ${record.student?.student_id || ""} ${record.scholarship?.name || ""}`.toLowerCase();
-    return words.every((word) => haystack.includes(word));
+    return matchesWords(haystack, words);
   });
   const tabs = programTabs(filtered, (record) => record.scholarship);
   const activeProgram = tabs.some((tab) => tab.key === program) ? program : "all";
@@ -193,16 +195,7 @@ export default function StaffScholarRecordsPage() {
         <SheetTabs tabs={tabs} value={activeProgram} onChange={setProgram} />
 
         <div className="sheet-toolbar">
-          <label htmlFor="scholar-search" className="sr-only">
-            Search scholars
-          </label>
-          <input
-            id="scholar-search"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search name, student ID or scholarship"
-          />
+          <SearchField id="scholar-search" label="Search scholars" value={query} onChange={setQuery} placeholder="Search name, student ID or scholarship" />
 
           <label htmlFor="scholar-status" className="sr-only">
             Status
@@ -539,7 +532,7 @@ function TagGranteeModal({ application, onClose, onDone }) {
         remarks: remarks.trim() || null,
       });
 
-      toast.success(`${fullName(application.student)} is now tagged as a grantee.`);
+      toast.success(`${fullName(application.student)} is now tagged as a grantee. Next: Payroll → Prepare payroll when the stipend period starts.`);
       await onDone();
     } catch (err) {
       toast.error(errMsg(err, "Unable to tag grantee."));

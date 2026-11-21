@@ -426,7 +426,7 @@ export default function StudentProfilePage() {
 
 // Read-only: OAS keeps the ATM status up to date. No banking is done here.
 /*
-  "My field and goals" (round 12, optional): helps the AI field fit find
+  "My field and goals" (optional): helps the AI field fit find
   scholarships for the student's field. It never affects eligibility.
 */
 function FieldGoals({ initial }) {

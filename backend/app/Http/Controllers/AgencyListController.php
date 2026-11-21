@@ -42,6 +42,9 @@ class AgencyListController extends Controller
 
     private ?int $uploadId = null;
 
+    /** Every student (id, Student ID, names), loaded once per upload for lists without Student IDs. */
+    private ?\Illuminate\Support\Collection $everyone = null;
+
     private function staffOnly(Request $request): void
     {
         if ($request->user()->role !== 'staff') {
@@ -191,7 +194,8 @@ class AgencyListController extends Controller
             "Uploaded approved list {$data['file_name']} for {$scholarship->name} ({$this->periodLabel($data)}): {$counts['approved']} approved, {$counts['created']} added, {$counts['unmatched']} unmatched.", $upload);
 
         return response()->json([
-            'message' => "Matched {$matched} student(s), {$counts['unmatched']} unmatched, {$counts['error']} error(s). {$emailed} approval e-mail(s) sent.",
+            'message' => "Matched {$matched} student(s), {$counts['unmatched']} unmatched, {$counts['error']} to check. {$emailed} approval e-mail(s) sent."
+                .($counts['approved'] + $counts['created'] ? ' Next: verify their enrollment (Enrollment → Verify All Enrollments).' : ''),
             'upload' => $upload->load(['scholarship:id,name', 'uploader:id,name']),
         ], 201);
     }
@@ -212,8 +216,19 @@ class AgencyListController extends Controller
         // "2026-00001", "2026 00001" and 202600001 (Excel turns the ID into a number) are the same student.
         $schoolId = EnrollmentList::normalizeId($line['student_id']);
 
+        $byName = false;
         if ($schoolId === '') {
-            return $line + ['result' => 'error', 'note' => 'No Student ID in this row.'];
+            // No Student ID on the list: only an exact, one-of-a-kind name match is accepted.
+            $student = $this->studentByName($row);
+            if ($student === false) {
+                return $line + ['result' => 'error', 'note' => 'No Student ID and no name in this row.'];
+            }
+            if ($student === null) {
+                return $line + ['result' => 'unmatched', 'note' => 'No Student ID on the list, and the name matches no student (or more than one). Find the student in Data Bank and add the Student ID.'];
+            }
+            $schoolId = EnrollmentList::normalizeId($student->student_id);
+            $line['student_id'] = $student->student_id;
+            $byName = true;
         }
 
         if (isset($seen[$schoolId])) {
@@ -221,10 +236,13 @@ class AgencyListController extends Controller
         }
         $seen[$schoolId] = $row['row'];
 
-        $student = Student::whereRaw("upper(replace(replace(replace(student_id, '-', ''), ' ', ''), '.', '')) = ?", [$schoolId])->first();
+        $student ??= Student::whereRaw("upper(replace(replace(replace(student_id, '-', ''), ' ', ''), '.', '')) = ?", [$schoolId])->first();
 
         if (!$student) {
             return $line + ['result' => 'unmatched', 'note' => 'No student with this Student ID in the system.'];
+        }
+        if ($byName) {
+            $line['matched_by'] = 'name';
         }
 
         $line['student'] = trim("{$student->first_name} {$student->last_name}");
@@ -322,7 +340,8 @@ class AgencyListController extends Controller
             ? " Note: OAS had not finished checking this application's documents (it was {$previous}); check them."
             : '';
 
-        return $line + ['result' => 'approved', 'note' => "Changed from {$previous} to approved. Verify enrollment next.".$early];
+        return $line + ['result' => 'approved', 'note' => "Changed from {$previous} to approved. Verify enrollment next.".$early
+            .(!empty($line['matched_by']) ? ' Matched by name (no Student ID on the list): check that it is the right student.' : '')];
     }
 
     private function approvalNote(?string $date, string $agency, string $file): string
@@ -396,6 +415,28 @@ class AgencyListController extends Controller
         $onList = trim(($row['first_name'] ?? '').' '.($row['last_name'] ?? ''));
 
         return "The Student ID belongs to {$student->first_name} {$student->last_name}, but the list says \"{$onList}\".";
+    }
+
+    /**
+     * The one student whose last and first name are exactly the ones on the list (accents, capitals and
+     * dots ignored). null = none or more than one; false = the row has no name.
+     */
+    private function studentByName(array $row): Student|false|null
+    {
+        $last = self::plain($row['last_name'] ?? '');
+        $first = self::plain($row['first_name'] ?? '');
+        if ($last === '' || $first === '') {
+            return ($last === '' && $first === '') ? false : null;
+        }
+        // Loaded once per upload; names are compared without accents (ÑUÑEZ = NUNEZ).
+        $this->everyone ??= Student::get(['id', 'student_id', 'first_name', 'last_name']);
+        $candidates = $this->everyone
+            ->filter(fn (Student $s) => self::plain($s->last_name) === $last
+                && (self::plain($s->first_name) === $first || str_starts_with(self::plain($s->first_name).' ', $first.' ')
+                    || str_starts_with($first.' ', self::plain($s->first_name).' ')))
+            ->values();
+
+        return $candidates->count() === 1 ? $candidates->first() : null;
     }
 
     private static function plain(?string $text): string

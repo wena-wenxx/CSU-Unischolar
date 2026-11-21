@@ -6,7 +6,7 @@ use App\Models\AiRecommendation;
 
 /*
 |--------------------------------------------------------------------------
-| "What to do next" for an AI recommendation (round 12)
+| "What to do next" for an AI recommendation
 |--------------------------------------------------------------------------
 | Plain rules on top of the eligibility checks; nothing is predicted.
 |

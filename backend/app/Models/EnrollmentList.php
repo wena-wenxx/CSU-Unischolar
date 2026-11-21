@@ -11,7 +11,7 @@ class EnrollmentList extends Model
     public function entries() { return $this->hasMany(EnrollmentListEntry::class); }
     public function uploader() { return $this->belongsTo(User::class, 'uploaded_by'); }
 
-    /** "221-00462", " 221 00462 ", "221-00462 " all compare the same. */
+    /** "221-00999", " 221 00999 ", "221-00999 " all compare the same. */
     public static function normalizeId(?string $id): string
     {
         return strtoupper(preg_replace('/[\s\-_.]/', '', (string) $id));

@@ -8,7 +8,7 @@ use App\Support\DemoListFiles;
 use Illuminate\Http\Request;
 
 /*
-| POST /staff/forwarded/export  (round 12)
+| POST /staff/forwarded/export
 | Forwarded to Agency as Excel (.xlsx) or PDF, besides the CSV made in the
 | browser. Same student details as the CSV. It is a plain list of what OAS
 | keeps, NOT any agency's official template (none was given to us).

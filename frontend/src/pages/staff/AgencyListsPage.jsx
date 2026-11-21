@@ -56,6 +56,7 @@ export default function AgencyListsPage() {
   const [hasHeader, setHasHeader] = useState(true);
   const [idColumn, setIdColumn] = useState("");
   const [dateColumn, setDateColumn] = useState("");
+  const [nameColumn, setNameColumn] = useState("");
   const [fileKey, setFileKey] = useState(0);
   const [processing, setProcessing] = useState(false);
   const [reading, setReading] = useState(false);
@@ -151,6 +152,7 @@ export default function AgencyListsPage() {
       const head = parsed[0].map((h) => String(h).trim());
       setIdColumn(guessColumn(head, [/student.?(id|no|num)/, /id.?(no|num)/, /^stud/, /^id$/]));
       setDateColumn(guessColumn(head, [/approv.*date/, /date/]));
+      setNameColumn(guessColumn(head, [/^(full\s*)?name$/, /^name of/, /^(student|grantee|scholar|awardee)('?s)?\s*name$/]));
     } catch (err) {
       toast.error(errMsg(err, err.message || "The file could not be read."));
       setFileKey((k) => k + 1);
@@ -179,6 +181,7 @@ export default function AgencyListsPage() {
     setFileName("");
     setIdColumn("");
     setDateColumn("");
+    setNameColumn("");
     setMetadata({});
     setConfirmedMismatch(false);
     setFileKey((k) => k + 1);
@@ -212,6 +215,20 @@ export default function AgencyListsPage() {
         const plain = String(text ?? "").replaceAll(",", "").trim();
         return /^\d+(\.\d+)?$/.test(plain) ? plain : null;
       };
+      // One "Name" column ("DELA CRUZ, JUAN M." or "Juan M. Dela Cruz") -> last and first name.
+      const splitName = (text) => {
+        const value = String(text || "").trim();
+        if (!value) return [null, null];
+        const dropInitials = (words) => words.filter((w) => !/^[A-Za-zÑñ]\.?$/.test(w)).join(" ");
+        if (value.includes(",")) {
+          const [last, rest] = value.split(",", 2);
+          return [last.trim(), dropInitials(rest.trim().split(/\s+/)) || null];
+        }
+        const words = value.split(/\s+/);
+        return words.length > 1 ? [words[words.length - 1], dropInitials(words.slice(0, -1))] : [value, null];
+      };
+      const lastCol = fieldColumn(["Last Name", "Surname"]);
+      const firstCol = fieldColumn(["Given Name", "First Name"]);
       const payload = {
         scholarship_id: Number(scholarshipId),
         agency_name: agency.trim(),
@@ -223,13 +240,13 @@ export default function AgencyListsPage() {
         confirmed_duplicate: confirmedDuplicate,
         rows: dataRows.map((row, i) => ({
           row: firstDataLine + i,
-          student_id: valueAt(row, Number(idColumn)),
+          student_id: idColumn === "" ? null : valueAt(row, Number(idColumn)),
           approval_date: dateColumn === "" ? null : valueAt(row, Number(dateColumn)),
           amount: money(valueAt(row, amountColumn)),
           control_number: valueAt(row, fieldColumn(["Control Number"])),
           award_number: valueAt(row, fieldColumn(["TES Award Number"])),
-          last_name: valueAt(row, fieldColumn(["Last Name"])),
-          first_name: valueAt(row, fieldColumn(["Given Name", "First Name"])),
+          last_name: lastCol !== null ? valueAt(row, lastCol) : nameColumn !== "" ? splitName(valueAt(row, Number(nameColumn)))[0] : null,
+          first_name: firstCol !== null ? valueAt(row, firstCol) : nameColumn !== "" ? splitName(valueAt(row, Number(nameColumn)))[1] : null,
           middle_name: valueAt(row, fieldColumn(["Middle Initial", "Middle Name"])),
           sex: valueAt(row, fieldColumn(["Sex at Birth", "Sex"])),
           birthdate: valueAt(row, fieldColumn(["Birthdate", "Date of Birth"])),
@@ -273,7 +290,9 @@ export default function AgencyListsPage() {
 
   if (!scholarships) return <Loading />;
 
-  const ready = scholarshipId && agency.trim() && fileName && idColumn !== "" && dataRows.length > 0;
+  // A Student ID column is best; a list with names only can still be matched (exact, one-of-a-kind names).
+  const hasNames = nameColumn !== "" || headers.some((h) => /^(last\s*name|surname)$/i.test(h.trim()));
+  const ready = scholarshipId && agency.trim() && fileName && (idColumn !== "" || hasNames) && dataRows.length > 0;
   const amountColumn = guessColumn(headers, [/tes.?amount/, /^amount$/, /total.?amount/]);
   const countMismatch = details.expected_count !== "" && Number(details.expected_count) !== dataRows.length;
   const amountSum = dataRows.reduce((sum, row) => sum + (Number(String(row[amountColumn] || "").replaceAll(",", "")) || 0), 0);
@@ -410,15 +429,33 @@ export default function AgencyListsPage() {
 
           <div className="form-grid">
             <div>
-              <label htmlFor="id-column">Student ID column (required)</label>
+              <label htmlFor="id-column">Student ID column</label>
               <select id="id-column" value={idColumn} onChange={(event) => setIdColumn(event.target.value)}>
-                <option value="">Choose a column</option>
+                <option value="">None (the list has names only)</option>
                 {headers.map((h, i) => (
                   <option key={i} value={String(i)}>
                     {h}
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label htmlFor="name-column">Name column (one column with the whole name)</label>
+              <select id="name-column" value={nameColumn} onChange={(event) => setNameColumn(event.target.value)}>
+                <option value="">None / separate Last and First name columns</option>
+                {headers.map((h, i) => (
+                  <option key={i} value={String(i)}>
+                    {h}
+                  </option>
+                ))}
+              </select>
+              {idColumn === "" && (
+                <span className="muted small">
+                  Without a Student ID, a row is matched only when its name fits exactly one student; the others are
+                  listed as unmatched for you to check.
+                </span>
+              )}
             </div>
 
             <div>

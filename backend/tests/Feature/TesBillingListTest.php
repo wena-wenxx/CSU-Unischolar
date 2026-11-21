@@ -101,4 +101,26 @@ class TesBillingListTest extends TestCase
         $this->upload($tes, $rows, ['confirmed_duplicate' => true])->assertCreated()
             ->assertJsonPath('upload.already_count', 1);
     }
+
+    public function test_a_list_without_student_ids_matches_only_one_of_a_kind_names(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'staff']));
+        $tes = $this->tes();
+        $ana = $this->student('221-00201', 'Ana', 'Ibañez');
+        $this->student('221-00202', 'Mark', 'Reyes');
+        $this->student('221-00203', 'Mark', 'Reyes');          // two students with the same name
+        Application::create(['student_id' => $ana->id, 'scholarship_id' => $tes->id, 'status' => 'complete', 'submitted_at' => now()]);
+
+        $response = $this->upload($tes, [
+            ['row' => 1, 'last_name' => 'IBANEZ', 'first_name' => 'ANA'],
+            ['row' => 2, 'last_name' => 'REYES', 'first_name' => 'MARK'],
+            ['row' => 3, 'last_name' => 'NOBODY', 'first_name' => 'HERE'],
+        ])->assertCreated();
+
+        $details = collect($response->json('upload.details'))->keyBy('row');
+        $this->assertSame('approved', $details[1]['result']);
+        $this->assertStringContainsString('Matched by name', $details[1]['note']);
+        $this->assertSame('unmatched', $details[2]['result']);     // ambiguous: never guessed
+        $this->assertSame('unmatched', $details[3]['result']);
+    }
 }

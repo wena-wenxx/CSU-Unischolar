@@ -14,6 +14,8 @@ import SheetTabs from "../../components/SheetTabs";
 import StatusBadge from "../../components/StatusBadge";
 import StatusTimeline from "../../components/StatusTimeline";
 import EmptyState from "../../components/EmptyState";
+import SearchField from "../../components/SearchField";
+import { matchesWords, searchWords } from "../../lib/search";
 import Loading from "../../components/Loading";
 
 const FILTERS = [
@@ -57,6 +59,7 @@ export default function StaffApplicationsPage() {
   const [query, setQuery] = useState("");
   const [program, setProgram] = useState("all");
   const [sort, setSort] = useState("student");
+  const [schoolYear, setSchoolYear] = useState("all");
   const [selected, setSelected] = useState(null);
   const [verifying, setVerifying] = useState(null);
   const version = useRef(null);
@@ -147,7 +150,7 @@ export default function StaffApplicationsPage() {
   };
 
   // Search by student name, student ID or scholarship (every word must match).
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const words = searchWords(query);
   const matchesSearch = (application) => {
     const haystack = [
       lastFirst(application.student),
@@ -157,7 +160,7 @@ export default function StaffApplicationsPage() {
     ]
       .join(" ")
       .toLowerCase();
-    return words.every((word) => haystack.includes(word));
+    return matchesWords(haystack, words);
   };
 
   const searched = applications.filter(matchesSearch).filter((application) => inFilter(application, filter));
@@ -172,6 +175,7 @@ export default function StaffApplicationsPage() {
   const countOf = {};
   const shown = searched
     .filter((application) => activeProgram === "all" || String(application.scholarship_id) === activeProgram)
+    .filter((application) => schoolYear === "all" || application.school_year === schoolYear)
     .sort((a, b) => {
       if (sort === "student") {
         return latestOf[b.student_id] - latestOf[a.student_id] || a.student_id - b.student_id || time(b.updated_at) - time(a.updated_at);
@@ -187,7 +191,7 @@ export default function StaffApplicationsPage() {
   const grouped = sort === "student";
 
   // Long lists: 25 rows first, then Show more (resets on another tab, filter or search).
-  const page = usePaged(shown, `${activeProgram}|${shown.length}|${shown[0]?.id}`);
+  const page = usePaged(shown, `${activeProgram}|${schoolYear}|${shown.length}|${shown[0]?.id}`);
 
 
   const statusCount = (key) =>
@@ -214,16 +218,7 @@ export default function StaffApplicationsPage() {
         <SheetTabs tabs={tabs} value={activeProgram} onChange={chooseProgram} />
 
         <div className="sheet-toolbar">
-          <label htmlFor="application-search" className="sr-only">
-            Search applications
-          </label>
-          <input
-            id="application-search"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search name, Student ID or program"
-          />
+          <SearchField id="application-search" label="Search applications" value={query} onChange={setQuery} placeholder="Search name, Student ID or program" />
 
           <label htmlFor="status-filter" className="sr-only">
             Status
@@ -232,6 +227,18 @@ export default function StaffApplicationsPage() {
             {FILTERS.map(([key, label]) => (
               <option key={key} value={key}>
                 {label} ({statusCount(key)})
+              </option>
+            ))}
+          </select>
+
+          <label htmlFor="school-year-filter" className="sr-only">
+            School year
+          </label>
+          <select id="school-year-filter" value={schoolYear} onChange={(event) => setSchoolYear(event.target.value)}>
+            <option value="all">All school years</option>
+            {[...new Set(applications.map((a) => a.school_year).filter(Boolean))].sort().reverse().map((year) => (
+              <option key={year} value={year}>
+                AY {year}
               </option>
             ))}
           </select>

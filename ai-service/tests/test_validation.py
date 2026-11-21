@@ -25,21 +25,21 @@ def make_pdf(tmp_path, lines, name="doc.pdf"):
 
 # ---------- name matching ----------
 def test_normalize():
-    assert normalize("Contiga, Wena-Rose!") == "CONTIGA WENA ROSE"
+    assert normalize("Villanueva, Liza-Mae!") == "VILLANUEVA LIZA MAE"
 
 
 def test_exact_and_reversed_names_match():
-    assert best_name_match("Wena Contiga", "Name: CONTIGA, WENA")[0] >= 90
-    assert best_name_match("Wena Contiga", "Name: WENA ROSE CONTIGA")[0] >= 90
+    assert best_name_match("Liza Villanueva", "Name: VILLANUEVA, LIZA")[0] >= 90
+    assert best_name_match("Liza Villanueva", "Name: LIZA MAE VILLANUEVA")[0] >= 90
 
 
 def test_similar_name_goes_to_review_band():
-    score, _ = best_name_match("Wena Contiga", "Name: WENA CONTIGO")
+    score, _ = best_name_match("Liza Villanueva", "Name: LIZA VILLANUEVO")
     assert 75 <= score < 100
 
 
 def test_different_person_is_low():
-    assert best_name_match("Wena Contiga", "Name: REYES, ANA")[0] < 75
+    assert best_name_match("Liza Villanueva", "Name: REYES, ANA")[0] < 75
 
 
 # ---------- rules ----------
@@ -116,15 +116,15 @@ def test_ocr_status_endpoint():
 
 
 def test_one_letter_surname_difference_goes_to_review():
-    text = "CERTIFICATE OF REGISTRATION Name: WENA CONTIGO Student ID: 2026-00100 Semester Subjects units"
-    r = validate_text(text, "Wena Contiga", "2026-00100", "Certificate of Registration")
+    text = "CERTIFICATE OF REGISTRATION Name: LIZA VILLANUEVO Student ID: 2026-00100 Semester Subjects units"
+    r = validate_text(text, "Liza Villanueva", "2026-00100", "Certificate of Registration")
     assert r["has_name_mismatch"] is True
     assert any("similar" in f.lower() for f in r["flags"])
 
 
 def test_middle_name_on_document_is_accepted():
-    text = "CERTIFICATE OF REGISTRATION Name: WENA ROSE CONTIGA Student ID: 2026-00100 Semester Subjects units"
-    r = validate_text(text, "Wena Contiga", "2026-00100", "Certificate of Registration")
+    text = "CERTIFICATE OF REGISTRATION Name: LIZA MAE VILLANUEVA Student ID: 2026-00100 Semester Subjects units"
+    r = validate_text(text, "Liza Villanueva", "2026-00100", "Certificate of Registration")
     assert r["has_name_mismatch"] is False
 
 
@@ -292,3 +292,32 @@ def test_names_close_and_far():
     assert one_letter["has_name_mismatch"]
     assert any("similar but not exact" in f for f in one_letter["flags"])
     assert 85 <= one_letter["confidence_score"] < 95
+
+
+# ---- parent documents that name the child (fictional people) ----------------
+BIR_NO_ITR = (
+    "BUREAU OF INTERNAL REVENUE Revenue District No. 999 CERTIFICATION THIS IS TO CERTIFY that no Income Tax "
+    "Return has been filed by Mr./Mrs. PEDRO L. NAVARRO and his/her spouse ROSA M. NAVARRO resident/s of "
+    "PUROK-1 SAMPLE CITY. This certification is issued upon the request of the above mentioned individual for "
+    "SCHOLARSHIP purposes of his/her son/daughter/guardian JUAN L. NAVARRO. Done this 7th day of July, 2026."
+)
+
+
+def test_parent_document_for_the_applicant_passes():
+    r = validate_text(BIR_NO_ITR, "Juan Navarro", "", "Parents' Income Tax Return (ITR)", "Navarro")
+    assert r["extracted_data"]["review_status"] == "no_obvious_issues"
+    assert "7th day of July, 2026" in r["extracted_data"]["dates"]
+
+
+def test_parent_document_issued_for_a_sibling_is_flagged():
+    r = validate_text(BIR_NO_ITR, "Maria Navarro", "", "Parents' Income Tax Return (ITR)", "Navarro")
+    assert r["has_name_mismatch"]
+    assert "issued for 'JUAN L NAVARRO'" in " ".join(r["flags"])
+
+
+def test_income_written_as_income_of_is_read():
+    text = ("OFFICE OF THE PUNONG BARANGAY CERTIFICATION This certifies that the parents of JUAN L. NAVARRO are "
+            "identified indigent members with an income of P40,000.00 per annum.")
+    r = validate_text(text, "Juan Navarro", "", "Certificate of Indigency", "Navarro")
+    assert r["extracted_data"]["extracted_family_income"] == "40000.00"
+    assert r["extracted_data"]["review_status"] == "no_obvious_issues"

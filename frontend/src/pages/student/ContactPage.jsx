@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { formatDateTime } from "../../lib/format";
 import { useToast } from "../../lib/toast";
@@ -24,7 +25,12 @@ export default function ContactPage() {
   const [office, setOffice] = useState(null);
   const [topics, setTopics] = useState({});
   const [messages, setMessages] = useState(null);
-  const [form, setForm] = useState(EMPTY);
+  // "Ask OAS" from a notice opens this page with the topic and subject filled in.
+  const location = useLocation();
+  const [form, setForm] = useState(() => {
+    const query = new URLSearchParams(location.search);
+    return { ...EMPTY, topic: query.get("topic") || "", subject: (query.get("subject") || "").slice(0, 150) };
+  });
   const [sending, setSending] = useState(false);
 
   // .then() (not await) so React's lint rule sees the state is set later.

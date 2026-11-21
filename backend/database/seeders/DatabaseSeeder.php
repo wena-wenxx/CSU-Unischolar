@@ -12,7 +12,7 @@ use Illuminate\Database\Seeder;
  * Demo logins:
  *   Admin        admin@carsu.edu.ph                             / Admin@12345
  *   Staff        oas.staff@carsu.edu.ph                         / Staff@12345
- *   Test student wenarose.contiga@carsu.edu.ph (real, with permission) / Student@12345
+ *   Test student (real, with permission): e-mail from TEST_STUDENT_EMAIL in .env / Student@12345
  *   Named demo   student1@carsu.edu.ph ... student10@carsu.edu.ph / Student@12345
  *   Bulk demo    s<student id without dash>@demo.carsu.edu.ph   / Student@12345
  *                (e.g. the student 2024-10123 logs in as s202410123@demo.carsu.edu.ph)

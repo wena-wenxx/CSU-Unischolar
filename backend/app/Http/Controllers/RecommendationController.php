@@ -76,7 +76,10 @@ class RecommendationController extends Controller
             ->when($words, fn ($q) => $q->whereHas('student', function ($s) use ($words) {
                 foreach ($words as $word) {
                     $like = '%'.$word.'%';
+                    // "202600001" also finds 2026-00001 (Excel drops the dash)
+                    $digits = preg_replace('/\D/', '', $word);
                     $s->where(fn ($w) => $w->where('student_id', 'like', $like)
+                        ->when(strlen($digits) >= 4, fn ($d) => $d->orWhereRaw("replace(student_id, '-', '') like ?", ['%'.$digits.'%']))
                         ->orWhere('first_name', 'like', $like)
                         ->orWhere('last_name', 'like', $like));
                 }
@@ -95,6 +98,7 @@ class RecommendationController extends Controller
     public function index(Request $request)
     {
         $this->staffOnly($request);
+        $this->refreshIfRulesChanged();
 
         $f = $request->validate([
             'view' => 'nullable|in:'.implode(',', self::VIEWS),
@@ -191,6 +195,24 @@ class RecommendationController extends Controller
                 'year_levels' => $filterOptions->pluck('year_level')->filter()->unique()->sort()->values(),
             ],
         ]);
+    }
+
+    /*
+    | Staff do not have to press Recalculate after editing a program. Student changes (profile, uploads,
+    | AI checks) already re-score that student. Here the whole list is re-scored when it was never
+    | calculated, or when a program or one of its requirements changed after the last calculation.
+    */
+    private function refreshIfRulesChanged(): void
+    {
+        $last = AiRecommendation::max('computed_at');
+        $changed = collect([
+            Scholarship::max('updated_at'),
+            \App\Models\ScholarshipRequirement::max('updated_at'),
+        ])->filter()->max();
+
+        if ($last === null || ($changed !== null && \Illuminate\Support\Carbon::parse($changed)->gt(\Illuminate\Support\Carbon::parse($last)))) {
+            EligibilityEngine::recalculate();
+        }
     }
 
     // Best matches first: meets the rules, then not enough data, then fails a rule.

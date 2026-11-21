@@ -24,6 +24,7 @@ import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 import Modal from "../../components/Modal";
+import SearchField from "../../components/SearchField";
 import SheetTabs from "../../components/SheetTabs";
 
 /*
@@ -291,6 +292,11 @@ export default function RecommendationsPage() {
             qualifies but has not uploaded the documents yet.
           </li>
           <li>Open “Why?” to see each check, the student&apos;s data used, and the result. Nothing changes until you act.</li>
+          <li>
+            <strong>You do not have to score anyone by hand.</strong> Scores update by themselves when a student changes
+            their profile or uploads a document, and when you edit a program or its requirements. Use{" "}
+            <strong>Recalculate</strong> only to refresh everything at once.
+          </li>
         </ol>
         {data.unscored?.length > 0 && (
           <p className="muted small">
@@ -334,15 +340,16 @@ export default function RecommendationsPage() {
               fetchRows(filters, programId);
             }}
           >
-            <label htmlFor="rec-search" className="sr-only">
-              Search
-            </label>
-            <input
+            <SearchField
               id="rec-search"
-              type="search"
+              label="Search"
               value={filters.q}
-              onChange={(event) => setFilters({ ...filters, q: event.target.value })}
-              placeholder="Name or Student ID, then Enter"
+              onChange={(q) => setFilters({ ...filters, q })}
+              onSearch={(q) => {
+                setSelectedIds(new Set());
+                fetchRows({ ...filters, q }, programId);
+              }}
+              placeholder="Name or Student ID"
             />
           </form>
 

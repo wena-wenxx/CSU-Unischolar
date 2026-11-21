@@ -202,12 +202,17 @@ export default function DataBankPage() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Student ID, name or course (e.g. 221-00462 or Contiga)"
+            placeholder="Student ID, name or course (e.g. 2026-00001 or Navarro)"
           />
 
           <button className="button button-primary" disabled={loading}>
             {loading ? "Searching..." : "Search"}
           </button>
+          {query && (
+            <button type="button" className="button button-secondary" onClick={() => { setQuery(""); fetchStudents("", filters, 1); }}>
+              Clear
+            </button>
+          )}
         </form>
 
         <div className="inline-form bank-filters">

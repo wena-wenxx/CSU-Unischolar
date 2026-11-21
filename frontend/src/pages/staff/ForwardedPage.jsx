@@ -11,6 +11,8 @@ import Loading from "../../components/Loading";
 import SheetTabs from "../../components/SheetTabs";
 import ExportMenu from "../../components/ExportMenu";
 import { downloadFile } from "../../lib/download";
+import SearchField from "../../components/SearchField";
+import { matchesWords, searchWords } from "../../lib/search";
 import { byLastName, lastFirst, programTabs } from "../../lib/programs";
 
 /*
@@ -61,10 +63,10 @@ export default function ForwardedPage() {
 
   const list = rows || [];
   const programs = [...new Map(list.map((a) => [a.scholarship_id, a.scholarship])).values()];
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const words = searchWords(query);
   const searched = list.filter((a) => {
     const haystack = `${lastFirst(a.student)} ${a.student?.student_id || ""}`.toLowerCase();
-    return words.every((word) => haystack.includes(word));
+    return matchesWords(haystack, words);
   });
   const tabs = programTabs(searched, (a) => a.scholarship);
   const active = tabs.some((tab) => tab.key === programId) ? programId : "all";
@@ -148,16 +150,7 @@ export default function ForwardedPage() {
         <SheetTabs tabs={tabs} value={active} onChange={setProgramId} />
 
         <div className="sheet-toolbar">
-          <label htmlFor="fw-search" className="sr-only">
-            Search
-          </label>
-          <input
-            id="fw-search"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search name or Student ID"
-          />
+          <SearchField id="fw-search" label="Search" value={query} onChange={setQuery} placeholder="Search name or Student ID" />
           <span className="sheet-meta muted">
             {shown.length} shown · {active === "all" ? "longest waiting first" : "A–Z"}
           </span>

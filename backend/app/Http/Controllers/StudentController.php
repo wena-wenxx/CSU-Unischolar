@@ -302,7 +302,7 @@ class StudentController extends Controller
     }
 
     /*
-    | GET /student/matches  (round 12)
+    | GET /student/matches
     | "Scholarships that fit you": programs whose rules the student meets
     | (or that only need their GWA / income), with what is left to do.
     | Only programs students can see now; failed rules, programs already
@@ -385,7 +385,7 @@ class StudentController extends Controller
     }
 
     /*
-    | PATCH /profile/interests  (round 12)  Body: interests (optional, max 300)
+    | PATCH /profile/interests  Body: interests (optional, max 300)
     | "My field and goals": helps the AI find scholarships for the student's field.
     | It never affects eligibility.
     */

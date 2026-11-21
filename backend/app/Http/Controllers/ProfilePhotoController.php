@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 /*
-| Profile photo (round 12): every user (student, staff, admin) can upload a
+| Profile photo: every user (student, staff, admin) can upload a
 | photo of themselves; it is shown in the sidebar. Optional: without one the
 | initials are shown. Saved in storage/app/public/avatars with a random file
 | name (needs "php artisan storage:link" once, like announcement pictures).

@@ -118,7 +118,8 @@ class EligibilityEngine
                 // Already a grantee of this program, or already approved: nothing to recommend.
                 $isGrantee = ($context['records'][$student->id] ?? collect())
                     ->contains(fn ($r) => $r->scholarship_id === $scholarship->id);
-                if ($isGrantee || $application?->status === 'approved') {
+                // An approval from an earlier school year does not stop a new recommendation.
+                if ($isGrantee || ($application?->status === 'approved' && $application->this_school_year)) {
                     continue;
                 }
 
@@ -190,9 +191,11 @@ class EligibilityEngine
             ->get()
             ->groupBy('student_id');
 
+        // One application per program per school year: the newest one counts (keyBy keeps the last).
         $applications = Application::query()
             ->whereIn('student_id', $studentIds)
-            ->get(['id', 'student_id', 'scholarship_id', 'status'])
+            ->orderBy('id')
+            ->get(['id', 'student_id', 'scholarship_id', 'status', 'school_year'])
             ->keyBy(fn ($a) => $a->student_id.'-'.$a->scholarship_id);
 
         // Newest copy of each document type per student (My Documents + applications).

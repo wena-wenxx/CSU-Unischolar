@@ -195,7 +195,7 @@ class PayrollController extends Controller
         }
 
         if ($included->isEmpty()) {
-            return response()->json(['message' => 'Nobody to add: every grantee was skipped.', 'summary' => $summary], 422);
+            return response()->json(['message' => 'Nobody to add: every grantee was skipped. The Reason column in the preview says why (not enrolled, already in this period, no amount set).', 'summary' => $summary], 422);
         }
 
         $labels = $records->keyBy('id');
@@ -223,7 +223,7 @@ class PayrollController extends Controller
             "Prepared payroll for {$period} ({$program}): {$summary['included']} entries, total ".number_format($summary['total_amount'], 2).'.');
 
         return response()->json([
-            'message' => "Payroll prepared: {$summary['included']} draft entries for {$period}.",
+            'message' => "Payroll prepared: {$summary['included']} draft entries for {$period}. Next: check the list, select the entries and press Mark ready; then print the General Payroll (Form 6-A).",
             'summary' => $summary,
         ], 201);
     }
@@ -256,6 +256,7 @@ class PayrollController extends Controller
 
         return response()->json([
             'message' => "{$changed} entr".($changed === 1 ? 'y' : 'ies')." marked {$data['status']}."
+                .($data['status'] === 'ready' ? ' Next: General Payroll (Form 6-A) to print, then Mark processed after the stipend is released.' : '')
                 .($skipped ? " {$skipped} skipped (not in the right step)." : ''),
             'changed' => $changed,
             'skipped' => $skipped,
@@ -370,7 +371,7 @@ class PayrollController extends Controller
 
         if (!$scholar->currently_enrolled) {
             return response()->json([
-                'message' => 'Student must be currently enrolled before payroll preparation.'
+                'message' => 'Student must be currently enrolled before payroll preparation. Check the Registrar\'s list in Enrollment, then update the student in Scholar Records.'
             ], 422);
         }
 

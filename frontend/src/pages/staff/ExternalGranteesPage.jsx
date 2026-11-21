@@ -8,6 +8,7 @@ import { useConfirm } from "../../lib/confirm";
 import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
+import SearchField from "../../components/SearchField";
 import SheetTabs from "../../components/SheetTabs";
 
 /*
@@ -470,15 +471,13 @@ export default function ExternalGranteesPage() {
               loadList(filters);
             }}
           >
-            <label htmlFor="ext-search" className="sr-only">
-              Search
-            </label>
-            <input
+            <SearchField
               id="ext-search"
-              type="search"
+              label="Search"
               value={filters.q}
-              onChange={(event) => setFilters({ ...filters, q: event.target.value })}
-              placeholder="Name or Student ID, then Enter"
+              onChange={(q) => setFilters({ ...filters, q })}
+              onSearch={(q) => loadList({ ...filters, q })}
+              placeholder="Name or Student ID"
             />
           </form>
           <label htmlFor="ext-match" className="sr-only">

@@ -141,7 +141,7 @@ class ApplicationController extends Controller
 
         if (!in_array($application->status, ['draft', 'needs_action'])) {
             return response()->json([
-                'message' => 'This application cannot be submitted in its current status.'
+                'message' => 'This application cannot be submitted in its current status. Open My Applications to see what it is waiting for.'
             ], 422);
         }
 
@@ -250,7 +250,7 @@ class ApplicationController extends Controller
         $statuses = array_filter(explode(',', (string) $request->query('status', '')));
 
         $applications = Application::query()
-            ->select(['id', 'student_id', 'scholarship_id', 'status', 'remarks', 'submitted_at', 'forwarded_at',
+            ->select(['id', 'student_id', 'scholarship_id', 'school_year', 'status', 'remarks', 'submitted_at', 'forwarded_at',
                 'enrollment_verified', 'enrollment_verified_at', 'created_at', 'updated_at'])
             ->with([
                 'student:id,user_id,student_id,first_name,middle_name,last_name,sex,course,year_level,college,contact_number',
@@ -414,7 +414,7 @@ class ApplicationController extends Controller
                 )
             ) {
                 return response()->json([
-                    'message' => 'Documents cannot be uploaded at this stage.'
+                    'message' => 'Documents cannot be uploaded at this stage (OAS is already checking or has decided). To send a newer copy, use Contact OAS.'
                 ], 422);
             }
         }

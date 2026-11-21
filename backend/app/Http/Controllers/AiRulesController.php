@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
 /*
-| POST /staff/ai/suggest-rules  (round 12)
+| POST /staff/ai/suggest-rules
 | Staff paste a scholarship memo (or upload it as PDF, Word, TXT or a picture);
 | the AI service suggests the eligibility rules, each with the sentence it
 | came from. Uses a local language model (Ollama) when it is running, or

@@ -32,7 +32,7 @@ export default function SidebarProfile() {
   const name = student ? `${student.first_name}${middle} ${student.last_name}` : user.name;
   const year = student?.year_level ? String(student.year_level).match(/\d/)?.[0] : "";
   const course = student ? [courseShort(student.course), year].filter(Boolean).join(" - ") : "";
-  // Like MySchool: "221-00462 | BSIT - 4" under the name.
+  // Like MySchool: "2026-00001 | BSIT - 4" under the name.
   const detail = student ? [student.student_id, course].filter(Boolean).join(" | ") : ROLE_LABELS[user.role] || user.role;
 
   return (
@@ -48,6 +48,11 @@ export default function SidebarProfile() {
         <span className="profile-text">
           <strong title={name}>{name}</strong>
           <small className="profile-role">{detail}</small>
+          {user.email && (
+            <small className="profile-email" title={user.email}>
+              {user.email}
+            </small>
+          )}
         </span>
         <span className="profile-caret" aria-hidden="true">
           ▾
