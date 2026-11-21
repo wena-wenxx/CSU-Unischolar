@@ -109,8 +109,16 @@ export function missingRequirements(application) {
 export function enrollmentText(application) {
   if (application.status !== "approved") return "—";
 
+  // How it was checked: against the Registrar's uploaded list, or by OAS staff (not a link to CSU's systems).
+  const how =
+    application.enrollment_method === "registrar_list"
+      ? " (Registrar's list)"
+      : application.enrollment_method === "manual"
+        ? " (checked by staff)"
+        : "";
+
   return application.enrollment_verified
-    ? `Verified ${formatDate(application.enrollment_verified_at)}`
+    ? `Verified ${formatDate(application.enrollment_verified_at)}${how}`
     : "Not yet verified";
 }
 

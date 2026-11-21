@@ -29,6 +29,7 @@ const NAVIGATION = {
     ["/staff/scholarships", "Scholarships"],
     ["/staff/recommendations", "AI Recommendations"],
     { heading: "2 · Applications" },
+    ["/staff/batches", "Processing Batches"],
     ["/staff/applications", "Applications"],
     ["/staff/forwarded", "Forwarded to Agency"],
     ["/staff/agency-lists", "Approved Lists"],

@@ -8,6 +8,7 @@ class Student extends Model
 {
     protected $fillable = [
         'user_id',
+        'is_demo',     // demo account made by the seeders (only these can be removed by demo:reset)
         'student_id',
         'first_name',
         'middle_name',
@@ -27,6 +28,7 @@ class Student extends Model
     ];
 
     protected $casts = [
+        'is_demo' => 'boolean',
         'gwa' => 'decimal:2',
         'family_income' => 'decimal:2',
         'eligibility_updated_at' => 'datetime',

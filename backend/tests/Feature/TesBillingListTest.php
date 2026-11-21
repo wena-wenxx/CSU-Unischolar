@@ -51,7 +51,7 @@ class TesBillingListTest extends TestCase
         Sanctum::actingAs(User::factory()->create(['role' => 'staff']));
         $tes = $this->tes();
         $ana = $this->student('221-00101', 'Ana Marie', 'Dela Peña');
-        $app = Application::create(['student_id' => $ana->id, 'scholarship_id' => $tes->id, 'status' => 'forwarded', 'submitted_at' => now()]);
+        $app = Application::create(['student_id' => $ana->id, 'scholarship_id' => $tes->id, 'status' => 'complete', 'submitted_at' => now()]);
 
         // "DELA PENA" on the scan (no Ñ) is the same person.
         $this->upload($tes, [$this->row(1, '221-00101', 'ANA MARIE', 'DELA PENA')])->assertCreated();
@@ -79,14 +79,14 @@ class TesBillingListTest extends TestCase
         Sanctum::actingAs(User::factory()->create(['role' => 'staff']));
         $tes = $this->tes();
         $ben = $this->student('221-00102', 'Ben', 'Torres');
-        $app = Application::create(['student_id' => $ben->id, 'scholarship_id' => $tes->id, 'status' => 'forwarded', 'submitted_at' => now()]);
+        $app = Application::create(['student_id' => $ben->id, 'scholarship_id' => $tes->id, 'status' => 'complete', 'submitted_at' => now()]);
 
         $response = $this->upload($tes, [$this->row(1, '221-00102', 'CARLO JAY', 'SALAZAR')])->assertCreated();
 
         $this->assertSame('check', $response->json('upload.details.0.result'));
         $this->assertStringContainsString('belongs to Ben Torres', $response->json('upload.details.0.note'));
         $this->assertSame(1, $response->json('upload.error_count'));
-        $this->assertSame('forwarded', $app->fresh()->status);
+        $this->assertSame('complete', $app->fresh()->status);
     }
 
     public function test_the_same_list_processed_twice_needs_a_confirmation(): void

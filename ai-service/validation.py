@@ -61,6 +61,24 @@ def normalize(text: str) -> str:
 FORM_LABELS = {"FIRST", "MIDDLE", "LAST", "NAME", "GIVEN", "SURNAME", "FAMILY"}
 
 
+def _as_initials(candidate: list, expected_words: list) -> list:
+    """
+    A middle INITIAL in the student's record ('GLESLIMIE B BINAG') matches the full middle name on
+    the document ('GLESLIMIE BITON BINAG'): a word starting with that letter becomes the initial.
+    A different middle name ('GLESLIMIE ANA BINAG') is not changed, so it still lowers the score.
+    """
+    initials = [w for w in expected_words if len(w) == 1]
+    if not initials:
+        return candidate
+    out = list(candidate)
+    for initial in initials:
+        for i, word in enumerate(out):
+            if len(word) > 1 and word not in expected_words and word.startswith(initial):
+                out[i] = initial
+                break
+    return out
+
+
 def best_name_match(expected_name: str, text: str):
     """
     Slide a small window of words across the document text and keep the best
@@ -77,7 +95,8 @@ def best_name_match(expected_name: str, text: str):
     if not expected or not words:
         return 0.0, ""
 
-    k = len(expected.split())
+    expected_words = expected.split()
+    k = len(expected_words)
     best_score, best_window = 0.0, ""
     for size in sorted({max(1, k - 1), k, k + 1, k + 2}):
         if size > len(words):
@@ -90,7 +109,7 @@ def best_name_match(expected_name: str, text: str):
             else:
                 candidates = [window]
             for cand in candidates:
-                score = fuzz.token_sort_ratio(expected, " ".join(cand))
+                score = fuzz.token_sort_ratio(expected, " ".join(_as_initials(cand, expected_words)))
                 if score > best_score:
                     best_score, best_window = score, " ".join(window)
     return round(best_score, 2), best_window

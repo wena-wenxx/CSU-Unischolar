@@ -11,7 +11,9 @@ use App\Models\ScholarRecord;
 use App\Models\Scholarship;
 use App\Models\Student;
 use App\Models\Setting;
+use App\Models\ProcessingBatch;
 use App\Support\ApplicationNotifier;
+use App\Support\MailMode;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +47,12 @@ class AgencyListController extends Controller
     /** Every student (id, Student ID, names), loaded once per upload for lists without Student IDs. */
     private ?\Illuminate\Support\Collection $everyone = null;
 
+    /** The processing batch new applications from this list go into. */
+    private ?int $batchId = null;
+
+    /** Staff picked the student themselves for an unmatched row (they confirmed a different name). */
+    private bool $skipNameCheck = false;
+
     private function staffOnly(Request $request): void
     {
         if ($request->user()->role !== 'staff') {
@@ -57,10 +65,12 @@ class AgencyListController extends Controller
         $this->staffOnly($request);
 
         return response()->json(
-            AgencyListUpload::with(['scholarship:id,name', 'uploader:id,name'])
+            AgencyListUpload::with(['scholarship:id,name', 'uploader:id,name', 'processingBatch:id,name,status'])
+                ->when($request->integer('processing_batch_id') ?: null, fn ($q, $id) => $q->where('processing_batch_id', $id))
                 ->latest()
                 ->limit(30)
                 ->get()
+                ->each(fn (AgencyListUpload $u) => $u->setAttribute('open_rows', $u->openRowCount()))
         );
     }
 
@@ -70,6 +80,8 @@ class AgencyListController extends Controller
 
         $data = $request->validate([
             'scholarship_id' => 'required|exists:scholarships,id',
+            'processing_batch_id' => 'nullable|integer|exists:processing_batches,id',
+            'file_sha256' => ['nullable', 'regex:/^[a-f0-9]{64}$/'],
             'agency_name' => 'required|string|max:255',
             'campus' => 'nullable|string|max:255',
             'file_name' => 'required|string|max:255',
@@ -118,7 +130,19 @@ class AgencyListController extends Controller
         $scholarship = Scholarship::findOrFail($data['scholarship_id']);
         $staffId = $request->user()->id;
 
-        // The same list processed twice (same program, file and period) is almost always a mistake.
+        // The processing batch: the one chosen by staff (it must be open and of this program),
+        // otherwise the open batch of this program and period (a new one is made when there is none).
+        if (!empty($data['processing_batch_id'])) {
+            $batch = ProcessingBatch::find($data['processing_batch_id']);
+            if ($batch->scholarship_id !== $scholarship->id) {
+                return response()->json(['message' => "The batch \"{$batch->name}\" belongs to another program."], 422);
+            }
+            if ($batch->status !== 'open') {
+                return response()->json(['message' => "The batch \"{$batch->name}\" is completed. Reopen it in Processing Batches, or choose another batch."], 422);
+            }
+        }
+
+        // The same list processed twice (same program, file and period, or exactly the same file) is almost always a mistake.
         $earlier = AgencyListUpload::where('scholarship_id', $scholarship->id)
             ->where('file_name', $data['file_name'])
             ->where('school_year', $data['school_year'] ?? null)
@@ -126,13 +150,23 @@ class AgencyListController extends Controller
             ->where('batch', $data['batch'] ?? null)
             ->latest()
             ->first();
+        $sameFile = !empty($data['file_sha256'])
+            ? AgencyListUpload::where('scholarship_id', $scholarship->id)->where('file_sha256', $data['file_sha256'])->latest()->first()
+            : null;
+        $earlier ??= $sameFile;
         if ($earlier && empty($data['confirmed_duplicate'])) {
+            $what = $sameFile ? "Exactly the same file ({$sameFile->file_name})" : "This list ({$data['file_name']})";
+
             return response()->json([
-                'message' => "This list ({$data['file_name']}) was already processed for {$scholarship->name} on "
+                'message' => "{$what} was already processed for {$scholarship->name} on "
                     .$earlier->created_at->format('F j, Y g:i A').'. Process it again only if the agency sent a corrected list.',
                 'duplicate_of' => $earlier->id,
             ], 409);
         }
+
+        $batch ??= ProcessingBatch::forWork($scholarship->id, $data['school_year'] ?? \App\Models\ExternalGrantee::currentSchoolYear(),
+            $data['semester'] ?? null, $request->user()->id);
+        $this->batchId = $batch?->id;
 
         $counts = ['approved' => 0, 'created' => 0, 'already' => 0, 'unmatched' => 0, 'error' => 0];
         $details = [];
@@ -143,6 +177,8 @@ class AgencyListController extends Controller
             // The upload is saved first so every application can point to the list it came from.
             $upload = AgencyListUpload::create([
                 'scholarship_id' => $scholarship->id,
+                'processing_batch_id' => $this->batchId,
+                'file_sha256' => $data['file_sha256'] ?? null,
                 'agency_name' => $data['agency_name'],
                 'campus' => $data['campus'] ?? null,
                 'file_name' => $data['file_name'],
@@ -180,13 +216,7 @@ class AgencyListController extends Controller
             ]);
         });
 
-        // E-mails go out after the database work is saved.
-        $emailed = 0;
-        foreach ($this->approvedApplications as $application) {
-            if (ApplicationNotifier::approved($application, 'agency_list')?->status !== 'failed') {
-                $emailed++;
-            }
-        }
+        $emailed = $this->sendApprovalEmails();
 
         $matched = $counts['approved'] + $counts['created'] + $counts['already'];
 
@@ -194,9 +224,11 @@ class AgencyListController extends Controller
             "Uploaded approved list {$data['file_name']} for {$scholarship->name} ({$this->periodLabel($data)}): {$counts['approved']} approved, {$counts['created']} added, {$counts['unmatched']} unmatched.", $upload);
 
         return response()->json([
-            'message' => "Matched {$matched} student(s), {$counts['unmatched']} unmatched, {$counts['error']} to check. {$emailed} approval e-mail(s) sent."
-                .($counts['approved'] + $counts['created'] ? ' Next: verify their enrollment (Enrollment → Verify All Enrollments).' : ''),
-            'upload' => $upload->load(['scholarship:id,name', 'uploader:id,name']),
+            'message' => "Matched {$matched} student(s), {$counts['unmatched']} unmatched, {$counts['error']} to check"
+                .($batch ? " (batch: {$batch->name})" : '').'. '.MailMode::approvalSentence($emailed)
+                .($counts['approved'] + $counts['created'] ? ' Next: verify their enrollment (Enrollment → Verify All Enrollments).' : '')
+                .($counts['unmatched'] + $counts['error'] ? ' Unmatched rows stay open under "Rows to resolve" until you link or set them aside.' : ''),
+            'upload' => $upload->load(['scholarship:id,name', 'uploader:id,name', 'processingBatch:id,name,status']),
         ], 201);
     }
 
@@ -249,7 +281,7 @@ class AgencyListController extends Controller
 
         // The Student ID matched. If the list also has a name, it must be the same person: a misread or
         // mistyped ID could otherwise approve the wrong student.
-        $nameProblem = self::nameDiffers($row, $student);
+        $nameProblem = $this->skipNameCheck ? null : self::nameDiffers($row, $student);
         if ($nameProblem) {
             return $line + ['result' => 'check', 'note' => $nameProblem.' Nothing was changed: check the Student ID on the list.'];
         }
@@ -293,6 +325,8 @@ class AgencyListController extends Controller
                 'student_id' => $student->id,
                 'scholarship_id' => $scholarship->id,
                 'school_year' => $year,
+                'semester' => $data['semester'] ?? null,
+                'processing_batch_id' => $this->batchId,
                 'status' => 'approved',
                 'remarks' => 'Added from agency list. '.$approvalNote,
             ] + $award);
@@ -326,6 +360,7 @@ class AgencyListController extends Controller
 
         $application->update([
             'status' => 'approved',
+            'semester' => $application->semester ?? ($data['semester'] ?? null),
             'remarks' => $approvalNote,
             'enrollment_verified' => false,
             'enrollment_verified_at' => null,
@@ -342,6 +377,189 @@ class AgencyListController extends Controller
 
         return $line + ['result' => 'approved', 'note' => "Changed from {$previous} to approved. Verify enrollment next.".$early
             .(!empty($line['matched_by']) ? ' Matched by name (no Student ID on the list): check that it is the right student.' : '')];
+    }
+
+    /** Approval e-mails go out after the database work is saved. Returns how many did not fail. */
+    private function sendApprovalEmails(): int
+    {
+        $emailed = 0;
+        foreach ($this->approvedApplications as $application) {
+            if (ApplicationNotifier::approved($application, 'agency_list')?->status !== 'failed') {
+                $emailed++;
+            }
+        }
+        $this->approvedApplications = [];
+
+        return $emailed;
+    }
+
+    /*
+    | GET /staff/agency-lists/{id}
+    | One processed list with every row and its result, and the rows still to resolve.
+    */
+    public function show(Request $request, $id)
+    {
+        $this->staffOnly($request);
+
+        $upload = AgencyListUpload::with(['scholarship:id,name', 'uploader:id,name', 'processingBatch:id,name,status'])->findOrFail($id);
+        $upload->setAttribute('open_rows', $upload->openRowCount());
+
+        return response()->json($upload);
+    }
+
+    /*
+    | POST /staff/agency-lists/{id}/rows/{row}/link
+    | Body: student_id (the id of a student in the Data Bank), confirm_name (when the names differ)
+    | Staff found the student of an unmatched row (e.g. the list had no or a wrong Student ID).
+    | The row is processed again for that student, exactly as during the upload, and the
+    | row keeps a note of what it was before. Nothing else on the list changes.
+    */
+    public function linkRow(Request $request, $id, $row)
+    {
+        $this->staffOnly($request);
+
+        $data = $request->validate([
+            'student_id' => 'required|integer|exists:students,id',
+            'confirm_name' => 'nullable|boolean',
+        ]);
+
+        $upload = AgencyListUpload::with('scholarship', 'processingBatch')->findOrFail($id);
+        [$index, $line] = $this->openRow($upload, (int) $row);
+        if ($index === null) {
+            return response()->json(['message' => "Row {$row} is not open (it was matched, linked or set aside already)."], 422);
+        }
+        if ($upload->processingBatch && $upload->processingBatch->status !== 'open') {
+            return response()->json(['message' => "The batch \"{$upload->processingBatch->name}\" is completed. Reopen it in Processing Batches first."], 422);
+        }
+
+        $student = Student::findOrFail($data['student_id']);
+        $schoolId = EnrollmentList::normalizeId($student->student_id);
+
+        // The same student must not be on the list twice.
+        foreach ($upload->details ?? [] as $other) {
+            if (($other['row'] ?? null) !== (int) $row && in_array($other['result'] ?? null, ['approved', 'created', 'already'], true)
+                && EnrollmentList::normalizeId($other['student_id'] ?? '') === $schoolId) {
+                return response()->json(['message' => "{$student->first_name} {$student->last_name} is already matched in row {$other['row']} of this list."], 422);
+            }
+        }
+
+        $input = array_intersect_key($line, array_flip([
+            'control_number', 'award_number', 'last_name', 'first_name', 'middle_name', 'sex', 'birthdate',
+            'program', 'year_level', 'email', 'phone', 'batch', 'pwd', 'amount', 'total_amount',
+        ]));
+        $input['row'] = (int) $row;
+        $input['student_id'] = $student->student_id;
+
+        if (empty($data['confirm_name']) && self::nameDiffers($input, $student)) {
+            $onList = trim(($input['first_name'] ?? '').' '.($input['last_name'] ?? ''));
+
+            return response()->json([
+                'message' => "The student you chose is {$student->first_name} {$student->last_name}, but the list says \"{$onList}\". "
+                    .'Link anyway only if you are sure it is the same person (e.g. a married name or a spelling error on the list).',
+                'needs_confirmation' => true,
+            ], 409);
+        }
+
+        $listData = [
+            'agency_name' => $upload->agency_name,
+            'file_name' => $upload->file_name,
+            'school_year' => $upload->school_year,
+            'semester' => $upload->semester,
+        ];
+
+        $this->uploadId = $upload->id;
+        $this->batchId = $upload->processing_batch_id;
+        $this->skipNameCheck = true;
+        $seen = [];
+        $result = null;
+
+        DB::transaction(function () use ($upload, $input, $listData, $index, $line, $request, &$seen, &$result) {
+            $result = $this->processRow($input, $upload->scholarship, $request->user()->id, $listData, $seen);
+            if (!in_array($result['result'], ['approved', 'created', 'already'], true)) {
+                return;     // not saved: the reason is shown to staff
+            }
+
+            $details = $upload->details;
+            $details[$index] = $result + [
+                'resolved_from' => $line['result'],
+                'resolved_note' => $line['note'] ?? null,
+                'resolved_by' => $request->user()->name,
+                'resolved_at' => now()->toDateTimeString(),
+            ];
+            $was = $line['result'] === 'check' ? 'error' : $line['result'];
+            $upload->update([
+                'details' => $details,
+                "{$was}_count" => max(0, $upload->{"{$was}_count"} - 1),
+                "{$result['result']}_count" => $upload->{"{$result['result']}_count"} + 1,
+            ]);
+        });
+
+        if (!in_array($result['result'], ['approved', 'created', 'already'], true)) {
+            $this->approvedApplications = [];
+
+            return response()->json(['message' => 'Not linked: '.($result['note'] ?? 'the row could not be processed for this student.')], 422);
+        }
+
+        $emailed = $this->sendApprovalEmails();
+        ActivityLog::record($request->user(), 'agency_list.row_linked',
+            "Linked row {$row} of {$upload->file_name} to {$student->first_name} {$student->last_name} ({$student->student_id}): {$result['result']}.", $upload);
+
+        return response()->json([
+            'message' => "Row {$row} linked to {$student->first_name} {$student->last_name}. ".$result['note']
+                .(in_array($result['result'], ['approved', 'created'], true) ? ' '.MailMode::approvalSentence($emailed) : ''),
+            'upload' => $upload->fresh(['scholarship:id,name', 'uploader:id,name', 'processingBatch:id,name,status'])
+                ->setAttribute('open_rows', $upload->fresh()->openRowCount()),
+        ]);
+    }
+
+    /*
+    | POST /staff/agency-lists/{id}/rows/{row}/set-aside   Body: note (required)
+    | The row stays as it is (e.g. the student is not a CSU student, or the agency will
+    | correct it), with the reason and who decided. It no longer counts as open.
+    */
+    public function setAsideRow(Request $request, $id, $row)
+    {
+        $this->staffOnly($request);
+
+        $data = $request->validate(['note' => 'required|string|max:500']);
+
+        $upload = AgencyListUpload::findOrFail($id);
+        [$index, $line] = $this->openRow($upload, (int) $row);
+        if ($index === null) {
+            return response()->json(['message' => "Row {$row} is not open (it was matched, linked or set aside already)."], 422);
+        }
+
+        $details = $upload->details;
+        $details[$index] = $line + [
+            'resolved_note' => trim($data['note']),
+            'resolved_by' => $request->user()->name,
+            'resolved_at' => now()->toDateTimeString(),
+            'set_aside' => true,
+        ];
+        $upload->update(['details' => $details]);
+
+        ActivityLog::record($request->user(), 'agency_list.row_set_aside',
+            "Set aside row {$row} of {$upload->file_name}: {$data['note']}", $upload);
+
+        return response()->json([
+            'message' => "Row {$row} set aside. It stays on the list with your note.",
+            'upload' => $upload->fresh(['scholarship:id,name', 'uploader:id,name', 'processingBatch:id,name,status'])
+                ->setAttribute('open_rows', $upload->fresh()->openRowCount()),
+        ]);
+    }
+
+    /** [index in details, the row] of an open row, or [null, null]. */
+    private function openRow(AgencyListUpload $upload, int $row): array
+    {
+        foreach ($upload->details ?? [] as $index => $line) {
+            if ((int) ($line['row'] ?? 0) === $row
+                && in_array($line['result'] ?? null, AgencyListUpload::OPEN_RESULTS, true)
+                && empty($line['resolved_at'])) {
+                return [$index, $line];
+            }
+        }
+
+        return [null, null];
     }
 
     private function approvalNote(?string $date, string $agency, string $file): string
@@ -383,9 +601,13 @@ class AgencyListController extends Controller
         ], fn ($value) => $value !== null);
 
         if ($values) {
-            ScholarRecord::where('student_id', $application->student_id)
-                ->where('scholarship_id', $application->scholarship_id)
-                ->update($values);
+            // The scholar record of the application's school year; for a continuing grantee whose
+            // record is of another year, the active record of this program.
+            $records = ScholarRecord::where('student_id', $application->student_id)
+                ->where('scholarship_id', $application->scholarship_id);
+            $record = (clone $records)->where('school_year', $application->school_year)->first()
+                ?? (clone $records)->where('status', 'active')->orderByDesc('school_year')->first();
+            $record?->update($values);
         }
     }
 

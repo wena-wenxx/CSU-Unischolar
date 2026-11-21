@@ -56,6 +56,31 @@ def read_root():
     }
 
 
+@app.get("/health")
+def health():
+    """
+    One check of every AI part, for the setup guide:
+      OCR (PaddleOCR or Tesseract), text matching (BGE model or TF-IDF), memo reader (Ollama or patterns).
+    Typed PDFs, Excel and Word files work even when no OCR program is installed.
+    """
+    import ocr_engine
+    import rule_reader
+
+    engine = ocr_engine.ocr_engine_name()
+    try:
+        model = rule_reader.ollama_model(timeout=2)
+    except Exception:
+        model = None
+    return {
+        "service": "running",
+        "ocr_engine": engine or "none (scanned files and photos cannot be read; install Tesseract or PaddleOCR)",
+        "paddleocr": ocr_engine.ocr_status(),
+        "tesseract_program": ocr_engine._tesseract_cmd(),
+        "text_matching": fit_matcher.status(),
+        "memo_reader": f"local language model {model}" if model else "pattern reader (Ollama not running; optional)",
+    }
+
+
 @app.get("/ocr-status")
 def get_ocr_status():
     """Is PaddleOCR installed and loaded? (Typed PDFs work even without it.)"""

@@ -19,6 +19,11 @@ class ApplicationStatusLog extends Model
         return $this->belongsTo(Application::class);
     }
 
+    public function changer()
+    {
+        return $this->belongsTo(User::class, 'changed_by');
+    }
+
     // Records one step. $from defaults to the application's status before the change.
     public static function record(Application $application, string $to, ?string $remarks = null, ?int $userId = null, ?string $from = null): self
     {

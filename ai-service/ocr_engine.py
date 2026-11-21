@@ -71,24 +71,64 @@ def collect_texts(result) -> list:
     return texts
 
 
+def _tesseract_cmd():
+    """
+    Where the Tesseract program is. On Windows the installer does not add it to PATH, so the usual
+    folders are tried too. TESSERACT_CMD (environment variable) wins when it is set.
+    """
+    import shutil
+    candidates = [
+        os.environ.get("TESSERACT_CMD"),
+        shutil.which("tesseract"),
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Tesseract-OCR\tesseract.exe"),
+    ]
+    for path in candidates:
+        if path and os.path.isfile(path):
+            return path
+    return None
+
+
+def _pytesseract():
+    import pytesseract
+    cmd = _tesseract_cmd()
+    if cmd:
+        pytesseract.pytesseract.tesseract_cmd = cmd
+    return pytesseract
+
+
 def _tesseract_text(path: str) -> str:
     """Second choice when PaddleOCR is not installed: Tesseract (needs the Tesseract program + pytesseract)."""
-    import pytesseract
+    pytesseract = _pytesseract()
     from PIL import Image, ImageOps
 
     image = ImageOps.exif_transpose(Image.open(path)).convert("L")
     if max(image.size) < 1800:          # small phone photos read better a little larger
         scale = 1800 / max(image.size)
         image = image.resize((int(image.width * scale), int(image.height * scale)))
-    return pytesseract.image_to_string(image, config="--psm 3")
+    text = pytesseract.image_to_string(image, config="--psm 3")
+
+    # Speckled or tinted phone photos can make Tesseract see the whole page as one picture and return
+    # (almost) nothing. Reading the page in overlapping horizontal strips fixes that; the longer
+    # result is kept.
+    if len(text.strip()) < 800:
+        strips, height = [], image.height
+        step = max(1, height // 4)
+        for i in range(4):
+            top, bottom = max(0, i * step - 60), min(height, (i + 1) * step + 60)
+            strips.append(pytesseract.image_to_string(image.crop((0, top, image.width, bottom)), config="--psm 6"))
+        by_strips = "\n".join(strips)
+        if len(by_strips.strip()) > len(text.strip()):
+            text = by_strips
+    return text
 
 
 def ocr_engine_name() -> str:
     if get_ocr() is not None:
         return "paddleocr"
     try:
-        import pytesseract
-        pytesseract.get_tesseract_version()
+        _pytesseract().get_tesseract_version()
         return "tesseract"
     except Exception:
         return ""

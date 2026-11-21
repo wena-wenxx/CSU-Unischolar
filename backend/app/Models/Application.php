@@ -10,12 +10,15 @@ class Application extends Model
         'student_id',
         'scholarship_id',
         'school_year',
+        'semester',
+        'processing_batch_id',
         'status',
         'remarks',
         'submitted_at',
         'forwarded_at',
         'enrollment_verified',
         'enrollment_verified_at',
+        'enrollment_method',    // registrar_list | manual
         // from the agency's approved list (e.g. CHED TES billing file)
         'agency_control_number',
         'agency_award_number',
@@ -41,7 +44,35 @@ class Application extends Model
                     ? self::schoolYearOf($application->created_at)
                     : ExternalGrantee::currentSchoolYear();
             }
+            // The semester of the current school year, when the OAS set one in Settings.
+            if (empty($application->semester) && $application->school_year === ExternalGrantee::currentSchoolYear()) {
+                $semester = Setting::get('current_semester');
+                $application->semester = in_array($semester, Setting::SEMESTERS, true) ? $semester : null;
+            }
+            // Every application belongs to a processing batch of its program and period.
+            if (empty($application->processing_batch_id) && $application->scholarship_id) {
+                $application->processing_batch_id = ProcessingBatch::forWork(
+                    (int) $application->scholarship_id, $application->school_year, $application->semester, auth()->id()
+                )?->id;
+            }
         });
+    }
+
+    /** Rows inserted directly (the bulk demo seeder) get the batch of their program and school year. */
+    public static function fillMissingBatches(): int
+    {
+        $count = 0;
+        foreach (self::whereNull('processing_batch_id')->whereNotNull('school_year')
+            ->get(['id', 'scholarship_id', 'school_year', 'semester']) as $application) {
+            $batch = ProcessingBatch::forWork((int) $application->scholarship_id, $application->school_year, $application->semester);
+            if ($batch) {
+                $application->timestamps = false;
+                $application->update(['processing_batch_id' => $batch->id]);
+                $count++;
+            }
+        }
+
+        return $count;
     }
 
     /** "2026-2027" for any date (a school year starts in August). */
@@ -87,6 +118,11 @@ class Application extends Model
     public function scholarship()
     {
         return $this->belongsTo(Scholarship::class);
+    }
+
+    public function processingBatch()
+    {
+        return $this->belongsTo(ProcessingBatch::class);
     }
 
     public function documents()
@@ -186,8 +222,10 @@ class Application extends Model
 
     public function isTaggedGrantee(): bool
     {
+        // Scholar records are kept per school year: only this application's year counts.
         return ScholarRecord::where('student_id', $this->student_id)
             ->where('scholarship_id', $this->scholarship_id)
+            ->where('school_year', $this->school_year)
             ->exists();
     }
 

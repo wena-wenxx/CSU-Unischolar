@@ -122,14 +122,19 @@ class ScholarRecordController extends Controller
             ], 422);
         }
 
+        // One scholar record per program per school year (older years stay as history).
         $record = ScholarRecord::updateOrCreate(
             [
                 'student_id' =>
                     $application->student_id,
                 'scholarship_id' =>
                     $application->scholarship_id,
+                'school_year' =>
+                    $application->school_year,
             ],
             [
+                'semester' => $application->semester,
+                'processing_batch_id' => $application->processing_batch_id,
                 'status' => 'active',
                 'currently_enrolled' =>
                     $data['currently_enrolled'] ?? true,
@@ -150,7 +155,15 @@ class ScholarRecordController extends Controller
             ], fn ($value) => $value !== null && $value !== '')
         );
 
-        ApplicationStatusLog::record($application, 'grantee_tagged', null, $request->user()->id, 'approved');
+        // A grant from an earlier school year of the same program is now finished (kept as history).
+        $finished = ScholarRecord::where('student_id', $application->student_id)
+            ->where('scholarship_id', $application->scholarship_id)
+            ->where('id', '!=', $record->id)
+            ->where('status', 'active')
+            ->where('school_year', '<', $application->school_year)
+            ->update(['status' => 'completed']);
+
+        ApplicationStatusLog::record($application, 'grantee_tagged', $finished ? 'Earlier school year record marked completed.' : null, $request->user()->id, 'approved');
         ActivityLog::record($request->user(), 'grantee.tagged', 'Tagged '.trim(($application->student?->first_name ?? '').' '.($application->student?->last_name ?? '')).' as grantee of '.$application->scholarship?->name.'.', $record);
 
         return response()->json([

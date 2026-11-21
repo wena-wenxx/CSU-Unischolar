@@ -26,6 +26,7 @@ import StaffScholarshipsPage from "./pages/staff/StaffScholarshipsPage";
 import StaffReportsPage from "./pages/staff/StaffReportsPage";
 import StaffAnnouncementsPage from "./pages/staff/StaffAnnouncementsPage";
 import AgencyListsPage from "./pages/staff/AgencyListsPage";
+import ProcessingBatchesPage from "./pages/staff/ProcessingBatchesPage";
 import HelpPage from "./pages/HelpPage";
 import StaffProfilePage from "./pages/staff/StaffProfilePage";
 import AutoReviewPage from "./pages/staff/AutoReviewPage";
@@ -53,6 +54,7 @@ import SettingsPage from "./pages/admin/SettingsPage";
     /student/scholarships     /staff/applications       /admin/staff
     /student/scholarships/:id /staff/auto-review        /admin/students
     /student/applications     /staff/agency-lists       /admin/activity
+                              /staff/batches
     /student/applications/:id /staff/forwarded          /admin/settings
     /student/documents        /staff/scholars           /admin/scholarships
     /student/history          /staff/enrollment         /admin/reports
@@ -105,6 +107,7 @@ export default function App() {
                 <Route path="/staff/scholarships" element={<StaffScholarshipsPage />} />
                 <Route path="/staff/reports" element={<StaffReportsPage />} />
                 <Route path="/staff/agency-lists" element={<AgencyListsPage />} />
+                <Route path="/staff/batches" element={<ProcessingBatchesPage />} />
                 <Route path="/staff/announcements" element={<StaffAnnouncementsPage />} />
                 <Route path="/staff/help" element={<HelpPage />} />
                 <Route path="/staff/profile" element={<StaffProfilePage />} />

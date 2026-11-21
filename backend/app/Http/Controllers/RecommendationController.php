@@ -551,7 +551,7 @@ class RecommendationController extends Controller
 
         return response()->json([
             'message' => $log && $log->status !== 'failed'
-                ? 'Invitation e-mail sent to '.$r->student->fullName().'.'
+                ? \App\Support\MailMode::oneSentence('Invitation e-mail', $r->student->fullName())
                 : 'Invitation recorded, but the e-mail could not be sent. '.EmailLog::plainError($log?->error),
             'recommendation' => $this->present($r->fresh(['student', 'scholarship'])),
         ]);
@@ -610,7 +610,7 @@ class RecommendationController extends Controller
 
         return response()->json([
             'message' => "Draft application started for {$student->fullName()}."
-                .($log && $log->status !== 'failed' ? ' The student was e-mailed.' : ' The e-mail could not be sent. '.EmailLog::plainError($log?->error)),
+                .($log && $log->status !== 'failed' ? ' '.\App\Support\MailMode::oneSentence('The e-mail', $student->fullName()) : ' The e-mail could not be sent. '.EmailLog::plainError($log?->error)),
             'application_id' => $application->id,
             'recommendation' => $this->present($r->fresh(['student', 'scholarship'])),
         ], 201);

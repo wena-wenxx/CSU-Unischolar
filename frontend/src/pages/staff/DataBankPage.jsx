@@ -24,19 +24,60 @@ const STANDING = {
   external: "Holds an outside scholarship",
 };
 
-const EMPTY_FILTERS = { college: "", year_level: "", sex: "", standing: "", scholarship_id: "", external_program: "" };
+const APPLICATION_STATUSES = {
+  "": "Any application status",
+  draft: "Draft (not submitted)",
+  submitted: "Submitted",
+  under_review: "Under review",
+  needs_action: "Needs action (correction)",
+  complete: "Forwarded to agency",
+  approved: "Approved",
+  rejected: "Rejected",
+};
+
+const SCHOLAR_STATUSES = {
+  "": "Any grantee status",
+  active: "Active grantee",
+  inactive: "Inactive grantee",
+  completed: "Completed (former grantee)",
+};
+
+const EMPTY_FILTERS = {
+  college: "",
+  year_level: "",
+  sex: "",
+  standing: "",
+  scholarship_id: "",
+  external_program: "",
+  school_year: "",
+  semester: "",
+  processing_batch_id: "",
+  application_status: "",
+  scholar_status: "",
+};
 const stamp = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
 export default function DataBankPage() {
   const toast = useToast();
 
   const [query, setQuery] = useState("");
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  // ?batch=<id> (from Processing Batches) starts with the students of that batch.
+  const [filters, setFilters] = useState(() => {
+    const batch = new URLSearchParams(window.location.search).get("batch");
+    return batch ? { ...EMPTY_FILTERS, processing_batch_id: batch } : EMPTY_FILTERS;
+  });
   const [results, setResults] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  const [options, setOptions] = useState({ colleges: [], year_levels: [], external_programs: [] });
+  const [options, setOptions] = useState({
+    colleges: [],
+    year_levels: [],
+    external_programs: [],
+    school_years: [],
+    semesters: [],
+    batches: [],
+  });
   const [programs, setPrograms] = useState([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -168,7 +209,7 @@ export default function DataBankPage() {
   // Show the first students as soon as the page opens. A link with
   // ?student=<id> (from the search box) also opens that student's history.
   useEffect(() => {
-    fetchStudents("", EMPTY_FILTERS, 1);
+    fetchStudents("", filters, 1);
     api
       .get("/scholarships")
       .then((response) => setPrograms(response.data))
@@ -287,6 +328,77 @@ export default function DataBankPage() {
             )}
           </select>
 
+          <label htmlFor="bank-sy" className="sr-only">
+            Academic year
+          </label>
+          <select id="bank-sy" value={filters.school_year} onChange={(e) => changeFilter("school_year", e.target.value)}>
+            <option value="">All academic years</option>
+            {(options.school_years || []).map((year) => (
+              <option key={year} value={year}>
+                AY {year}
+              </option>
+            ))}
+          </select>
+
+          <label htmlFor="bank-sem" className="sr-only">
+            Semester
+          </label>
+          <select id="bank-sem" value={filters.semester} onChange={(e) => changeFilter("semester", e.target.value)}>
+            <option value="">All semesters</option>
+            {(options.semesters || []).map((semester) => (
+              <option key={semester} value={semester}>
+                {semester}
+              </option>
+            ))}
+          </select>
+
+          <label htmlFor="bank-batch" className="sr-only">
+            Processing batch
+          </label>
+          <select
+            id="bank-batch"
+            value={filters.processing_batch_id}
+            onChange={(e) => changeFilter("processing_batch_id", e.target.value)}
+          >
+            <option value="">All processing batches</option>
+            {(options.batches || []).map((batch) => (
+              <option key={batch.id} value={String(batch.id)}>
+                {batch.name}
+                {batch.status === "completed" ? " (completed)" : ""}
+              </option>
+            ))}
+          </select>
+
+          <label htmlFor="bank-app-status" className="sr-only">
+            Application status
+          </label>
+          <select
+            id="bank-app-status"
+            value={filters.application_status}
+            onChange={(e) => changeFilter("application_status", e.target.value)}
+          >
+            {Object.entries(APPLICATION_STATUSES).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+
+          <label htmlFor="bank-scholar-status" className="sr-only">
+            Grantee status
+          </label>
+          <select
+            id="bank-scholar-status"
+            value={filters.scholar_status}
+            onChange={(e) => changeFilter("scholar_status", e.target.value)}
+          >
+            {Object.entries(SCHOLAR_STATUSES).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+
           {filtered && (
             <button type="button" className="link-button" onClick={clearAll}>
               Clear all
@@ -334,7 +446,8 @@ export default function DataBankPage() {
                         <>
                           {(item.scholar_records || []).map((record) => (
                             <div key={record.id}>
-                              {record.scholarship?.name}{" "}
+                              {record.scholarship?.name}
+                              {record.school_year ? ` (${record.school_year})` : ""}{" "}
                               <span className={statusClass(record.status)}>{record.status}</span>
                             </div>
                           ))}
@@ -453,6 +566,8 @@ export default function DataBankPage() {
                   <thead>
                     <tr>
                       <th>Scholarship</th>
+                      <th>School year</th>
+                      <th>Batch</th>
                       <th>Status</th>
                       <th>Tagged</th>
                       <th>Enrolled</th>
@@ -465,6 +580,8 @@ export default function DataBankPage() {
                     {student.scholar_records.map((record) => (
                       <tr key={record.id}>
                         <td>{record.scholarship?.name}</td>
+                        <td>{[record.semester, record.school_year].filter(Boolean).join(" ") || "—"}</td>
+                        <td>{record.processing_batch?.name || "—"}</td>
                         <td>
                           <span className={statusClass(record.status)}>
                             {record.status}
@@ -500,6 +617,8 @@ export default function DataBankPage() {
                   <thead>
                     <tr>
                       <th>Scholarship</th>
+                      <th>School year</th>
+                      <th>Batch</th>
                       <th>Status</th>
                       <th>Submitted</th>
                       <th>Enrollment</th>
@@ -511,6 +630,8 @@ export default function DataBankPage() {
                     {student.applications.map((application) => (
                       <tr key={application.id}>
                         <td>{application.scholarship?.name}</td>
+                        <td>{[application.semester, application.school_year].filter(Boolean).join(" ") || "—"}</td>
+                        <td>{application.processing_batch?.name || "—"}</td>
                         <td>
                           <span className={statusClass(application.status)}>
                             {statusLabel(application.status)}
@@ -534,8 +655,50 @@ export default function DataBankPage() {
             ) : (
               <EmptyState message="No applications." />
             )}
+
+            <h3>Processing history</h3>
+            {processingHistory(student).length ? (
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Scholarship</th>
+                      <th>Step</th>
+                      <th>By</th>
+                      <th>Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {processingHistory(student).map((log) => (
+                      <tr key={log.id}>
+                        <td>{formatDate(log.created_at)}</td>
+                        <td>{log.scholarship}</td>
+                        <td>
+                          {log.from_status ? `${statusLabel(log.from_status)} → ` : ""}
+                          {statusLabel(log.to_status)}
+                        </td>
+                        <td>{log.changer?.name || (log.changed_by ? "Staff" : "Student / system")}</td>
+                        <td>{log.remarks || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState message="No recorded steps yet." />
+            )}
         </Modal>
       )}
     </div>
   );
+}
+
+// Every recorded step of every application (status changes, enrollment checks, tagging), newest first.
+function processingHistory(student) {
+  return (student.applications || [])
+    .flatMap((application) =>
+      (application.status_logs || []).map((log) => ({ ...log, scholarship: application.scholarship?.name }))
+    )
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at) || b.id - a.id);
 }

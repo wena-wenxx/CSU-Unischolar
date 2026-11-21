@@ -205,6 +205,8 @@ class PayrollController extends Controller
             foreach ($included as $row) {
                 PayrollRecord::create([
                     'scholar_record_id' => $row['scholar_record_id'],
+                    // the processing batch of the grantee's scholar record (program and school year)
+                    'processing_batch_id' => $labels[$row['scholar_record_id']]->processing_batch_id,
                     'amount' => $row['amount'],
                     'period' => $period,
                     'bank_atm_status' => mb_substr($labels[$row['scholar_record_id']]->atm_label, 0, 50),
@@ -272,7 +274,10 @@ class PayrollController extends Controller
     {
         $this->staffOnly($request);
 
+        $batchId = $request->integer('processing_batch_id') ?: null;
+
         $rows = PayrollRecord::with('scholarRecord.scholarship:id,name')
+            ->when($batchId, fn ($q, $id) => $q->where('processing_batch_id', $id))
             ->get()
             ->groupBy(fn ($p) => mb_strtolower(trim($p->period)).'|'.$p->scholarRecord?->scholarship_id)
             ->map(function ($group) {
@@ -311,11 +316,13 @@ class PayrollController extends Controller
 
         // Only the columns the payroll list and CSV use (keeps the page fast).
         $records = PayrollRecord::with([
-            'scholarRecord:id,student_id,scholarship_id,status,currently_enrolled,has_atm,atm_funds,atm_note',
+            'scholarRecord:id,student_id,scholarship_id,school_year,semester,status,currently_enrolled,has_atm,atm_funds,atm_note',
             'scholarRecord.student:id,student_id,first_name,middle_name,last_name,course,year_level',
             'scholarRecord.scholarship:id,name,short_name,application_mode',
+            'processingBatch:id,name,status',
             'preparer:id,name',
         ])
+            ->when($request->integer('processing_batch_id') ?: null, fn ($q, $id) => $q->where('processing_batch_id', $id))
             ->latest()
             ->get();
 
@@ -378,6 +385,8 @@ class PayrollController extends Controller
         $record = PayrollRecord::create([
             'scholar_record_id' =>
                 $data['scholar_record_id'],
+            'processing_batch_id' =>
+                $scholar->processing_batch_id,
             'amount' =>
                 $data['amount'],
             'period' =>

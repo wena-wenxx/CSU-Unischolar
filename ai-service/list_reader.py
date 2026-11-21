@@ -732,6 +732,84 @@ def _parse_general_payroll(text):
     return rows, sheet_total
 
 
+TES_HEADER = [
+    "Control Number", "Student Number", "TES Award Number", "Last Name",
+    "Given Name", "Middle Initial", "Sex at Birth", "Birthdate",
+    "Degree Program", "Year Level", "Email Address", "Phone Number",
+    "TES Batch", "TES Amount", "PWD", "TOTAL AMOUNT",
+]
+
+
+def _merge_close(values, gap=3.0):
+    out = []
+    for v in sorted(values):
+        if not out or v - out[-1] > gap:
+            out.append(v)
+    return out
+
+
+def _tes_rows_from_vector_table(path):
+    """
+    TES billing list saved as a clear PDF (e.g. exported from Excel): the table has drawn lines and
+    real text. Each word is put in the cell its position falls in (16 columns between the vertical
+    lines, one row between two horizontal lines), so wrapped cells (a Student Number or award number
+    on two lines) stay together. Returns [] when the PDF has no such table (the caller then reads the
+    text line by line).
+    """
+    try:
+        import pymupdf as fitz
+    except ImportError:
+        import fitz
+
+    rows = [list(TES_HEADER)]
+    with fitz.open(path) as doc:
+        for page in doc:
+            vertical, horizontal = [], []
+            for drawing in page.get_drawings():
+                for item in drawing.get("items", []):
+                    if item[0] == "l":
+                        p1, p2 = item[1], item[2]
+                        if abs(p1.x - p2.x) < 1 and abs(p1.y - p2.y) > 20:
+                            vertical.append(p1.x)
+                        elif abs(p1.y - p2.y) < 1 and abs(p1.x - p2.x) > page.rect.width * 0.5:
+                            horizontal.append(p1.y)
+                    elif item[0] == "re":
+                        r = item[1]
+                        if r.width < 2 and r.height > 20:
+                            vertical.append(r.x0)
+                        elif r.height < 2 and r.width > page.rect.width * 0.5:
+                            horizontal.append(r.y0)
+            xs, ys = _merge_close(vertical), _merge_close(horizontal)
+            if len(xs) < 17 or len(ys) < 2:
+                continue
+            xs = xs[-17:] if len(xs) > 17 else xs
+            cells = {}
+            for x0, y0, x1, y1, word, *_ in page.get_text("words"):
+                cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+                col = next((c for c in range(16) if xs[c] <= cx < xs[c + 1]), None)
+                row = next((r for r in range(len(ys) - 1) if ys[r] <= cy < ys[r + 1]), None)
+                if col is None or row is None:
+                    continue
+                cells.setdefault(row, {}).setdefault(col, []).append((round(y0, 1), x0, word))
+            for r in sorted(cells):
+                values = []
+                for c in range(16):
+                    # words on the same line (tops within 3 points; Ñ is taller) left to right, then the next line
+                    lines = []
+                    for y, x, w in sorted(cells[r].get(c, [])):
+                        if lines and abs(y - lines[-1][0]) <= 3:
+                            lines[-1][1].append((x, w))
+                        else:
+                            lines.append((y, [(x, w)]))
+                    text = " ".join(w for _y, line in lines for _x, w in sorted(line))
+                    # pieces of one value broken over two lines: "2026-" + "00001", "TES-2099..-" + "...".
+                    text = re.sub(r"-\s+(?=[0-9A-Z])", "-", text)
+                    values.append(text.strip())
+                if re.fullmatch(r"\d{5}", values[0]):
+                    rows.append(values)
+    return rows if len(rows) > 1 else []
+
+
 def _parse_tes_continuing(text):
     """Parse TES Continuing Form 2 - Annex 2 rows into named 16-column fields."""
     header = [
@@ -746,7 +824,7 @@ def _parse_tes_continuing(text):
     starts = [
         i for i, line in enumerate(lines)
         if re.search(r"(?<!\d)\d{5}(?!\d)", line)
-        and re.search(r"\d{3}\s*-\s*\d{5}", line)
+        and re.search(r"\d{3,4}\s*-\s*\d{5}", line)
     ]
     if not starts:
         for i, line in enumerate(lines):
@@ -766,7 +844,7 @@ def _parse_tes_continuing(text):
             chunk = chunk[:footer_match.start()].strip()
 
         control_match = re.search(r"(?<!\d)(\d{5})(?!\d)", chunk)
-        student_match = re.search(r"\b(\d{3})\s*-\s*(\d{5})\b", chunk)
+        student_match = re.search(r"\b(\d{3,4})\s*-\s*(\d{5})\b", chunk)
         award_match = re.search(r"\bTES-\s*(\d{8})\s*-\s*(\d{12})\s*-\s*(\d{6})\b", chunk, re.I)
         sex_match = re.search(r"\b(FEMALE|MALE)\b", chunk, re.I)
         pwd_match = re.search(r"\b(YES|NO)\b", chunk, re.I)
@@ -965,8 +1043,11 @@ def _read_pdf(path):
 
     rows, layout, used_ocr, page_texts = [], [], False, []
     tes_layout_rows = []
+    # How each page was read: "text" (the PDF's own text layer), "ocr", "text-no-ocr" (scanned, but
+    # OCR is not installed, so the weak text layer was used) or "skipped" (instructions, totals, signatures).
+    page_methods = []
     with fitz.open(path) as doc:
-        for page in doc:
+        for page_number, page in enumerate(doc, start=1):
             words = page.get_text("words")  # (x0, y0, x1, y1, word, block, line, word_no)
             embedded = " ".join(w[4] for w in words)
             structured_text = page.get_text("text").strip()
@@ -984,9 +1065,11 @@ def _read_pdf(path):
             embedded_class = classify_page(embedded)
             if embedded_class in ("instruction", "signature", "total"):
                 page_texts.append(structured_text or embedded)
+                page_methods.append({"page": page_number, "method": "skipped"})
                 continue
             if not use_ocr and len(words) >= 3:
                 page_rows, page_layout = group_boxes([(w[0], w[1], w[2], w[3], w[4]) for w in words], True)
+                page_methods.append({"page": page_number, "method": "text"})
             else:
                 # Render suspicious layers as well as truly scanned pages.
                 pix = page.get_pixmap(dpi=200)
@@ -999,11 +1082,13 @@ def _read_pdf(path):
                         embedded = " ".join(cell for row in page_rows for cell in row)
                         structured_text = embedded
                         used_ocr = True
+                        page_methods.append({"page": page_number, "method": "ocr"})
                     except (ImportError, RuntimeError):
                         # Keep the embedded layer as a best-effort fallback when
                         # the optional offline OCR package is not installed.
                         page_rows, page_layout = group_boxes(
                             [(w[0], w[1], w[2], w[3], w[4]) for w in words], True)
+                        page_methods.append({"page": page_number, "method": "text-no-ocr"})
                 finally:
                     os.remove(tmp_path)
             page_texts.append(structured_text or embedded)
@@ -1033,7 +1118,9 @@ def _read_pdf(path):
                     *unique,
                 ]
             else:
-                rows = _parse_tes_continuing(text)
+                # A clear (digital) PDF with real text: read the table by its drawn lines;
+                # otherwise fall back to reading the text line by line.
+                rows = _tes_rows_from_vector_table(path) or _parse_tes_continuing(text)
             printed_total = None
             totals = re.findall(r"\b\d{1,3}(?:,\d{3})*\.\d{2}\b", text)
             candidates = [float(value.replace(",", "")) for value in totals]
@@ -1061,9 +1148,14 @@ def _read_pdf(path):
             for row in rows:
                 if len(row) > 12 and not row[12]:
                     row[12] = batch_number
+    if metadata.get("batch"):
+        metadata["batch"] = re.sub(r"\s+", " ", str(metadata["batch"])).strip()     # "Batch\n2" -> "Batch 2"
     if template in ("general_payroll", "tes_continuing_form_2_annex_2"):
         metadata["printed_total"] = printed_total or None
     checks = validate_document_rows(rows, metadata, template)
+    metadata["page_methods"] = page_methods
+    metadata["text_pages"] = sum(1 for p in page_methods if p["method"] == "text")
+    metadata["ocr_pages"] = sum(1 for p in page_methods if p["method"] == "ocr")
     return rows[:MAX_ROWS], layout[:MAX_ROWS], "ocr" if used_ocr else "pdf-text", metadata | checks
 
 
@@ -1254,8 +1346,9 @@ def read_table(path, filename=""):
         if ruled is None:
             rows, layout, method, metadata = _read_pdf(path)
             warnings.append("This is a scanned CHED form, but no OCR program is installed, so the scanner's own "
-                            "text was used. It has many mistakes: install PaddleOCR (pip install -r "
-                            "requirements-ocr.txt) and read the file again, or check every row by hand.")
+                            "hidden text was used and it has many mistakes. Install Tesseract (see the setup guide: "
+                            "winget install UB-Mannheim.TesseractOCR, then pip install pytesseract) or PaddleOCR, "
+                            "restart the AI service and read the file again, or check every row by hand.")
         else:
             return ruled
     elif ext == ".pdf" and _is_scanned_pdf(path) and (grid := _generic_grid(path)):

@@ -106,7 +106,8 @@ def _paddle_boxes(image_path):
 
 
 def _tesseract_boxes(image_path):
-    import pytesseract
+    from ocr_engine import _pytesseract
+    pytesseract = _pytesseract()
     from PIL import Image
 
     data = pytesseract.image_to_data(Image.open(image_path), config="--psm 11",
@@ -129,7 +130,8 @@ def ocr_engines_available():
     except Exception:
         pass
     try:
-        import pytesseract
+        from ocr_engine import _pytesseract
+        pytesseract = _pytesseract()
         pytesseract.get_tesseract_version()
         names.append("tesseract")
     except Exception:
@@ -534,7 +536,8 @@ def _ocr_cell(gray, row_span, col_span, engine, field=""):
         if engine == "paddleocr":
             boxes = _paddle_boxes(path)
         else:
-            import pytesseract
+            from ocr_engine import _pytesseract
+            pytesseract = _pytesseract()
             from PIL import Image
 
             config = "--psm 6"

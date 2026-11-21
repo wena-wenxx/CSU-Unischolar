@@ -250,8 +250,8 @@ class ApplicationController extends Controller
         $statuses = array_filter(explode(',', (string) $request->query('status', '')));
 
         $applications = Application::query()
-            ->select(['id', 'student_id', 'scholarship_id', 'school_year', 'status', 'remarks', 'submitted_at', 'forwarded_at',
-                'enrollment_verified', 'enrollment_verified_at', 'created_at', 'updated_at'])
+            ->select(['id', 'student_id', 'scholarship_id', 'school_year', 'semester', 'processing_batch_id', 'status', 'remarks', 'submitted_at', 'forwarded_at',
+                'enrollment_verified', 'enrollment_verified_at', 'enrollment_method', 'created_at', 'updated_at'])
             ->with([
                 'student:id,user_id,student_id,first_name,middle_name,last_name,sex,course,year_level,college,contact_number',
                 'student.user:id,email',
@@ -259,8 +259,10 @@ class ApplicationController extends Controller
                 'scholarship.requirements:id,scholarship_id,name,is_required',
                 'documents:id,application_id,scholarship_requirement_id,status',
                 'latestLog',
+                'processingBatch:id,name,status',
             ])
             ->when($statuses, fn ($q) => $q->whereIn('status', $statuses))
+            ->when($request->integer('processing_batch_id') ?: null, fn ($q, $id) => $q->where('processing_batch_id', $id))
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
             ->get()
@@ -615,7 +617,7 @@ class ApplicationController extends Controller
 
         return response()->json([
             'message' => 'Application review updated successfully.',
-            'email' => $emailLog ? ['status' => $emailLog->status, 'to' => $emailLog->to_email] : null,
+            'email' => $emailLog ? ['status' => $emailLog->status, 'to' => $emailLog->to_email, 'mode' => \App\Support\MailMode::mode()] : null,
             'application' => $application->fresh()->load([
                 'student',
                 'scholarship',

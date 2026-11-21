@@ -20,6 +20,10 @@ return [
         'photo' => env('TEST_STUDENT_PHOTO') ?: null,
     ],
 
+    // "php artisan demo:reset" works only when this is true AND APP_ENV is local. Keep it false
+    // on any computer with real data.
+    'reset_allowed' => (bool) env('DEMO_RESET_ALLOWED', false),
+
     // Show the demo accounts (with their passwords) on the login page. Turn OFF for real use.
     'show_on_login' => (bool) env('DEMO_LOGIN_ACCOUNTS', false),
 ];

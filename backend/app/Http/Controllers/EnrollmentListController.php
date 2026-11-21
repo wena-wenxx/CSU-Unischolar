@@ -212,7 +212,7 @@ class EnrollmentListController extends Controller
                         $skipped++;
                         continue;
                     }
-                    EnrollmentController::record($application, $enrolled, $note, $request->user());
+                    EnrollmentController::record($application, $enrolled, $note, $request->user(), 'registrar_list');
                 } else {
                     $record = ScholarRecord::with('student:id,first_name,last_name', 'scholarship:id,name')->find($item['id']);
                     if (!$record || $record->status !== 'active') {

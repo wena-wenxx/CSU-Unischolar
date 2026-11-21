@@ -19,3 +19,4 @@ pytest
 httpx
 openpyxl
 python-docx
+pytesseract

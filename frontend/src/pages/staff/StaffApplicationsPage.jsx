@@ -18,7 +18,13 @@ import SearchField from "../../components/SearchField";
 import { matchesWords, searchWords } from "../../lib/search";
 import Loading from "../../components/Loading";
 
+// "Still needs action" is the default: applications OAS must still review, those waiting for the
+// student's correction, and approved ones whose enrollment is not verified yet. Processed ones
+// (forwarded, approved and verified, rejected) leave this list but stay under their own status.
+const ACTION_STATUSES = ["submitted", "under_review", "needs_action"];
+
 const FILTERS = [
+  ["action", "Still needs action"],
   ["all", "All statuses"],
   ["submitted", "Submitted"],
   ["under_review", "Under review"],
@@ -54,12 +60,14 @@ export default function StaffApplicationsPage() {
   const location = useLocation();
   const [filter, setFilter] = useState(() => {
     const wanted = new URLSearchParams(location.search).get("filter");
-    return FILTERS.some(([key]) => key === wanted) ? wanted : "all";
+    return FILTERS.some(([key]) => key === wanted) ? wanted : "action";
   });
   const [query, setQuery] = useState("");
   const [program, setProgram] = useState("all");
   const [sort, setSort] = useState("student");
   const [schoolYear, setSchoolYear] = useState("all");
+  // ?batch=<id> (from Processing Batches) shows only that processing batch.
+  const [batch, setBatch] = useState(() => new URLSearchParams(location.search).get("batch") || "all");
   const [selected, setSelected] = useState(null);
   const [verifying, setVerifying] = useState(null);
   const version = useRef(null);
@@ -142,6 +150,12 @@ export default function StaffApplicationsPage() {
 
   const inFilter = (application, key) => {
     if (key === "all") return true;
+    if (key === "action") {
+      return (
+        ACTION_STATUSES.includes(application.status) ||
+        (application.status === "approved" && !application.enrollment_verified)
+      );
+    }
     if (key === "to_verify") {
       return application.status === "approved" && !application.enrollment_verified;
     }
@@ -176,6 +190,7 @@ export default function StaffApplicationsPage() {
   const shown = searched
     .filter((application) => activeProgram === "all" || String(application.scholarship_id) === activeProgram)
     .filter((application) => schoolYear === "all" || application.school_year === schoolYear)
+    .filter((application) => batch === "all" || String(application.processing_batch_id) === batch)
     .sort((a, b) => {
       if (sort === "student") {
         return latestOf[b.student_id] - latestOf[a.student_id] || a.student_id - b.student_id || time(b.updated_at) - time(a.updated_at);
@@ -191,7 +206,10 @@ export default function StaffApplicationsPage() {
   const grouped = sort === "student";
 
   // Long lists: 25 rows first, then Show more (resets on another tab, filter or search).
-  const page = usePaged(shown, `${activeProgram}|${schoolYear}|${shown.length}|${shown[0]?.id}`);
+  const page = usePaged(shown, `${activeProgram}|${schoolYear}|${batch}|${shown.length}|${shown[0]?.id}`);
+  const batches = [...new Map(applications.filter((a) => a.processing_batch).map((a) => [a.processing_batch.id, a.processing_batch])).values()]
+    .filter((b) => activeProgram === "all" || applications.some((a) => a.processing_batch_id === b.id && String(a.scholarship_id) === activeProgram))
+    .sort((a, b) => b.id - a.id);
 
 
   const statusCount = (key) =>
@@ -243,6 +261,22 @@ export default function StaffApplicationsPage() {
             ))}
           </select>
 
+          <label htmlFor="batch-filter" className="sr-only">
+            Processing batch
+          </label>
+          <select id="batch-filter" value={batch} onChange={(event) => setBatch(event.target.value)}>
+            <option value="all">All processing batches</option>
+            {batch !== "all" && !batches.some((b) => String(b.id) === batch) && (
+              <option value={batch}>Chosen batch (no applications in this view)</option>
+            )}
+            {batches.map((b) => (
+              <option key={b.id} value={String(b.id)}>
+                {b.name}
+                {b.status === "completed" ? " (completed)" : ""}
+              </option>
+            ))}
+          </select>
+
           <label htmlFor="sort-applications" className="sr-only">
             Sort
           </label>
@@ -260,7 +294,13 @@ export default function StaffApplicationsPage() {
         </div>
 
         {shown.length === 0 ? (
-          <EmptyState message="No applications in this list." />
+          <EmptyState
+            message={
+              filter === "action"
+                ? "Nothing needs action right now. Processed applications are kept: choose \"All statuses\" (or a status) to see them."
+                : "No applications in this list."
+            }
+          />
         ) : (
           <div className="table-wrapper">
             <table>
@@ -434,7 +474,12 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
       );
 
       // Approval e-mail to the student (see Reports → E-mails sent).
-      if (data.email?.status === "sent") toast.info(`Approval e-mail sent to ${data.email.to}.`);
+      // E-mail to CSU accounts is off during the study (log only) or goes to one test inbox: say so honestly.
+      if (data.email?.mode === "off" && data.email.status !== "failed")
+        toast.info("E-mail is off: the approval e-mail was written to the log only. The student sees the update in their notifications.");
+      else if (data.email?.mode === "test" && data.email.status !== "failed")
+        toast.info("The approval e-mail went to the test inbox only, not to the student.");
+      else if (data.email?.status === "sent") toast.info(`Approval e-mail sent to ${data.email.to}.`);
       else if (data.email?.status === "queued") toast.info(`Approval e-mail queued for ${data.email.to}.`);
       else if (data.email?.status === "failed") toast.error("The approval e-mail could not be sent. See Reports → E-mails sent.");
       await onChanged();

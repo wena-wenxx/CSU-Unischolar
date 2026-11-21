@@ -3,6 +3,7 @@
 use App\Http\Controllers\AIController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AgencyListController;
+use App\Http\Controllers\ProcessingBatchController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\AuthController;
@@ -150,6 +151,24 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\RequirePasswordChange::c
     Route::patch('/staff/profile-requests/{id}', [ProfileChangeRequestController::class, 'resolve']);
     Route::get('/staff/agency-lists', [AgencyListController::class, 'index']);
     Route::post('/staff/agency-lists', [AgencyListController::class, 'store']);
+    Route::get('/staff/agency-lists/{id}', [AgencyListController::class, 'show']);
+    Route::post('/staff/agency-lists/{id}/rows/{row}/link', [AgencyListController::class, 'linkRow']);          // unmatched row -> a student found in Data Bank
+    Route::post('/staff/agency-lists/{id}/rows/{row}/set-aside', [AgencyListController::class, 'setAsideRow']); // keep it unmatched, with a note
+
+    // Processing batches: one cycle of one program (e.g. TES – 1st Semester AY 2026-2027)
+    Route::get('/staff/processing-batches', [ProcessingBatchController::class, 'index']);
+    Route::post('/staff/processing-batches', [ProcessingBatchController::class, 'store']);
+    Route::get('/staff/processing-batches/{id}', [ProcessingBatchController::class, 'show']);
+    Route::patch('/staff/processing-batches/{id}', [ProcessingBatchController::class, 'update']);
+    Route::post('/staff/processing-batches/{id}/complete', [ProcessingBatchController::class, 'complete']);
+    Route::post('/staff/processing-batches/{id}/reopen', [ProcessingBatchController::class, 'reopen']);
+    Route::get('/staff/mail-mode', function (\Illuminate\Http\Request $request) {
+        if (!in_array($request->user()->role, ['staff', 'admin'], true)) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
+        return response()->json(\App\Support\MailMode::describe());
+    });
     Route::get('/staff/email-logs', [ReportController::class, 'emailLogs']);
 
     /*

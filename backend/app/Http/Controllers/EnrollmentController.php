@@ -49,7 +49,7 @@ class EnrollmentController extends Controller
 
         $enrolled = (bool) $data['currently_enrolled'];
 
-        self::record($application, $enrolled, $data['remarks'] ?? null, $request->user());
+        self::record($application, $enrolled, $data['remarks'] ?? null, $request->user(), 'manual');
 
         return response()->json([
             'message' => $enrolled
@@ -69,11 +69,13 @@ class EnrollmentController extends Controller
     | the application, its step history, the activity log, and the scholar
     | record's enrollment flag (payroll checks it).
     */
-    public static function record(Application $application, bool $enrolled, ?string $remarks, User $by): void
+    public static function record(Application $application, bool $enrolled, ?string $remarks, User $by, string $method = 'manual'): void
     {
         $application->update([
             'enrollment_verified' => $enrolled,
             'enrollment_verified_at' => $enrolled ? now() : null,
+            // How it was checked: against the Registrar's uploaded list, or by staff (not a link to CSU's systems).
+            'enrollment_method' => $method,
             'remarks' => $remarks ?? $application->remarks,
         ]);
 
@@ -93,6 +95,7 @@ class EnrollmentController extends Controller
 
         ScholarRecord::where('student_id', $application->student_id)
             ->where('scholarship_id', $application->scholarship_id)
+            ->where('school_year', $application->school_year)
             ->update(['currently_enrolled' => $enrolled]);
     }
 }

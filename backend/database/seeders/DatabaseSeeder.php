@@ -40,8 +40,13 @@ class DatabaseSeeder extends Seeder
             PortalDemoSeeder::class,  // announcements + one profile correction request
         ]);
 
-        // Bulk applications were inserted directly; give each the school year it was started in.
+        // Bulk applications were inserted directly; give each the school year it was started in,
+        // and the processing batch of its program and school year.
         \App\Models\Application::fillMissingSchoolYears();
+        \App\Models\Application::fillMissingBatches();
+
+        // The seeders' fictional students are marked as demo (only these can be removed by demo:reset).
+        \App\Support\DemoData::markSeededStudents();
 
         // Bulk documents were inserted directly; record which student owns each.
         \App\Models\Document::backfillOwners();
@@ -49,6 +54,9 @@ class DatabaseSeeder extends Seeder
 
         // Starting ATM status for every grantee (funded / pending / for ATM application).
         \App\Models\ScholarRecord::backfillAtmStatus();
+
+        // Scholar records are kept per school year; bulk records get theirs (and their batch).
+        \App\Models\ScholarRecord::fillMissingSchoolYears();
 
         // When each demo application was forwarded to its agency.
         \App\Models\Application::backfillForwardedAt();
