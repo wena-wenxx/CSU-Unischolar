@@ -25,6 +25,10 @@ def get_ocr():
     if _ocr_error is not None:
         return None
     try:
+        # Paddle 3.x on Windows CPUs can stop with "ConvertPirAttribute2RuntimeAttribute not support"
+        # when its oneDNN (MKL-DNN) speed-up is on. Turning it off fixes it; OCR is a little slower.
+        os.environ.setdefault("FLAGS_use_mkldnn", "0")
+        os.environ.setdefault("FLAGS_enable_pir_api", "0")
         from paddleocr import PaddleOCR
         try:  # PaddleOCR 3.x style
             _ocr = PaddleOCR(
@@ -32,6 +36,7 @@ def get_ocr():
                 use_doc_orientation_classify=False,
                 use_doc_unwarping=False,
                 use_textline_orientation=False,
+                enable_mkldnn=False,
             )
         except (TypeError, ValueError):  # PaddleOCR 2.x style
             _ocr = PaddleOCR(lang="en", use_angle_cls=True)
