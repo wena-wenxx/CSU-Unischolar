@@ -40,7 +40,7 @@ class EnrollmentListController extends Controller
 
         return response()->json([
             'lists' => EnrollmentList::with('uploader:id,name')->latest()->latest('id')->limit(20)->get(),
-            'waiting' => Application::where('status', 'approved')->where('enrollment_verified', false)->count(),
+            'waiting' => Application::where('status', 'approved')->where('enrollment_verified', false)->inOpenWork()->count(),
             'grantees' => ScholarRecord::where('status', 'active')->count(),
         ]);
     }
@@ -131,6 +131,7 @@ class EnrollmentListController extends Controller
             Application::with(['student', 'scholarship:id,name'])
                 ->where('status', 'approved')
                 ->where('enrollment_verified', false)
+                ->inOpenWork()
                 ->get()
                 ->each(fn ($a) => $targets->push(['kind' => 'application', 'id' => $a->id, 'student' => $a->student, 'scholarship' => $a->scholarship?->name]));
         }

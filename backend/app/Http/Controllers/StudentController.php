@@ -206,6 +206,8 @@ class StudentController extends Controller
         $invitations = AiRecommendation::with('scholarship:id,name')
             ->where('student_id', $student->id)
             ->where('staff_status', 'invited')
+            // invitations saved as a personal notice are listed once, under opportunities
+            ->whereNotIn('id', ScholarshipNotification::where('student_id', $student->id)->whereNotNull('ai_recommendation_id')->select('ai_recommendation_id'))
             ->where('invited_at', '>=', now()->subDays(60))
             ->latest('invited_at')
             ->get(['id', 'scholarship_id', 'invited_at'])

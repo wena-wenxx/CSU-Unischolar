@@ -183,6 +183,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\RequirePasswordChange::c
     Route::post('/staff/recommendations/notifications', [RecommendationController::class, 'sendNotifications']);
     Route::get('/staff/recommendations/{id}', [RecommendationController::class, 'show']);
     Route::post('/staff/recommendations/{id}/invite', [RecommendationController::class, 'invite']);
+    Route::get('/staff/notices', [RecommendationController::class, 'sentNotices']);   // sent invitations and notices: whom, when, status
     Route::post('/staff/recommendations/{id}/add', [RecommendationController::class, 'add']);
     Route::post('/staff/recommendations/{id}/dismiss', [RecommendationController::class, 'dismiss']);
     Route::post('/staff/recommendations/{id}/wrong', [RecommendationController::class, 'wrong']);

@@ -48,13 +48,19 @@ export default function StaffScholarRecordsPage() {
     load();
   }, [load]);
 
-  // Approved applications that are not yet tagged as grantees.
+  // Approved applications that are not yet tagged as grantees. A scholar record is kept per school
+  // year, so a record of another school year does not count. Applications in a completed batch are
+  // history, not work still to do.
+  const sameYear = (record, application) =>
+    !record.school_year || !application.school_year || record.school_year === application.school_year;
   const untagged = applications.filter(
     (application) =>
+      application.processing_batch?.status !== "completed" &&
       !records.some(
         (record) =>
           record.student_id === application.student_id &&
-          record.scholarship_id === application.scholarship_id
+          record.scholarship_id === application.scholarship_id &&
+          sameYear(record, application)
       )
   );
   const readyToTag = untagged.filter((application) => application.enrollment_verified);

@@ -66,7 +66,8 @@ export function ConfirmProvider({ children }) {
   const confirm = useCallback(
     (options) =>
       new Promise((resolve) => {
-        setRequest({ ...options, resolve });
+        // confirm("Question?") works too: a plain string is the message (it used to be lost).
+        setRequest({ ...(typeof options === "string" ? { message: options } : options), resolve });
       }),
     []
   );

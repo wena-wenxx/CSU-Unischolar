@@ -159,7 +159,7 @@ class AgencyListController extends Controller
 
             return response()->json([
                 'message' => "{$what} was already processed for {$scholarship->name} on "
-                    .$earlier->created_at->format('F j, Y g:i A').'. Process it again only if the agency sent a corrected list.',
+                    .$earlier->created_at->copy()->timezone(Scholarship::TIMEZONE)->format('F j, Y g:i A').'. Process it again only if the agency sent a corrected list.',
                 'duplicate_of' => $earlier->id,
             ], 409);
         }

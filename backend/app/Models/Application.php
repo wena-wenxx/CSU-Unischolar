@@ -110,6 +110,24 @@ class Application extends Model
         return $query->where('school_year', ExternalGrantee::currentSchoolYear());
     }
 
+    /**
+     * Work that can still be pending: the application has no batch, or its batch is not completed.
+     * A completed batch was closed on purpose (with a reason when work was left open), so its
+     * applications stay in the history and the Data Bank but are not shown as new pending tasks.
+     */
+    public function scopeInOpenWork($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereNull('processing_batch_id')
+                ->orWhereHas('processingBatch', fn ($b) => $b->where('status', '!=', 'completed'));
+        });
+    }
+
+    public function inOpenWork(): bool
+    {
+        return !$this->processing_batch_id || $this->processingBatch?->status !== 'completed';
+    }
+
     public function student()
     {
         return $this->belongsTo(Student::class);

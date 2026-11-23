@@ -129,6 +129,19 @@ class ProcessingBatch extends Model
         if ($counts['pending']) {
             $items[] = "{$counts['pending']} application(s) still need OAS action (submitted, under review or needs action)";
         }
+        // Approved students who were not yet checked for enrollment or tagged would otherwise drop out of
+        // the queues when the batch is completed.
+        $approved = $this->applications()->where('status', 'approved')->get(['id', 'student_id', 'scholarship_id', 'school_year', 'enrollment_verified']);
+        $toVerify = $approved->where('enrollment_verified', false)->count();
+        $toTag = $approved->where('enrollment_verified', true)->filter(fn ($a) => !\App\Models\ScholarRecord::where('student_id', $a->student_id)
+            ->where('scholarship_id', $a->scholarship_id)
+            ->where(fn ($q) => $q->whereNull('school_year')->orWhere('school_year', $a->school_year))->exists())->count();
+        if ($toVerify) {
+            $items[] = "{$toVerify} approved student(s) still need enrollment verification";
+        }
+        if ($toTag) {
+            $items[] = "{$toTag} enrolled student(s) are not yet tagged as grantees";
+        }
         if ($counts['unmatched']) {
             $items[] = "{$counts['unmatched']} row(s) of an approved list are still unmatched or need checking";
         }

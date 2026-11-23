@@ -446,11 +446,16 @@ class RecommendationController extends Controller
                     continue;
                 }
 
+                $fullName = $recommendation->student->fullName();
                 $message = str_replace(
                     ['[Student Name]', '[Scholarship Name]'],
-                    [$recommendation->student->fullName(), $scholarship->name],
+                    [$fullName, $scholarship->name],
                     trim($data['message'])
                 );
+                // A notice must say whom it is for, even if the [Student Name] tag was removed.
+                if (mb_stripos($message, $fullName) === false) {
+                    $message = "Dear {$fullName},\n\n".$message;
+                }
 
                 ScholarshipNotification::create([
                     'student_id' => $recommendation->student_id,
@@ -543,16 +548,49 @@ class RecommendationController extends Controller
             return response()->json(['message' => 'This student already applied for this scholarship.'], 422);
         }
 
+        $name = $r->student->fullName();
+
+        // No accidental second invitation: an earlier one must be confirmed before sending again.
+        $earlier = ScholarshipNotification::where('student_id', $r->student_id)
+            ->where('scholarship_id', $r->scholarship_id)
+            ->where('type', self::NOTIFICATION_TYPE)
+            ->latest('sent_at')->first();
+        $earlierAt = $earlier?->sent_at ?? ($r->staff_status === 'invited' ? $r->invited_at : null);
+        if ($earlierAt && !$request->boolean('confirm_resend')) {
+            return response()->json([
+                'message' => "{$name} was already invited to {$r->scholarship->name} on {$earlierAt->copy()->timezone(Scholarship::TIMEZONE)->format('M j, Y g:i A')}. Send another invitation?",
+                'needs_confirmation' => true,
+            ], 409);
+        }
+
+        // The invitation is saved in the system first (the student sees it under the bell, staff see it
+        // under Messages > Sent invitations); the e-mail is extra and may be turned off.
+        $message = "Dear {$name},\n\nThe Office of Admission and Scholarship invites you to apply for {$r->scholarship->name}. "
+            .'Based on the information in CSU UniScholar, you may be eligible. Please review the requirements and apply in CSU UniScholar if you are interested.'
+            .($note ? "\n\nNote from the OAS: {$note}" : '')
+            ."\n\nThis invitation is not an approval. Your application is still subject to the scholarship requirements, OAS review, and the decision of the scholarship provider.";
+
+        // One notice per student and program (a database rule): sending again refreshes it and
+        // shows it as unread again.
+        $notice = ScholarshipNotification::updateOrCreate(
+            ['student_id' => $r->student_id, 'scholarship_id' => $r->scholarship_id, 'type' => self::NOTIFICATION_TYPE],
+            ['sender_id' => $request->user()->id, 'ai_recommendation_id' => $r->id, 'message' => $message,
+                'sent_at' => now(), 'read_at' => null]
+        );
+
         $log = ApplicationNotifier::invitation($r->student, $r->scholarship, 'invite', null, $note);
         $this->decide($r, $request, 'invited', $note, ['invited_at' => now()]);
         RecommendationLog::record($r, $request->user(), 'invited', $note);
         ActivityLog::record($request->user(), 'recommendation.invited',
             "Sent a scholarship invitation to {$r->student->fullName()} for {$r->scholarship->name} (AI score {$r->score}%).", $r);
 
+        $saved = "Invitation saved for {$name}; it shows under the student's bell.";
+
         return response()->json([
             'message' => $log && $log->status !== 'failed'
-                ? \App\Support\MailMode::oneSentence('Invitation e-mail', $r->student->fullName())
-                : 'Invitation recorded, but the e-mail could not be sent. '.EmailLog::plainError($log?->error),
+                ? $saved.' '.\App\Support\MailMode::oneSentence('Invitation e-mail', $name)
+                : $saved.' The e-mail could not be sent. '.EmailLog::plainError($log?->error),
+            'notification_id' => $notice->id,
             'recommendation' => $this->present($r->fresh(['student', 'scholarship'])),
         ]);
     }
@@ -735,5 +773,63 @@ class RecommendationController extends Controller
                 .($verified ? 'GWA and family income marked as verified.' : 'Verification removed.'),
             'student' => $student->fresh(),
         ]);
+    }
+
+    /*
+    | GET /staff/notices?status=&q=
+    | Every invitation and scholarship notice sent to students: to whom, for which program, by whom,
+    | when, and where it stands now. Status: applied (the student applied after the notice), read
+    | (opened under the bell), sent (not opened yet), closed (the program is no longer open and the
+    | student did not apply). Nothing here changes data.
+    */
+    public function sentNotices(Request $request)
+    {
+        $this->staffOnly($request);
+        $status = (string) $request->query('status', 'all');
+        $words = array_filter(preg_split('/\s+/', mb_strtolower(trim((string) $request->query('q', '')))));
+
+        $notices = ScholarshipNotification::with(['student:id,student_id,first_name,middle_name,last_name',
+                'scholarship:id,name,short_name,status,application_start,application_end,application_mode', 'sender:id,name'])
+            ->latest('sent_at')->latest('id')->limit(1000)->get();
+
+        $applied = Application::whereIn('student_id', $notices->pluck('student_id')->unique())
+            ->where('status', '!=', 'draft')
+            ->get(['student_id', 'scholarship_id', 'status', 'created_at']);
+
+        $rows = $notices->map(function (ScholarshipNotification $n) use ($applied) {
+            $application = $applied->first(fn ($a) => $a->student_id === $n->student_id && $a->scholarship_id === $n->scholarship_id
+                && (!$n->sent_at || $a->created_at >= $n->sent_at->copy()->subDay()));
+            $open = in_array($n->scholarship?->availability, ['open', 'upcoming'], true);
+            $state = $application ? 'applied' : ($n->read_at ? 'read' : ($open ? 'sent' : 'closed'));
+
+            return [
+                'id' => $n->id,
+                'student' => $n->student ? trim("{$n->student->last_name}, {$n->student->first_name} {$n->student->middle_name}") : null,
+                'student_number' => $n->student?->student_id,
+                'scholarship' => $n->scholarship?->name,
+                'sender' => $n->sender?->name,
+                'kind' => $n->ai_recommendation_id ? 'Invitation' : 'Notice',
+                'sent_at' => $n->sent_at,
+                'read_at' => $n->read_at,
+                'status' => $state,
+                'application_status' => $application?->status,
+                'message' => $n->message,
+            ];
+        });
+
+        $counts = $rows->countBy('status')->all() + ['all' => $rows->count()];
+        $rows = $rows->when($status !== 'all', fn ($c) => $c->where('status', $status))
+            ->filter(function ($row) use ($words) {
+                $hay = mb_strtolower("{$row['student']} {$row['student_number']} {$row['scholarship']}");
+                $hay .= ' '.str_replace('-', '', $hay);
+                foreach ($words as $w) {
+                    if (!str_contains($hay, str_replace('-', '', $w)) && !str_contains($hay, $w)) {
+                        return false;
+                    }
+                }
+                return true;
+            })->values();
+
+        return response()->json(['counts' => $counts, 'notices' => $rows]);
     }
 }

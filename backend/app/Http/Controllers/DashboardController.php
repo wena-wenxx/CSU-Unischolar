@@ -18,11 +18,13 @@ class DashboardController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $apps = Application::with(['scholarship.requirements', 'documents'])->get();
+        $apps = Application::with(['scholarship.requirements', 'documents', 'processingBatch:id,status'])->get();
+        // Pending counts leave out applications in completed batches (they are history, not new work).
+        $openApps = $apps->filter(fn (Application $a) => $a->inOpenWork());
 
         $totalApplicants = $apps->pluck('student_id')->unique()->count();
         $totalApplications = $apps->count();
-        $needsAction = $apps->where('status', 'needs_action')->count();
+        $needsAction = $openApps->where('status', 'needs_action')->count();
         $approved = $apps->where('status', 'approved')->count();
         $activeScholars = ScholarRecord::where('status', 'active')->count();
         $payrollReady = PayrollRecord::where('status', 'ready')->count();
@@ -47,7 +49,7 @@ class DashboardController extends Controller
             'applications_by_status' => $apps->groupBy('status')->map->count(),
             'applications_with_missing_docs' => $apps->filter(fn ($a) => count($a->missingRequirementNames()) > 0)->count(),
             'documents_needing_review' => Document::whereNotNull('application_id')->whereIn('status', ['flagged', 'needs_review'])->count(),
-            'students_needing_review' => $apps->whereIn('status', ['submitted', 'under_review', 'needs_action'])->pluck('student_id')->unique()->count(),
+            'students_needing_review' => $openApps->whereIn('status', ['submitted', 'under_review', 'needs_action'])->pluck('student_id')->unique()->count(),
             'currently_enrolled_grantees' => ScholarRecord::where('status', 'active')->where('currently_enrolled', true)->count(),
             'students_with_active_scholarship' => ScholarRecord::where('status', 'active')->distinct()->count('student_id'),
             'active_scholarship_programs' => Scholarship::where('status', 'active')->count(),
@@ -58,8 +60,8 @@ class DashboardController extends Controller
                 ->limit(6)->get(),
             'pending_profile_requests' => ProfileChangeRequest::where('status', 'pending')->count(),
             'open_messages' => \App\Models\ContactMessage::where('status', 'open')->count(),
-            'forwarded' => $apps->where('status', 'complete')->count(),
-            'enrollment_to_verify' => $apps->where('status', 'approved')->where('enrollment_verified', false)->count(),
+            'forwarded' => $openApps->where('status', 'complete')->count(),
+            'enrollment_to_verify' => $openApps->where('status', 'approved')->where('enrollment_verified', false)->count(),
 
             // Older names for the same numbers (backward compatibility).
             'approved_applications' => $approved,

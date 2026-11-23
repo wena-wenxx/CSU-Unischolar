@@ -631,7 +631,24 @@ function RecommendationWindow({ id: firstId, onClose, onChanged }) {
 
     setBusy(true);
     try {
-      const { data } = await api.post(`/staff/recommendations/${id}/${action}`, { note: note.trim() || null });
+      const body = { note: note.trim() || null };
+      let data;
+      try {
+        ({ data } = await api.post(`/staff/recommendations/${id}/${action}`, body));
+      } catch (err) {
+        // An invitation that was already sent needs a second "yes" (no accidental duplicates).
+        if (err?.response?.status === 409 && err.response.data?.needs_confirmation) {
+          const again = await confirm({
+            title: "Send the invitation again?",
+            message: err.response.data.message,
+            confirmLabel: "Send again",
+          });
+          if (!again) return;
+          ({ data } = await api.post(`/staff/recommendations/${id}/${action}`, { ...body, confirm_resend: true }));
+        } else {
+          throw err;
+        }
+      }
       toast.success(data.message);
       if (data.recommendation) onChanged(data.recommendation);
       setNote("");

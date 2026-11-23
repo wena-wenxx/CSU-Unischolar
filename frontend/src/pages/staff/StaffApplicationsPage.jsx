@@ -148,16 +148,20 @@ export default function StaffApplicationsPage() {
     setSort(key === "all" ? "student" : "name");
   }
 
+  // An application in a completed batch is history: it is not shown as work still to do.
+  const openWork = (application) => application.processing_batch?.status !== "completed";
+
   const inFilter = (application, key) => {
     if (key === "all") return true;
     if (key === "action") {
       return (
-        ACTION_STATUSES.includes(application.status) ||
-        (application.status === "approved" && !application.enrollment_verified)
+        openWork(application) &&
+        (ACTION_STATUSES.includes(application.status) ||
+          (application.status === "approved" && !application.enrollment_verified))
       );
     }
     if (key === "to_verify") {
-      return application.status === "approved" && !application.enrollment_verified;
+      return openWork(application) && application.status === "approved" && !application.enrollment_verified;
     }
     if (key === "flagged") return flaggedCount(application) > 0;
     return application.status === key;

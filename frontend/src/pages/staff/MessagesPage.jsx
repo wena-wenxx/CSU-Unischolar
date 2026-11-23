@@ -5,6 +5,7 @@ import { useToast } from "../../lib/toast";
 import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
+import SentNotices from "./SentNotices";
 
 /* Student Messages (staff): questions from Contact OAS. Oldest open message first. */
 const TABS = [
@@ -22,6 +23,7 @@ export default function MessagesPage() {
   const [data, setData] = useState(null);
   const [replies, setReplies] = useState({}); // message id -> reply text
   const [busy, setBusy] = useState(null);
+  const [view, setView] = useState("questions"); // questions | invitations
 
   function fetchMessages(nextStatus = status, q = query) {
     return api
@@ -82,8 +84,30 @@ export default function MessagesPage() {
 
   return (
     <div>
-      <PageHeader title="Student Messages" subtitle="Questions students sent from Contact OAS" />
+      <PageHeader title="Student Messages" subtitle="Questions students sent from Contact OAS, and the invitations the OAS sent" />
 
+      <div className="filter-row" role="group" aria-label="Messages or sent invitations">
+        <button
+          id="view-questions"
+          className={view === "questions" ? "button button-primary" : "button button-secondary"}
+          aria-pressed={view === "questions"}
+          onClick={() => setView("questions")}
+        >
+          Student questions
+        </button>
+        <button
+          id="view-invitations"
+          className={view === "invitations" ? "button button-primary" : "button button-secondary"}
+          aria-pressed={view === "invitations"}
+          onClick={() => setView("invitations")}
+        >
+          Sent invitations
+        </button>
+      </div>
+
+      {view === "invitations" ? (
+        <SentNotices />
+      ) : (
       <section className="card">
         <div className="filter-row" role="group" aria-label="Show messages">
           {TABS.map(([key, label]) => (
@@ -197,6 +221,7 @@ export default function MessagesPage() {
           </ul>
         )}
       </section>
+      )}
     </div>
   );
 }
