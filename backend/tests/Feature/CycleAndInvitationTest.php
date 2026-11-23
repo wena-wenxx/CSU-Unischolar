@@ -51,8 +51,8 @@ class CycleAndInvitationTest extends TestCase
 
     private function upload(Scholarship $program, int $batchId, string $file, array $rows, array $extra = [])
     {
-        return $this->postJson('/api/staff/agency-lists', ['scholarship_id' => $program->id, 'processing_batch_id' => $batchId,
-            'agency_name' => 'CHED', 'file_name' => $file, 'school_year' => '2026-2027', 'semester' => '1st Semester', 'rows' => $rows] + $extra);
+        return $this->postJson('/api/staff/agency-lists', array_merge(['scholarship_id' => $program->id, 'processing_batch_id' => $batchId,
+            'agency_name' => 'CHED', 'file_name' => $file, 'school_year' => '2026-2027', 'semester' => '1st Semester', 'rows' => $rows], $extra));
     }
 
     private function tagAll(Scholarship $program): void
@@ -105,7 +105,7 @@ class CycleAndInvitationTest extends TestCase
             ['row' => 3, 'student_id' => '2026-70003', 'last_name' => 'LIM', 'first_name' => 'CARA'],      // same row twice
             ['row' => 4, 'student_id' => '2026-70004', 'last_name' => 'SANTOS', 'first_name' => 'MARIA'],  // ID of Dino, other name
             ['row' => 5, 'student_id' => '2026-79999', 'last_name' => 'UNKNOWN', 'first_name' => 'PAT'],   // no such student
-        ])->assertCreated()->json('upload');
+        ], ['semester' => '2nd Semester'])->assertCreated()->json('upload');
 
         $details = collect(AgencyListUpload::find($upload['id'])->details)->keyBy('row');
         $this->assertSame('already', $details[1]['result']);
@@ -122,8 +122,8 @@ class CycleAndInvitationTest extends TestCase
             ->groupBy('student_id', 'scholarship_id', 'school_year')->havingRaw('count(*) > 1')->get()->count());
 
         // The same file again needs a confirmation (no double processing).
-        $this->upload($program, $b2, 'batch2.pdf', [['row' => 1, 'student_id' => '2026-70003', 'last_name' => 'LIM', 'first_name' => 'CARA']])
-            ->assertStatus(409);
+        $this->upload($program, $b2, 'batch2.pdf', [['row' => 1, 'student_id' => '2026-70003', 'last_name' => 'LIM', 'first_name' => 'CARA']],
+            ['semester' => '2nd Semester'])->assertStatus(409);
 
         // Only the new student waits for enrollment; batch 1 does not come back as new work.
         $this->getJson('/api/staff/enrollment-lists')->assertOk()->assertJsonPath('waiting', 1);
@@ -131,8 +131,17 @@ class CycleAndInvitationTest extends TestCase
         $this->assertSame(3, ScholarRecord::where('status', 'active')->count());
         $this->assertSame(1, ScholarRecord::where('student_id', $ana->id)->count());                  // no second record
 
+        // Batch 1 grantees (Ana, Ben) were last checked in the 1st semester, so 2nd-semester payroll takes only
+        // Cara until the Registrar's list for the 2nd semester is recorded for them.
         $period2 = ['period' => '2nd Semester AY 2026-2027', 'scholarship_id' => $program->id, 'confirm' => true];
-        $this->postJson('/api/payroll/prepare', $period2)->assertSuccessful();
+        $this->postJson('/api/payroll/prepare', $period2)->assertSuccessful()->assertJsonPath('summary.included', 1);
+        $list = $this->postJson('/api/staff/enrollment-lists', ['period' => '2nd Semester AY 2026-2027', 'file_name' => 'reg-2nd.csv',
+            'rows' => [['student_id' => '2026-70001', 'last_name' => 'Reyes', 'first_name' => 'Ana'],
+                       ['student_id' => '2026-70002', 'last_name' => 'Cruz', 'first_name' => 'Ben']]])->assertSuccessful()->json('list.id');
+        $items = ScholarRecord::whereIn('student_id', [$ana->id, $ben->id])->pluck('id')
+            ->map(fn ($id) => ['kind' => 'grantee', 'id' => $id, 'enrolled' => true])->all();
+        $this->postJson('/api/staff/enrollment/record', ['enrollment_list_id' => $list, 'items' => $items])->assertOk();
+        $this->postJson('/api/payroll/prepare', $period2)->assertSuccessful()->assertJsonPath('summary.included', 2);
         $this->postJson('/api/payroll/prepare', $period2)->assertStatus(422);
         $this->assertSame(5, PayrollRecord::count());                                                // 2 + 3, no copies
 

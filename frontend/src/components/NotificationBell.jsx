@@ -121,7 +121,7 @@ export default function NotificationBell() {
                 <li key={item.id} className={item.read_at ? "" : "unread"}>
                   <Link to={`/student/scholarships/${item.scholarship_id}`} onClick={() => setOpen(false)}>
                     <strong>{item.scholarship}</strong>
-                    <span>{item.message}</span>
+                    <span style={{ whiteSpace: "pre-line" }}>{item.message}</span>
                     <small className="muted">{timeAgo(item.sent_at)}</small>
                   </Link>
                   <span className="button-row">

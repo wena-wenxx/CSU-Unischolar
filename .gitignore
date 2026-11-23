@@ -18,3 +18,8 @@ frontend/dist/
 private-test-data/
 *.survey.csv
 ai-service/tests/output/
+
+# Database dumps and backups made on this computer (they hold personal data)
+backups/
+*.sql
+*.sqlite.bak

@@ -446,7 +446,7 @@ class RecommendationController extends Controller
                     continue;
                 }
 
-                $fullName = $recommendation->student->fullName();
+                $fullName = $recommendation->student->fullName(true);
                 $message = str_replace(
                     ['[Student Name]', '[Scholarship Name]'],
                     [$fullName, $scholarship->name],
@@ -548,7 +548,14 @@ class RecommendationController extends Controller
             return response()->json(['message' => 'This student already applied for this scholarship.'], 422);
         }
 
-        $name = $r->student->fullName();
+        // Same rule as the bulk notices: no invitation to a program that is not taking applications.
+        if (!in_array($r->scholarship->availability, ['open', 'upcoming'], true)) {
+            return response()->json([
+                'message' => "{$r->scholarship->name} is not open for applications ({$r->scholarship->availability}), so no invitation was sent.",
+            ], 422);
+        }
+
+        $name = $r->student->fullName(true);
 
         // No accidental second invitation: an earlier one must be confirmed before sending again.
         $earlier = ScholarshipNotification::where('student_id', $r->student_id)

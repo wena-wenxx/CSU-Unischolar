@@ -1,4 +1,6 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import Loading from "./components/Loading";
 import AuthProvider from "./components/AuthProvider";
 import { homePathFor, useAuth } from "./lib/auth";
 import { ToastProvider } from "./components/Toast";
@@ -17,33 +19,33 @@ import StudentProfilePage from "./pages/student/StudentProfilePage";
 import StudentHistoryPage from "./pages/student/StudentHistoryPage";
 import MyDocumentsPage from "./pages/student/MyDocumentsPage";
 
-import StaffDashboard from "./pages/staff/StaffDashboard";
-import StaffApplicationsPage from "./pages/staff/StaffApplicationsPage";
-import StaffScholarRecordsPage from "./pages/staff/StaffScholarRecordsPage";
-import StaffPayrollPage from "./pages/staff/StaffPayrollPage";
-import DataBankPage from "./pages/staff/DataBankPage";
-import StaffScholarshipsPage from "./pages/staff/StaffScholarshipsPage";
-import StaffReportsPage from "./pages/staff/StaffReportsPage";
-import StaffAnnouncementsPage from "./pages/staff/StaffAnnouncementsPage";
-import AgencyListsPage from "./pages/staff/AgencyListsPage";
-import ProcessingBatchesPage from "./pages/staff/ProcessingBatchesPage";
+const StaffDashboard = lazy(() => import("./pages/staff/StaffDashboard"));
+const StaffApplicationsPage = lazy(() => import("./pages/staff/StaffApplicationsPage"));
+const StaffScholarRecordsPage = lazy(() => import("./pages/staff/StaffScholarRecordsPage"));
+const StaffPayrollPage = lazy(() => import("./pages/staff/StaffPayrollPage"));
+const DataBankPage = lazy(() => import("./pages/staff/DataBankPage"));
+const StaffScholarshipsPage = lazy(() => import("./pages/staff/StaffScholarshipsPage"));
+const StaffReportsPage = lazy(() => import("./pages/staff/StaffReportsPage"));
+const StaffAnnouncementsPage = lazy(() => import("./pages/staff/StaffAnnouncementsPage"));
+const AgencyListsPage = lazy(() => import("./pages/staff/AgencyListsPage"));
+const ProcessingBatchesPage = lazy(() => import("./pages/staff/ProcessingBatchesPage"));
 import HelpPage from "./pages/HelpPage";
-import StaffProfilePage from "./pages/staff/StaffProfilePage";
-import AutoReviewPage from "./pages/staff/AutoReviewPage";
-import ForwardedPage from "./pages/staff/ForwardedPage";
-import RecommendationsPage from "./pages/staff/RecommendationsPage";
-import ExternalGranteesPage from "./pages/staff/ExternalGranteesPage";
-import GeneralPayrollPage from "./pages/staff/GeneralPayrollPage";
-import EnrollmentPage from "./pages/staff/EnrollmentPage";
-import MessagesPage from "./pages/staff/MessagesPage";
+const StaffProfilePage = lazy(() => import("./pages/staff/StaffProfilePage"));
+const AutoReviewPage = lazy(() => import("./pages/staff/AutoReviewPage"));
+const ForwardedPage = lazy(() => import("./pages/staff/ForwardedPage"));
+const RecommendationsPage = lazy(() => import("./pages/staff/RecommendationsPage"));
+const ExternalGranteesPage = lazy(() => import("./pages/staff/ExternalGranteesPage"));
+const GeneralPayrollPage = lazy(() => import("./pages/staff/GeneralPayrollPage"));
+const EnrollmentPage = lazy(() => import("./pages/staff/EnrollmentPage"));
+const MessagesPage = lazy(() => import("./pages/staff/MessagesPage"));
 import ContactPage from "./pages/student/ContactPage";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
 import AnnouncementDetailPage from "./pages/AnnouncementDetailPage";
 
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import ManageAccountsPage from "./pages/admin/ManageAccountsPage";
-import ActivityLogPage from "./pages/admin/ActivityLogPage";
-import SettingsPage from "./pages/admin/SettingsPage";
+const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const ManageAccountsPage = lazy(() => import("./pages/admin/ManageAccountsPage"));
+const ActivityLogPage = lazy(() => import("./pages/admin/ActivityLogPage"));
+const SettingsPage = lazy(() => import("./pages/admin/SettingsPage"));
 
 /*
   Every page has its own address, so the browser Back button and
@@ -78,6 +80,8 @@ export default function App() {
     <AuthProvider>
       <ToastProvider>
         <ConfirmProvider>
+          {/* Staff and admin pages load when first opened, so students download less. */}
+          <Suspense fallback={<Loading />}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
 
@@ -145,6 +149,7 @@ export default function App() {
             {/* "/", "/student", "/staff" or an unknown address -> your dashboard (or login) */}
             <Route path="*" element={<HomeRedirect />} />
           </Routes>
+          </Suspense>
         </ConfirmProvider>
       </ToastProvider>
     </AuthProvider>

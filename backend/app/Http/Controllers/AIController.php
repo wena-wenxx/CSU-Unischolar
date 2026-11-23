@@ -130,7 +130,12 @@ class AIController extends Controller
 
         // Unreadable file -> a human must look at it.
         // Readable with any flag -> flagged. Otherwise -> validated.
-        if (($result['ocr_status'] ?? 'ok') !== 'ok') {
+        // Almost nothing could be read (blank or very poor scan): a person must look at it, the same as an
+        // unreadable file, instead of treating it as an ordinary flag.
+        $tooLittleText = collect((array) ($result['flags'] ?? []))
+            ->contains(fn ($flag) => str_starts_with((string) $flag, 'Very little text could be read'));
+
+        if (($result['ocr_status'] ?? 'ok') !== 'ok' || $tooLittleText) {
             $status = 'needs_review';
         } elseif (
             $outdated ||
@@ -150,7 +155,9 @@ class AIController extends Controller
             'message' => match ($status) {
                 'validated' => 'AI check finished: no issues found.',
                 'flagged' => 'AI check finished: possible issues flagged for your review.',
-                default => 'The file could not be read automatically. Please check it manually.',
+                default => $tooLittleText
+                    ? 'Very little text could be read from this file (blank, unclear or low-quality scan). It was sent to manual review.'
+                    : 'The file could not be read automatically. Please check it manually.',
             },
             'document' => $document->fresh()->load('validationResult'),
         ]);

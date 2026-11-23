@@ -66,6 +66,14 @@ class PayrollController extends Controller
         return mb_strtolower(trim($a)) === mb_strtolower(trim($b));
     }
 
+    /** Same term, ignoring spacing, case and the "AY" word ("1st Semester AY 2026-2027" = "1st semester 2026-2027"). */
+    private function sameTerm(string $a, string $b): bool
+    {
+        $plain = fn ($v) => preg_replace('/\s+/', ' ', trim(preg_replace('/\bAY\b/i', ' ', mb_strtolower($v))));
+
+        return $plain($a) === $plain($b);
+    }
+
     /*
     | GET /payroll/periods
     | Choices for the Period dropdown: the last three terms, the current term
@@ -153,6 +161,9 @@ class PayrollController extends Controller
                 $reason = 'Paid directly by the agency';
             } elseif (!$record->currently_enrolled) {
                 $reason = 'Not currently enrolled';
+            } elseif ($record->enrollment_period && !$this->sameTerm($record->enrollment_period, $period)) {
+                // Enrollment was checked for another term: check this term's Registrar list first.
+                $reason = "Enrollment not yet checked for this period (last checked: {$record->enrollment_period})";
             } elseif ($record->payrollRecords->contains(fn ($p) => $this->samePeriod($p->period, $period))) {
                 $reason = 'Already in payroll for this period';
             } elseif (!$amount || (float) $amount <= 0) {
@@ -195,7 +206,7 @@ class PayrollController extends Controller
         }
 
         if ($included->isEmpty()) {
-            return response()->json(['message' => 'Nobody to add: every grantee was skipped. The Reason column in the preview says why (not enrolled, already in this period, no amount set).', 'summary' => $summary], 422);
+            return response()->json(['message' => 'Nobody to add: every grantee was skipped. The Reason column in the preview says why (not enrolled, enrollment not checked for this period, already in this period, no amount set).', 'summary' => $summary], 422);
         }
 
         $labels = $records->keyBy('id');

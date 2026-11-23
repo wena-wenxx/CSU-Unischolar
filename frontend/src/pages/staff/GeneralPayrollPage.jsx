@@ -16,11 +16,15 @@ export default function GeneralPayrollPage() {
   const location = useLocation();
   const [body] = useState(() => readFormAddress(location.search));
   const [form, setForm] = useState(null);
-  const [error, setError] = useState("");
+  // Opened without chosen entries (e.g. typed address or bookmark): explain instead of a server error.
+  const [error, setError] = useState(() =>
+    body.ids.length === 0 ? "No payroll entries were chosen. Go back to Payroll, select the entries, then press General Payroll (Form 6-A)." : ""
+  );
   const [busy, setBusy] = useState("");
 
   // .then() (not await) so React's lint rule sees the state is set later.
   useEffect(() => {
+    if (body.ids.length === 0) return;
     api
       .post("/payroll/form", body)
       .then(({ data }) => setForm(data))

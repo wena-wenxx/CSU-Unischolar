@@ -206,7 +206,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\RequirePasswordChange::c
     Route::post('/staff/external-grantees/uploads/{id}/save', [ExternalGranteeController::class, 'save']);
     Route::post('/staff/external-grantees/uploads/{id}/discard', [ExternalGranteeController::class, 'discard']);
     Route::post('/staff/read-table', [ExternalGranteeController::class, 'readTable']);   // Approved Lists / Enrollment: Excel, Word, PDF
-    Route::post('/staff/forwarded/export', [ForwardedExportController::class, 'export']);   // Forwarded to Agency as Excel or PDF
+    Route::post('/staff/forwarded/export', [ForwardedExportController::class, 'export']);
+    Route::post('/staff/billing-statement', [\App\Http\Controllers\BillingStatementController::class, 'export']);   // billing list (CHED TES Form 2 column order) as Excel or PDF   // Forwarded to Agency as Excel or PDF
     Route::post('/staff/ai/suggest-rules', [AiRulesController::class, 'suggest']);          // AI reads a memo, suggests eligibility rules
 
     /*

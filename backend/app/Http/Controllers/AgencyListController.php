@@ -53,6 +53,34 @@ class AgencyListController extends Controller
     /** Staff picked the student themselves for an unmatched row (they confirmed a different name). */
     private bool $skipNameCheck = false;
 
+    /** Student ID (normalized) => "file (date)" of the newest EARLIER list of the program that matched the student. */
+    private ?array $earlierLists = null;
+
+    /** " Also on the earlier list X (date)." when an earlier list of this program already had the student. */
+    private function earlierListNote(int $scholarshipId, string $schoolId): string
+    {
+        if ($schoolId === '') {
+            return '';
+        }
+        if ($this->earlierLists === null) {
+            $this->earlierLists = [];
+            AgencyListUpload::where('scholarship_id', $scholarshipId)
+                ->when($this->uploadId, fn ($q) => $q->where('id', '!=', $this->uploadId))
+                ->orderBy('id')
+                ->get(['id', 'file_name', 'created_at', 'details'])
+                ->each(function (AgencyListUpload $upload) {
+                    foreach ((array) $upload->details as $line) {
+                        if (in_array($line['result'] ?? null, ['approved', 'created', 'already'], true) && !empty($line['student_id'])) {
+                            $this->earlierLists[EnrollmentList::normalizeId($line['student_id'])] =
+                                $upload->file_name.' ('.$upload->created_at->copy()->timezone(Scholarship::TIMEZONE)->format('M j, Y').')';
+                        }
+                    }
+                });
+        }
+
+        return isset($this->earlierLists[$schoolId]) ? " Also on the earlier list {$this->earlierLists[$schoolId]}." : '';
+    }
+
     private function staffOnly(Request $request): void
     {
         if ($request->user()->role !== 'staff') {
@@ -315,7 +343,8 @@ class AgencyListController extends Controller
                 $this->copyToScholarRecord($latest, $award);
             }
 
-            return $line + ['result' => 'already', 'note' => 'Continuing grantee of this program; status not changed.'.($award ? ' Award details from the list were saved.' : '')];
+            return $line + ['result' => 'already', 'note' => 'Continuing grantee of this program; status not changed.'.($award ? ' Award details from the list were saved.' : '')
+                .$this->earlierListNote($scholarship->id, EnrollmentList::normalizeId((string) $student->student_id))];
         }
 
         $award = $this->awardDetails($row);
@@ -345,7 +374,8 @@ class AgencyListController extends Controller
                 $this->copyToScholarRecord($application, $award);
             }
 
-            return $line + ['result' => 'already', 'note' => 'Already approved; status not changed.'.($award ? ' Award details from the list were saved.' : '')];
+            return $line + ['result' => 'already', 'note' => 'Already approved; status not changed.'.($award ? ' Award details from the list were saved.' : '')
+                .$this->earlierListNote($scholarship->id, EnrollmentList::normalizeId((string) $student->student_id))];
         }
 
         if (in_array($application->status, ['draft', 'rejected'], true)) {

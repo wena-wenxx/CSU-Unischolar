@@ -19,7 +19,7 @@ class ScholarRecord extends Model
     public const ATM_FUNDS = ['yes', 'no', 'pending'];
 
     protected $fillable = [
-        'student_id', 'scholarship_id', 'school_year', 'semester', 'processing_batch_id', 'status', 'currently_enrolled', 'has_atm', 'atm_funds', 'atm_note',
+        'student_id', 'scholarship_id', 'school_year', 'semester', 'processing_batch_id', 'status', 'currently_enrolled', 'enrollment_period', 'has_atm', 'atm_funds', 'atm_note',
         'grantee_tagged_at', 'remarks',
         // from the agency's approved list (e.g. the CHED TES billing file)
         'control_number', 'award_number', 'award_amount', 'award_batch',

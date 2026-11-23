@@ -61,9 +61,13 @@ class Student extends Model
         return $this->belongsTo(User::class, 'eligibility_verified_by');
     }
 
-    public function fullName(): string
+    /** "Juan Abad", or with $middleInitial "Juan M. Abad" (used where the student is addressed, e.g. invitations). */
+    public function fullName(bool $middleInitial = false): string
     {
-        return trim("{$this->first_name} {$this->last_name}");
+        $middle = trim((string) $this->middle_name);
+        $initial = $middleInitial && $middle !== '' && $middle !== 'Demo' ? ' '.mb_strtoupper(mb_substr($middle, 0, 1)).'.' : '';
+
+        return trim("{$this->first_name}{$initial} {$this->last_name}");
     }
 
     /*

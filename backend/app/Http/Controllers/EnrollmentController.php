@@ -69,7 +69,7 @@ class EnrollmentController extends Controller
     | the application, its step history, the activity log, and the scholar
     | record's enrollment flag (payroll checks it).
     */
-    public static function record(Application $application, bool $enrolled, ?string $remarks, User $by, string $method = 'manual'): void
+    public static function record(Application $application, bool $enrolled, ?string $remarks, User $by, string $method = 'manual', ?string $period = null): void
     {
         $application->update([
             'enrollment_verified' => $enrolled,
@@ -96,6 +96,10 @@ class EnrollmentController extends Controller
         ScholarRecord::where('student_id', $application->student_id)
             ->where('scholarship_id', $application->scholarship_id)
             ->where('school_year', $application->school_year)
-            ->update(['currently_enrolled' => $enrolled]);
+            ->update([
+                'currently_enrolled' => $enrolled,
+                // the term that was checked: the Registrar list's period, else the application's term
+                'enrollment_period' => $period ?? ($application->semester ? "{$application->semester} AY {$application->school_year}" : null),
+            ]);
     }
 }

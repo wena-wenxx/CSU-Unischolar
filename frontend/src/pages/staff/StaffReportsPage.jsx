@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import api, { errMsg } from "../../services/api";
 import { downloadCSV, flaggedCount, formatDate, formatDateTime, fullName, missingRequirements, statusLabel } from "../../lib/format";
 import { useToast } from "../../lib/toast";
+import { useAuth } from "../../lib/auth";
+import { downloadFile } from "../../lib/download";
 import PageHeader from "../../components/PageHeader";
 import Loading from "../../components/Loading";
 
@@ -30,6 +32,14 @@ export default function StaffReportsPage() {
   const [data, setData] = useState(null);
   const [programId, setProgramId] = useState("all");
   const [status, setStatus] = useState("all");
+  const { user } = useAuth();
+  const [billYear, setBillYear] = useState(() => {
+    const now = new Date();
+    const start = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1; // school year starts in August
+    return `${start}-${start + 1}`;
+  });
+  const [billSemester, setBillSemester] = useState("");
+  const [billBusy, setBillBusy] = useState("");
 
   useEffect(() => {
     Promise.all([
@@ -76,6 +86,23 @@ export default function StaffReportsPage() {
   const forAgency = data.applications.filter(
     (a) => inProgram(a.scholarship_id) && ["complete", "approved"].includes(a.status)
   );
+
+  // Billing list of one program and school year (CHED TES Form 2 column order), made by the server.
+  async function exportBilling(format) {
+    setBillBusy(format);
+    try {
+      const name = await downloadFile(
+        "/staff/billing-statement",
+        { scholarship_id: Number(programId), school_year: billYear.trim(), semester: billSemester || null, format },
+        `billing-statement.${format}`
+      );
+      toast.success(`Downloaded ${name}. Check the cells marked "to fill in" before submitting.`);
+    } catch (err) {
+      toast.error(errMsg(err, "Unable to make the billing statement."));
+    } finally {
+      setBillBusy("");
+    }
+  }
 
   function exportFile(filename, rows) {
     if (downloadCSV(filename, rows)) toast.success(`Downloaded ${filename}`);
@@ -292,6 +319,51 @@ export default function StaffReportsPage() {
           );
         })}
       </div>
+
+      {user?.role === "staff" && (
+        <section className="card" id="billing">
+          <div className="card-header">
+            <h2>Billing statement</h2>
+          </div>
+          <p className="muted small">
+            The grantees of one program and school year in the column order of the CHED TES billing list (Form 2,
+            Annex 2), as Excel or PDF, for checking before you encode or submit it. It is not the official CHED form:
+            birthdate and PWD are not kept here, and a missing award number or amount is marked &quot;to fill in&quot;.
+          </p>
+          <div className="form-grid">
+            <div>
+              <label htmlFor="bill-year">School year</label>
+              <input id="bill-year" value={billYear} onChange={(event) => setBillYear(event.target.value)} placeholder="2026-2027" />
+            </div>
+            <div>
+              <label htmlFor="bill-semester">Semester</label>
+              <select id="bill-semester" value={billSemester} onChange={(event) => setBillSemester(event.target.value)}>
+                <option value="">Whole school year</option>
+                <option value="1st Semester">1st Semester</option>
+                <option value="2nd Semester">2nd Semester</option>
+                <option value="Summer">Summer</option>
+              </select>
+            </div>
+          </div>
+          <div className="button-row">
+            <button
+              className="button button-primary"
+              onClick={() => exportBilling("xlsx")}
+              disabled={programId === "all" || !/^\d{4}-\d{4}$/.test(billYear.trim()) || Boolean(billBusy)}
+            >
+              {billBusy === "xlsx" ? "Making..." : "Download Excel"}
+            </button>
+            <button
+              className="button button-secondary"
+              onClick={() => exportBilling("pdf")}
+              disabled={programId === "all" || !/^\d{4}-\d{4}$/.test(billYear.trim()) || Boolean(billBusy)}
+            >
+              {billBusy === "pdf" ? "Making..." : "Download PDF"}
+            </button>
+            {programId === "all" && <span className="muted small">Choose one program above first.</span>}
+          </div>
+        </section>
+      )}
 
       <section className="card" id="emails">
         <div className="card-header">

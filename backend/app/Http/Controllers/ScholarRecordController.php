@@ -123,37 +123,45 @@ class ScholarRecordController extends Controller
         }
 
         // One scholar record per program per school year (older years stay as history).
-        $record = ScholarRecord::updateOrCreate(
-            [
-                'student_id' =>
-                    $application->student_id,
-                'scholarship_id' =>
-                    $application->scholarship_id,
-                'school_year' =>
-                    $application->school_year,
-            ],
-            [
-                'semester' => $application->semester,
-                'processing_batch_id' => $application->processing_batch_id,
-                'status' => 'active',
-                'currently_enrolled' =>
-                    $data['currently_enrolled'] ?? true,
-                'has_atm' =>
-                    $data['has_atm'] ?? false,
-                'atm_funds' => !empty($data['has_atm']) ? ($data['atm_funds'] ?? 'pending') : null,
-                'atm_note' => !empty($data['has_atm']) ? null : ($data['atm_note'] ?? 'For ATM application'),
-                'grantee_tagged_at' => now(),
-                'remarks' =>
-                    $data['remarks'] ?? null,
-            ] + array_filter([
-                // carried over from the agency's approved list, when there was one
-                // (a value already on the record is kept when the application has none)
-                'control_number' => $application->agency_control_number,
-                'award_number' => $application->agency_award_number,
-                'award_amount' => $application->agency_amount,
-                'award_batch' => $application->agency_batch,
-            ], fn ($value) => $value !== null && $value !== '')
-        );
+        // Pressing "Tag as Grantee" again updates that record; it never makes a copy, and it does not
+        // overwrite ATM details or remarks that were not sent again.
+        $keys = [
+            'student_id' => $application->student_id,
+            'scholarship_id' => $application->scholarship_id,
+            'school_year' => $application->school_year,
+        ];
+        $existing = ScholarRecord::where($keys)->first();
+        $hasAtm = array_key_exists('has_atm', $data) ? (bool) $data['has_atm'] : ($existing ? $existing->has_atm : false);
+
+        $values = [
+            'semester' => $application->semester,
+            'processing_batch_id' => $application->processing_batch_id,
+            'status' => 'active',
+            'currently_enrolled' => $data['currently_enrolled'] ?? true,
+            'has_atm' => $hasAtm,
+            // The term whose enrollment was checked (payroll for another term asks for a new check).
+            'enrollment_period' => $application->semester ? "{$application->semester} AY {$application->school_year}" : null,
+            'grantee_tagged_at' => $existing?->grantee_tagged_at ?? now(),
+        ];
+        if (!$existing || array_key_exists('has_atm', $data) || array_key_exists('atm_funds', $data)) {
+            $values['atm_funds'] = $hasAtm ? ($data['atm_funds'] ?? $existing?->atm_funds ?? 'pending') : null;
+        }
+        if (!$existing || array_key_exists('has_atm', $data) || array_key_exists('atm_note', $data)) {
+            $values['atm_note'] = $hasAtm ? null : ($data['atm_note'] ?? $existing?->atm_note ?? 'For ATM application');
+        }
+        if (!$existing || array_key_exists('remarks', $data)) {
+            $values['remarks'] = $data['remarks'] ?? null;
+        }
+
+        $record = ScholarRecord::updateOrCreate($keys, $values + array_filter([
+            // carried over from the agency's approved list, when there was one
+            // (a value already on the record is kept when the application has none)
+            'control_number' => $application->agency_control_number,
+            'award_number' => $application->agency_award_number,
+            'award_amount' => $application->agency_amount,
+            'award_batch' => $application->agency_batch,
+        ], fn ($value) => $value !== null && $value !== ''));
+        $wasTagged = $existing && $existing->status === 'active';
 
         // A grant from an earlier school year of the same program is now finished (kept as history).
         $finished = ScholarRecord::where('student_id', $application->student_id)
@@ -167,12 +175,14 @@ class ScholarRecordController extends Controller
         ActivityLog::record($request->user(), 'grantee.tagged', 'Tagged '.trim(($application->student?->first_name ?? '').' '.($application->student?->last_name ?? '')).' as grantee of '.$application->scholarship?->name.'.', $record);
 
         return response()->json([
-            'message' => 'Student tagged as grantee. Next: Payroll → Prepare payroll when the stipend period starts.',
+            'message' => $wasTagged
+                ? "Already tagged as grantee for school year {$application->school_year}; no second record was made (the record was updated)."
+                : 'Student tagged as grantee. Next: Payroll → Prepare payroll when the stipend period starts.',
             'scholar_record' => $record->load([
                 'student',
                 'scholarship'
             ])
-        ], 201);
+        ], $wasTagged ? 200 : 201);
     }
 
 

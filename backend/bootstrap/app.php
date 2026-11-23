@@ -16,6 +16,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Hosting platforms (Railway, Render, ...) put Laravel behind an HTTPS
         // proxy. Trusting it makes Laravel see the real https:// address.
         $middleware->trustProxies(at: '*');
+
+        // There is no web login page: a signed-out call to the API gets a plain 401 answer
+        // ("Unauthenticated.") instead of a redirect to a missing "login" route (a 500 error).
+        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*') ? null : '/');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(function (Request $request, Throwable $e) {

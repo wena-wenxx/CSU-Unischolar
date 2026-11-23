@@ -203,7 +203,7 @@ class EnrollmentListController extends Controller
         $saved = ['enrolled' => 0, 'not_enrolled' => 0];
         $skipped = 0;
 
-        DB::transaction(function () use ($data, $note, $request, &$saved, &$skipped) {
+        DB::transaction(function () use ($data, $note, $request, $list, &$saved, &$skipped) {
             foreach ($data['items'] as $item) {
                 $enrolled = (bool) $item['enrolled'];
 
@@ -213,14 +213,14 @@ class EnrollmentListController extends Controller
                         $skipped++;
                         continue;
                     }
-                    EnrollmentController::record($application, $enrolled, $note, $request->user(), 'registrar_list');
+                    EnrollmentController::record($application, $enrolled, $note, $request->user(), 'registrar_list', $list->period);
                 } else {
                     $record = ScholarRecord::with('student:id,first_name,last_name', 'scholarship:id,name')->find($item['id']);
                     if (!$record || $record->status !== 'active') {
                         $skipped++;
                         continue;
                     }
-                    $record->update(['currently_enrolled' => $enrolled]);
+                    $record->update(['currently_enrolled' => $enrolled, 'enrollment_period' => $list->period]);
                     ActivityLog::record($request->user(), $enrolled ? 'enrollment.verified' : 'enrollment.not_enrolled',
                         ($enrolled ? 'Grantee still enrolled: ' : 'Grantee NOT enrolled this term: ')
                         .trim($record->student?->first_name.' '.$record->student?->last_name).' ('.$record->scholarship?->name.'). '.$note, $record);

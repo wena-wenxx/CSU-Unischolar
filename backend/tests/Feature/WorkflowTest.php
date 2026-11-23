@@ -121,7 +121,7 @@ class WorkflowTest extends TestCase
 
         $this->postJson("/api/applications/{$app->id}/verify-enrollment", ['currently_enrolled' => true])->assertOk();
         $this->postJson("/api/applications/{$app->id}/scholar-record")->assertCreated();
-        $this->postJson("/api/applications/{$app->id}/scholar-record")->assertCreated();   // pressing again updates, no copy
+        $this->postJson("/api/applications/{$app->id}/scholar-record")->assertOk();        // pressing again updates, no copy
         $this->assertSame(1, ScholarRecord::count());
     }
 
