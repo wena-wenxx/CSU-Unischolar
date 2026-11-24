@@ -101,4 +101,25 @@ class StaffAlertsAndStudentResetTest extends TestCase
         $this->assertNotNull(Student::find($demo->id));
         $this->assertSame(1, Scholarship::count());
     }
+
+    public function test_demo_applicants_submit_complete_applications_for_demo_students_only(): void
+    {
+        config(['demo.reset_allowed' => true]);
+        \Illuminate\Support\Facades\Storage::fake('local');
+        $program = Scholarship::create(['name' => 'Tertiary Grant', 'short_name' => 'TG', 'status' => 'active', 'application_mode' => 'oas']);
+        foreach (['Certificate of Registration (COR)', 'Certificate of Grades'] as $name) {
+            \App\Models\ScholarshipRequirement::create(['scholarship_id' => $program->id, 'name' => $name, 'is_required' => true]);
+        }
+        foreach (range(1, 3) as $i) {
+            $this->student("demo{$i}@carsu.edu.ph");
+        }
+        [, $real] = $this->student('real.person@carsu.edu.ph', false);
+
+        $this->artisan('demo:applicants', ['count' => 5, '--program' => 'TG'])->assertExitCode(0);
+
+        $this->assertSame(3, Application::where('status', 'submitted')->count());   // the three demo students only
+        $this->assertSame(0, Application::where('student_id', $real->id)->count());
+        $this->assertSame(6, \App\Models\Document::whereNotNull('application_id')->count());
+        $this->assertSame(3, ApplicationStatusLog::where('to_status', 'submitted')->count());
+    }
 }

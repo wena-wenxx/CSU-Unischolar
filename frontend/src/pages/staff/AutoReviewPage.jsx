@@ -266,7 +266,7 @@ export default function AutoReviewPage() {
                       </td>
                       <td>
                         <strong>{row.student}</strong>
-                        <small className="muted account-note">{row.student_id}</small>
+                        <small className="muted account-note nowrap">{row.student_id}</small>
                       </td>
                       {activeProgram === "all" && <td title={row.scholarship}>{row.short_name || row.scholarship}</td>}
                       <td>{formatDate(row.submitted_at)}</td>

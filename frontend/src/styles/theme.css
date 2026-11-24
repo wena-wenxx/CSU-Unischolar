@@ -1314,3 +1314,28 @@ select {
   padding: 2px 0;
   min-height: 0;
 }
+
+/* Buttons inside a bell item keep the button look (the item's link rules gave them the gold item
+   background and dark text, so "Open review" was hard to see on new items). */
+.bell-panel li a.button {
+  display: inline-flex;
+  flex-direction: row;
+  padding: 6px 11px;
+  border-radius: var(--ds-r-sm);
+}
+
+.bell-panel li a.button-primary,
+.bell-panel li.unread a.button-primary,
+.bell-panel li a.button-primary:hover {
+  background: var(--ds-green);
+  color: #fff;
+}
+
+.bell-panel li.unread a.button-primary:hover {
+  background: var(--ds-green-600);
+}
+
+/* Auto-Review: the "Why" list keeps a readable width next to the remark box */
+.reason-list {
+  min-width: 240px;
+}

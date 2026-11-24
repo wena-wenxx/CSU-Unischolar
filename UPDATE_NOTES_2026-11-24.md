@@ -211,3 +211,15 @@ Checked here: production build OK; 22 pages (student, staff, admin) at 1366 px a
 | AI worker window closed by itself with no message | `start-csu.ps1` runs the worker in a loop: it shows the exit code and why (0 = stop signal or lost MySQL connection, 12 = memory, other = error) and starts again after 5 s; `--memory=512 -v` |
 
 Checked here: build OK; bell -> conversation, ?open=, My Documents Cancel upload, AI check start -> worker -> saved (validated). `npm run lint` not available here: run it on your computer.
+
+## Part 10 (round 29) — More applicants to process, small display fixes
+
+No new migration, no new package. Nothing committed or pushed.
+
+| Change | Files |
+|---|---|
+| New `php artisan demo:applicants [count] [--program=TES]` (default 12): demo students (fictional, `is_demo`) get a SUBMITTED application with every required document, so staff process 10-15 applications next to Gleslimie. Readable sample PDFs; every 4th has a wrong document, every 5th a surname typo, every 7th a blank scan, for the AI to flag. Documents start "not AI-checked". Real students are never used; demo computer only. Undo: `demo:clean` or `demo:reset-student <ID>` | `backend/app/Console/Commands/DemoApplicants.php`, `backend/tests/Feature/DemoApplicantsTest.php`, `backend/tests/Feature/StaffAlertsAndStudentResetTest.php` |
+| Student IDs no longer break onto two lines (Auto-Review, Enrollment preview and rows) | `AutoReviewPage.jsx`, `EnrollmentPage.jsx` |
+| Bell: "Open review" button readable on new (gold) items; Auto-Review "Why" column keeps a readable width | `frontend/src/styles/theme.css` |
+
+Tests: backend **135 passed** here (GitHub main 9fe69dc: 133 passed). The AI result for the planted problems was not checked here with the real AI service (NOT VERIFIED): run AI check all on your computer.

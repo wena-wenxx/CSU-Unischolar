@@ -448,7 +448,7 @@ export default function EnrollmentPage() {
                             />
                           </td>
                           <td>{row.student}</td>
-                          <td>{row.student_id}</td>
+                          <td className="nowrap">{row.student_id}</td>
                           <td>{row.scholarship}</td>
                           <td>{row.kind === "application" ? "Approved applicant" : "Active grantee"}</td>
                           <td>{row.note}</td>
@@ -525,7 +525,7 @@ function ReadPreview({ rows, columns }) {
         <tbody>
           {rows.map((row, i) => (
             <tr key={i} className={cell(row, "id").trim() ? "" : "row-muted"}>
-              <td>{cell(row, "id") || <span className="text-warning small">no Student ID: skipped</span>}</td>
+              <td className="nowrap">{cell(row, "id") || <span className="text-warning small">no Student ID: skipped</span>}</td>
               <td>{cell(row, "last")}</td>
               <td>{cell(row, "first")}</td>
               <td>{cell(row, "course")}</td>
@@ -612,7 +612,7 @@ function ListRows({ list, latestId, onBack }) {
               <tbody>
                 {shown.map((row) => (
                   <tr key={`${row.no}-${row.student_id}`}>
-                    <td>{row.student_id}</td>
+                    <td className="nowrap">{row.student_id}</td>
                     <td>{[row.last_name, row.first_name].filter(Boolean).join(", ")}</td>
                     <td>{row.course}</td>
                     <td>
