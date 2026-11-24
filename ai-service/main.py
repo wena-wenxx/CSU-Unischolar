@@ -18,18 +18,24 @@ It never approves or rejects anyone.
 Run (inside ai-service/, with the virtual environment active):
     uvicorn main:app --reload --port 8001
 """
+import hashlib
 import json
+import logging
 import os
+import time
+from collections import OrderedDict
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.concurrency import run_in_threadpool
 
 from authenticity import file_notes
 import fit_matcher
 import rule_reader
 from list_reader import LIST_EXTENSIONS, extract_and_match, table_rows
+import ocr_engine
 from ocr_engine import extract_text, ocr_status
 from validation import validate_text
 
@@ -46,6 +52,32 @@ app.add_middleware(
 )
 
 ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
+
+log = logging.getLogger("uvicorn.error")
+
+# Same file + same student + same document kind -> same answer: a repeated check is answered at once.
+_RESULTS = OrderedDict()
+_RESULTS_MAX = 64
+
+
+@app.on_event("startup")
+def _load_ocr_early():
+    """Loads PaddleOCR in the background when the service starts, so the first AI check is not slow."""
+    ocr_engine.warm_up()
+
+
+def _cached(key):
+    if key in _RESULTS:
+        _RESULTS.move_to_end(key)
+        return json.loads(_RESULTS[key])
+    return None
+
+
+def _remember(key, value):
+    _RESULTS[key] = json.dumps(value)
+    _RESULTS.move_to_end(key)
+    while len(_RESULTS) > _RESULTS_MAX:
+        _RESULTS.popitem(last=False)
 
 
 @app.get("/")
@@ -112,21 +144,45 @@ async def validate_document(
     if not file_bytes:
         raise HTTPException(status_code=422, detail="Uploaded file is empty.")
 
+    label = document_label or document_type
+    started = time.monotonic()
+    key = hashlib.sha256(file_bytes).hexdigest() + "|" + json.dumps(
+        [expected_name, expected_student_id, expected_last_name, label, current_school_year])
+    cached = _cached(key)
+    if cached is not None:
+        cached["cached"] = True
+        cached["elapsed_seconds"] = round(time.monotonic() - started, 2)
+        log.info("validate-document %s: same file checked before, answered from memory", file.filename)
+        return cached
+
+    # The reading runs in a worker thread, so the service keeps answering other requests meanwhile.
+    result = await run_in_threadpool(
+        _check_file, file_bytes, suffix, file.filename, label, expected_name, expected_student_id,
+        expected_last_name, current_school_year,
+    )
+    result["elapsed_seconds"] = round(time.monotonic() - started, 2)
+    log.info("validate-document %s: %s in %.1f s (%s)", file.filename, result.get("ocr_status"),
+             result["elapsed_seconds"], result.get("engine"))
+    if result.get("ocr_status") == "ok":
+        _remember(key, result)
+    return result
+
+
+def _check_file(file_bytes, suffix, filename, label, expected_name, expected_student_id, expected_last_name,
+                current_school_year):
     with NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
         temp_file.write(file_bytes)
         temp_path = temp_file.name
 
     try:
-        extraction = extract_text(temp_path, file.filename)
+        extraction = extract_text(temp_path, filename)
         # "Possible edit" cautions from the file's hidden details (never a verdict).
-        cautions = file_notes(temp_path, file.filename, file_bytes)
+        cautions = file_notes(temp_path, filename, file_bytes)
     finally:
         try:
             os.remove(temp_path)
         except OSError:
             pass
-
-    label = document_label or document_type
 
     if extraction["ocr_status"] != "ok":
         # Could not read the file at all: send it to a human, do not guess.
@@ -160,6 +216,9 @@ async def validate_document(
     extracted_data["document_label"] = label
     extracted_data["detected_name"] = extracted_data.get("best_name_window") or None
     extracted_data["authenticity_notes"] = cautions
+    if extraction.get("note"):
+        extracted_data["reading_note"] = extraction["note"]
+        result["flags"] = list(result["flags"]) + [extraction["note"]]
 
     return {
         "success": True,
@@ -216,7 +275,7 @@ async def extract_grantee_list(
         temp_path = temp_file.name
 
     try:
-        result = extract_and_match(temp_path, file.filename, student_list, threshold)
+        result = await run_in_threadpool(extract_and_match, temp_path, file.filename, student_list, threshold)
     except Exception as e:  # unreadable or damaged file: tell staff plainly
         raise HTTPException(status_code=422, detail=f"The file could not be read ({type(e).__name__}: {e}).")
     finally:
@@ -249,7 +308,9 @@ async def read_table_endpoint(file: UploadFile = File(...)):
         temp_file.write(file_bytes)
         temp_path = temp_file.name
     try:
-        result = table_rows(temp_path, file.filename)
+        started = time.monotonic()
+        result = await run_in_threadpool(table_rows, temp_path, file.filename)
+        result["elapsed_seconds"] = round(time.monotonic() - started, 2)
     except Exception as e:
         text = str(e)
         if "password" in text.lower() or "encrypt" in text.lower():
@@ -317,7 +378,7 @@ async def suggest_rules(
             temp_file.write(file_bytes)
             temp_path = temp_file.name
         try:
-            memo = (memo + "\n" + rule_reader.read_file_text(temp_path, file.filename)).strip()
+            memo = (memo + "\n" + await run_in_threadpool(rule_reader.read_file_text, temp_path, file.filename)).strip()
         except Exception as e:
             raise HTTPException(status_code=422, detail=f"The file could not be read ({type(e).__name__}: {e}).")
         finally:
@@ -327,7 +388,7 @@ async def suggest_rules(
                 pass
 
     try:
-        result = rule_reader.suggest(memo, choices, use_llm=use_llm)
+        result = await run_in_threadpool(rule_reader.suggest, memo, choices, use_llm=use_llm)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     return {"success": True, "characters": len(memo), **result}

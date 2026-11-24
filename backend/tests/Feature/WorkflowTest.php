@@ -246,7 +246,7 @@ class WorkflowTest extends TestCase
 
     // -------------------------------------------------------- AI unavailable
 
-    public function test_when_the_ai_service_is_off_a_document_goes_to_manual_review_not_passed(): void
+    public function test_when_the_ai_service_is_off_the_document_is_not_passed_and_the_page_is_told_why(): void
     {
         Storage::fake('local');
         Http::fake(fn () => throw new \Illuminate\Http\Client\ConnectionException('AI service is off'));
@@ -258,7 +258,14 @@ class WorkflowTest extends TestCase
         Sanctum::actingAs($student->user);
         $this->postJson("/api/documents/{$document->id}/validate")
             ->assertStatus(503)
-            ->assertJsonFragment(['message' => 'Unable to connect to AI service. The document was sent to manual review.', 'error' => null]);
-        $this->assertSame('needs_review', $document->fresh()->status);
+            ->assertJsonPath('error', null)
+            ->assertJsonPath('queued', false);
+        // Never "validated", and never left on "processing" (the old bug: stuck on "Checking...").
+        $this->assertSame('uploaded', $document->fresh()->status);
+        $this->getJson("/api/documents/{$document->id}/check-status")
+            ->assertOk()
+            ->assertJsonPath('state', 'failed');
+        $this->assertStringContainsString('AI service is not running',
+            $this->getJson("/api/documents/{$document->id}/check-status")->json('message'));
     }
 }

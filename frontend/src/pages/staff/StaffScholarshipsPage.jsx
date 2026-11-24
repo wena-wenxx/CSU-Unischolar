@@ -274,7 +274,7 @@ export default function StaffScholarshipsPage() {
           <EmptyState message="No scholarship programs yet." />
         ) : (
           <div className="table-wrapper">
-            <table>
+            <table className="numbered">
               <thead>
                 <tr>
                   <th>Name</th>

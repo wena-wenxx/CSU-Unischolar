@@ -5,6 +5,8 @@ import { enrollmentText, fileUrl, flaggedCount, formatDate, fullName, missingReq
 import { verifySteps } from "../../lib/verifyGuide";
 import { byLastName, lastFirst, programTabs } from "../../lib/programs";
 import { useToast } from "../../lib/toast";
+import { needsAiCheck, useAiChecks } from "../../lib/aiChecks";
+import { useConfirm } from "../../lib/confirm";
 import Modal from "../../components/Modal";
 import { usePaged } from "../../lib/paging";
 import ShowMore from "../../components/ShowMore";
@@ -38,7 +40,7 @@ const FILTERS = [
 ];
 
 const SORTS = {
-  student: "Grouped by student",
+  student: "Grouped by student (A–Z)",
   recent: "Latest activity first",
   name: "Student name (A–Z)",
   submitted_old: "Oldest submitted first (queue)",
@@ -123,8 +125,9 @@ export default function StaffApplicationsPage() {
       .get(`/applications/${wanted}`)
       .then((response) => setSelected(response.data))
       .catch((err) => toast.error(errMsg(err, "Unable to load application.")));
+    // Also when the staff bell links here while this page is already open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [location.search]);
 
   async function openApplication(id) {
     try {
@@ -185,11 +188,7 @@ export default function StaffApplicationsPage() {
   const tabs = programTabs(searched, (a) => a.scholarship);
   const activeProgram = tabs.some((tab) => tab.key === program) ? program : "all";
 
-  // Grouped by student: the student with the newest activity first, then their applications (newest first).
-  const latestOf = {};
-  searched.forEach((a) => {
-    latestOf[a.student_id] = Math.max(latestOf[a.student_id] || 0, time(a.updated_at));
-  });
+  // Grouped by student: students A to Z by surname, then each student's applications (newest first).
   const countOf = {};
   const shown = searched
     .filter((application) => activeProgram === "all" || String(application.scholarship_id) === activeProgram)
@@ -197,7 +196,8 @@ export default function StaffApplicationsPage() {
     .filter((application) => batch === "all" || String(application.processing_batch_id) === batch)
     .sort((a, b) => {
       if (sort === "student") {
-        return latestOf[b.student_id] - latestOf[a.student_id] || a.student_id - b.student_id || time(b.updated_at) - time(a.updated_at);
+        // One block per student, students A to Z by surname (the student's applications stay together, newest first).
+        return byLastName(a.student, b.student) || a.student_id - b.student_id || time(b.updated_at) - time(a.updated_at);
       }
       if (sort === "submitted_new") return time(b.submitted_at) - time(a.submitted_at);
       if (sort === "submitted_old") return (time(a.submitted_at) || Infinity) - (time(b.submitted_at) || Infinity);
@@ -307,7 +307,7 @@ export default function StaffApplicationsPage() {
           />
         ) : (
           <div className="table-wrapper">
-            <table>
+            <table className="numbered">
               <thead>
                 <tr>
                   <th>Student</th>
@@ -450,7 +450,7 @@ const NEXT_HINT = {
   rejected: "The agency did not approve this application.",
 };
 
-function ReviewModal({ application, onClose, onChanged, onVerify }) {
+export function ReviewModal({ application, onClose, onChanged, onVerify }) {
   const toast = useToast();
 
   const [remarks, setRemarks] = useState(application.remarks || "");
@@ -494,23 +494,14 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
     }
   }
 
-  async function validateDocument(documentId) {
-    setBusyDocumentId(documentId);
-
-    try {
-      const response = await api.post(`/documents/${documentId}/validate`);
-      const status = response.data?.document?.status;
-
-      if (status === "validated") toast.success(response.data.message);
-      else toast.info(response.data?.message || "AI check finished.");
-    } catch (err) {
-      toast.error(errMsg(err, "AI validation failed."));
-    } finally {
-      setBusyDocumentId(null);
-    }
-
-    await onChanged();
-  }
+  // One "Checking..." state per document (checking one no longer resets another). A check that runs in the
+  // AI worker is followed until it finishes, also after the window was closed and opened again.
+  const confirmAi = useConfirm();
+  const ai = useAiChecks({ toast, onChange: onChanged, confirm: confirmAi });
+  const { resume } = ai;
+  useEffect(() => {
+    resume(application?.documents);
+  }, [application, resume]);
 
   // A person's confirmation that the document is genuine (the AI cannot prove this).
   async function verifyDocument(document, verified) {
@@ -533,7 +524,16 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
   const student = application.student || {};
   const others = application.other_applications || [];
   const grants = application.scholar_records || [];
-  const flagged = (application.documents || []).filter((d) => d.status === "flagged").length;
+  // A flag that a staff member already checked and verified is not counted as open.
+  const flagged = (application.documents || []).filter((d) => d.status === "flagged" && !d.staff_verified_at).length;
+  const docs = application.documents || [];
+  const overview = {
+    verified: docs.filter((d) => d.staff_verified_at).length,
+    ok: docs.filter((d) => !d.staff_verified_at && d.status === "validated").length,
+    flagged,
+    unreadable: docs.filter((d) => !d.staff_verified_at && d.status === "needs_review").length,
+    pending: docs.filter((d) => !d.staff_verified_at && ["uploaded", "processing"].includes(d.status)).length,
+  };
 
   return (
     <Modal
@@ -583,6 +583,29 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
         Submitted Documents
         {flagged > 0 && <span className="status status-warning review-flag-count">⚠ {flagged} flagged by the AI</span>}
       </h3>
+
+      {docs.length > 0 && (
+        <div className="doc-overview">
+          <span>
+            <strong>{overview.verified}</strong> verified by staff · <strong>{overview.ok}</strong> AI: no issue ·{" "}
+            <strong>{overview.flagged}</strong> flagged · <strong>{overview.unreadable}</strong> AI could not read ·{" "}
+            <strong>{overview.pending}</strong> not AI-checked yet
+          </span>
+          <button
+            className="button button-small button-secondary"
+            onClick={() => ai.startAll(docs)}
+            disabled={!docs.some(needsAiCheck) || docs.some((d) => ai.isRunning(d.id))}
+            title="Checks only documents not checked yet (or not readable before). Documents verified by staff are skipped."
+          >
+            AI check all ({docs.filter(needsAiCheck).length})
+          </button>
+          {ai.anyRunning && (
+            <button className="button button-small button-danger-outline" onClick={() => ai.cancelAll()}>
+              Cancel AI checks
+            </button>
+          )}
+        </div>
+      )}
 
       {application.documents?.length ? (
         application.documents.map((document) => (
@@ -648,17 +671,28 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
             <div className="button-row">
               <StatusBadge status={document.status} />
 
-              <button
-                className="button button-small button-secondary"
-                onClick={() => validateDocument(document.id)}
-                disabled={busyDocumentId === document.id}
-              >
-                {busyDocumentId === document.id
-                  ? "Checking..."
-                  : document.validation_result
-                    ? "Re-run AI check"
-                    : "Run AI check"}
-              </button>
+              {document.staff_verified_at && !ai.isRunning(document.id) ? (
+                <span className="muted small" title="Verified by staff: the AI check is not needed. The AI result above is kept for reference.">
+                  AI check not needed
+                </span>
+              ) : (
+                <button
+                  className="button button-small button-secondary"
+                  onClick={() => ai.start(document.id)}
+                  disabled={busyDocumentId === document.id || ai.isRunning(document.id) || document.status === "processing"}
+                >
+                  {ai.isRunning(document.id) || document.status === "processing"
+                    ? "Checking..."
+                    : document.validation_result
+                      ? "Re-run AI check"
+                      : "Run AI check"}
+                </button>
+              )}
+              {(ai.isRunning(document.id) || document.status === "processing") && (
+                <button className="button button-small button-danger-outline" onClick={() => ai.cancel(document.id)}>
+                  Cancel check
+                </button>
+              )}
             </div>
           </div>
         ))
@@ -668,7 +702,24 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
 
       {application.status !== "draft" && (
         <>
-          <label htmlFor="remarks">Remarks (shown to the student)</label>
+          <div className="label-row">
+            <label htmlFor="remarks">Remarks (shown to the student)</label>
+            <button
+              type="button"
+              className="link-button small"
+              onClick={async () => {
+                try {
+                  const { data } = await api.get(`/staff/applications/${application.id}/suggested-remark`);
+                  if (data.remarks) setRemarks(data.remarks);
+                  else toast.info("No problem for the student to fix was found in the AI results or missing documents.");
+                } catch (err) {
+                  toast.error(errMsg(err, "Unable to suggest a remark."));
+                }
+              }}
+            >
+              Suggest from AI flags
+            </button>
+          </div>
 
           <textarea
             id="remarks"
@@ -731,7 +782,7 @@ function ReviewModal({ application, onClose, onChanged, onVerify }) {
 
 /* ---------- Enrollment verification form ---------- */
 
-function VerifyEnrollmentModal({ application, onClose, onDone }) {
+export function VerifyEnrollmentModal({ application, onClose, onDone }) {
   const toast = useToast();
 
   const [enrolled, setEnrolled] = useState("yes");

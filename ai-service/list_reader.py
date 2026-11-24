@@ -1275,14 +1275,30 @@ def _generic_grid(path):
         return None
     if not doc or len(doc["rows"]) < 2:
         return None
+    skipped = doc.get("skipped_pages") or []
+    # Most pages had no table lines the reader could find: reading the words by their position is better
+    # for this file than reading only the few pages with lines (that once gave 9 rows of a 65-row list).
+    if skipped and len(skipped) >= doc.get("pages", 0):
+        return None
+    warnings = ["This is a scan, so it was read with OCR (" + str(doc["engine"]) + ") cell by cell. Highlighted "
+                "cells were hard to read: check them against the paper before processing."]
+    if skipped:
+        warnings.append(
+            f"Page{'s' if len(skipped) > 1 else ''} {', '.join(str(n) for n in skipped)} of {doc.get('total_pages')} had no "
+            "table lines the reader could find, so the rows on "
+            f"{'those pages were' if len(skipped) > 1 else 'that page were'} NOT read. Compare the number of rows below "
+            "with the paper; for a complete reading, ask for the list as Excel or a typed PDF, or scan those pages again "
+            "straight and clear.")
+    per_page = doc.get("rows_per_page") or {}
     return {
         "rows": doc["rows"],
         "cells": doc["cells"],
         "layout": [None] * len(doc["rows"]),
         "method": "ocr-" + str(doc["engine"]),
-        "warnings": ["This is a scan, so it was read with OCR (" + str(doc["engine"]) + ") cell by cell. Highlighted "
-                     "cells were hard to read: check them against the paper before processing."],
-        "metadata": {"row_count": len(doc["rows"]) - 1},
+        "warnings": warnings,
+        "metadata": {"row_count": len(doc["rows"]) - 1, "pages_read": doc.get("pages"),
+                     "total_pages": doc.get("total_pages"), "skipped_pages": skipped,
+                     "rows_per_page": {str(k): v for k, v in per_page.items()}},
     }
 
 

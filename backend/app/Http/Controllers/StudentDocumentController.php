@@ -135,6 +135,35 @@ class StudentDocumentController extends Controller
         ], 201);
     }
 
+    /*
+    | DELETE /student/documents/{id}
+    | The student removes one of their own files: a file in My Documents, or a file of an application that
+    | is still theirs to change (draft or needs action). A file of a submitted application is kept: it is
+    | part of what the OAS is reviewing. The stored file is removed when no other row still uses it.
+    */
+    public function destroy(Request $request, $id)
+    {
+        $student = $this->student($request);
+        $document = Document::with('application:id,status')->where('student_id', $student->id)->findOrFail($id);
+
+        if ($document->application_id && !in_array($document->application?->status, ['draft', 'needs_action'], true)) {
+            return response()->json(['message' => 'This file is part of an application you already submitted, so the OAS keeps it. Contact the OAS if it is wrong.'], 422);
+        }
+        if ($document->status === 'processing') {
+            \App\Support\DocumentChecker::cancel($document);   // the AI check of this file is stopped first
+        }
+
+        $name = $document->original_filename;
+        $path = $document->file_path;
+        $document->delete();   // its AI result goes with it
+        if ($path) {
+            Document::deleteFileIfUnused($path);
+        }
+        \App\Models\ActivityLog::record($request->user(), 'document.deleted', "Deleted the file {$name}.");
+
+        return response()->json(['message' => "{$name} was deleted."]);
+    }
+
     private function saveFile(Request $request, int $studentId, string $type): Document
     {
         $file = $request->file('file');

@@ -16,6 +16,7 @@ class Application extends Model
         'remarks',
         'submitted_at',
         'forwarded_at',
+        'agency_submission_id',
         'enrollment_verified',
         'enrollment_verified_at',
         'enrollment_method',    // registrar_list | manual
@@ -126,6 +127,11 @@ class Application extends Model
     public function inOpenWork(): bool
     {
         return !$this->processing_batch_id || $this->processingBatch?->status !== 'completed';
+    }
+
+    public function agencySubmission()
+    {
+        return $this->belongsTo(AgencySubmission::class);
     }
 
     public function student()

@@ -3,10 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Document;
-use App\Models\ValidationResult;
+use App\Jobs\ValidateDocumentJob;
+use App\Support\DocumentChecker;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Sends an uploaded document to the Python AI service (FastAPI + PaddleOCR)
@@ -41,125 +40,112 @@ class AIController extends Controller
             }
         }
 
+        DocumentChecker::expireIfStale($document);
+
+        // Verified by a staff member: the AI check is not needed any more. Staff can still run it on purpose
+        // (confirm = true); the staff decision stays either way (it is saved separately from the AI result).
+        if ($document->staff_verified_at && !$request->boolean('confirm')) {
+            return response()->json([
+                'message' => 'This document was already verified by OAS staff'.($document->staffVerifier?->name ? " ({$document->staffVerifier->name})" : '')
+                    .' on '.$document->staff_verified_at->copy()->timezone('Asia/Manila')->format('M j, Y').'. The AI check is not needed. Run it anyway?',
+                'needs_confirmation' => true,
+                'staff_verified' => true,
+            ], 409);
+        }
+
+        // Already being checked: do not start a second check of the same file.
+        if (DocumentChecker::isRunning($document)) {
+            return response()->json([
+                'message' => 'The AI check of this document is already running. The result will appear here when it is ready.',
+                'queued' => true,
+                'document' => $document->fresh()->load('validationResult'),
+            ], 202);
+        }
+
         $fullPath = $document->absolutePath();
-
         if (!$fullPath || !file_exists($fullPath)) {
-            return response()->json([
-                'message' => 'Document file not found.'
-            ], 404);
+            return response()->json(['message' => 'Document file not found.'], 404);
         }
 
-        $document->update(['status' => 'processing']);
+        DocumentChecker::begin($document);
 
-        $student = $document->student ?? $document->application->student;
-
-        // First + last name only: validation.py already accepts a middle
-        // name printed on the document.
-        $expectedName = trim($student->first_name . ' ' . $student->last_name);
-
-        // The requirement name ("Certificate of Registration (COR)") tells
-        // the AI which kind of document to expect.
-        $documentLabel = $document->requirement?->name
-            ?? $document->document_type
-            ?? '';
-
-        try {
-            $response = Http::timeout(180)
-                ->attach(
-                    'file',
-                    file_get_contents($fullPath),
-                    $document->original_filename
-                )
-                ->post(
-                    rtrim(config('services.ai.url'), '/') . '/validate-document',
-                    [
-                        'expected_name' => $expectedName,
-                        'expected_student_id' => $student->student_id,
-                        // Parents' documents (e.g. ITR) only show the surname.
-                        'expected_last_name' => $student->last_name,
-                        'document_label' => $documentLabel,
-                        // A COR from another school year is flagged.
-                        'current_school_year' => \App\Models\ExternalGrantee::currentSchoolYear(),
-                    ]
-                );
-        } catch (\Throwable $e) {
-            $document->update(['status' => 'needs_review']);
+        // AI worker running: the check is done there and this request returns at once,
+        // so the rest of the website does not wait for the AI.
+        if (DocumentChecker::workerRunning()) {
+            ValidateDocumentJob::dispatch($document->id)->onConnection('database')->onQueue('ai');
 
             return response()->json([
-                'message' => 'Unable to connect to AI service. The document was sent to manual review.',
-                // Technical detail only for staff (it can show server names).
-                'error' => $request->user()->role === 'staff' ? $e->getMessage() : null,
-            ], 503);
+                'message' => 'AI check started. The result will appear here when it is ready.',
+                'queued' => true,
+                'document' => $document->fresh()->load('validationResult'),
+            ], 202);
         }
 
-        if (!$response->successful()) {
-            $document->update(['status' => 'needs_review']);
-
-            return response()->json([
-                'message' => 'AI service returned an error. The document was sent to manual review.',
-                'ai_response' => $response->json()
-            ], 502);
-        }
-
-        $result = $response->json();
-
-        // An old certificate (e.g. an indigency issued two years ago) is flagged for staff.
-        $outdated = \App\Support\DocumentAge::outdatedFlag(
-            $document->typeName(),
-            (array) ($result['extracted_data']['dates'] ?? [])
-        );
-        if ($outdated) {
-            $result['flags'] = array_merge((array) ($result['flags'] ?? []), [$outdated]);
-        }
-
-        $validation = ValidationResult::updateOrCreate(
-            ['document_id' => $document->id],
-            [
-                'is_complete' => (bool) ($result['is_complete'] ?? false),
-                'has_name_mismatch' => (bool) ($result['has_name_mismatch'] ?? false),
-                'has_missing_information' => (bool) ($result['has_missing_information'] ?? false),
-                'has_wrong_document' => (bool) ($result['has_wrong_document'] ?? false),
-                'confidence_score' => $result['confidence_score'] ?? null,
-                'extracted_text' => $result['extracted_text'] ?? null,
-                'extracted_data' => $result['extracted_data'] ?? null,
-                'flags' => !empty($result['flags'])
-                    ? implode("\n", $result['flags'])
-                    : null,
-            ]
-        );
-
-        // Unreadable file -> a human must look at it.
-        // Readable with any flag -> flagged. Otherwise -> validated.
-        // Almost nothing could be read (blank or very poor scan): a person must look at it, the same as an
-        // unreadable file, instead of treating it as an ordinary flag.
-        $tooLittleText = collect((array) ($result['flags'] ?? []))
-            ->contains(fn ($flag) => str_starts_with((string) $flag, 'Very little text could be read'));
-
-        if (($result['ocr_status'] ?? 'ok') !== 'ok' || $tooLittleText) {
-            $status = 'needs_review';
-        } elseif (
-            $outdated ||
-            !$validation->is_complete ||
-            $validation->has_name_mismatch ||
-            $validation->has_missing_information ||
-            $validation->has_wrong_document
-        ) {
-            $status = 'flagged';
-        } else {
-            $status = 'validated';
-        }
-
-        $document->update(['status' => $status]);
+        // No worker: check inside this request, with a time limit below PHP's own limit.
+        $outcome = DocumentChecker::run($document, DocumentChecker::inlineTimeout());
 
         return response()->json([
-            'message' => match ($status) {
-                'validated' => 'AI check finished: no issues found.',
-                'flagged' => 'AI check finished: possible issues flagged for your review.',
-                default => $tooLittleText
-                    ? 'Very little text could be read from this file (blank, unclear or low-quality scan). It was sent to manual review.'
-                    : 'The file could not be read automatically. Please check it manually.',
-            },
+            'message' => $outcome['message'],
+            'queued' => false,
+            'error' => !$outcome['ok'] && $request->user()->role === 'staff' ? ($outcome['detail'] ?? null) : null,
             'document' => $document->fresh()->load('validationResult'),
+        ], $outcome['http']);
+    }
+
+    /*
+    | GET /documents/{documentId}/check-status
+    | The page asks this every few seconds while a check runs in the AI worker.
+    | running = still checking; done = finished (see document.status and validation_result);
+    | failed = it stopped, with the reason in "message".
+    */
+    /*
+    | POST /documents/{documentId}/cancel-check
+    | "Cancel" on a running AI check (the student who owns the file, or staff). Nothing is saved.
+    */
+    public function cancelCheck(Request $request, $documentId)
+    {
+        $document = Document::findOrFail($documentId);
+        if ($request->user()->role !== 'staff') {
+            $mine = $document->student_id && $request->user()->student && $document->student_id === $request->user()->student->id;
+            if (!$mine) {
+                return response()->json(['message' => 'Not your document.'], 403);
+            }
+        }
+
+        $cancelled = DocumentChecker::cancel($document);
+
+        return response()->json([
+            'cancelled' => $cancelled,
+            'message' => $cancelled
+                ? 'AI check cancelled. Nothing was saved; you can run it again at any time.'
+                : 'The AI check had already finished, so there was nothing to cancel.',
+            'document' => $document->fresh()->load('validationResult'),
+        ]);
+    }
+
+    public function checkStatus(Request $request, $documentId)
+    {
+        $document = Document::with(['application', 'validationResult'])->findOrFail($documentId);
+
+        if ($request->user()->role !== 'staff') {
+            $mine = $document->student_id
+                && $request->user()->student
+                && $document->student_id === $request->user()->student->id;
+            if (!$mine) {
+                return response()->json(['message' => 'Not your document.'], 403);
+            }
+        }
+
+        DocumentChecker::expireIfStale($document);
+        $document->refresh()->load('validationResult');
+        $running = DocumentChecker::isRunning($document);
+        $error = $running ? null : DocumentChecker::lastError($document->id);
+
+        return response()->json([
+            'state' => $running ? 'running' : ($error ? 'failed' : 'done'),
+            'message' => $error,
+            'worker' => DocumentChecker::workerRunning(),
+            'document' => $document,
         ]);
     }
 

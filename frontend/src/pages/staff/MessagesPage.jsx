@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import api, { errMsg } from "../../services/api";
 import { formatDateTime, timeAgo } from "../../lib/format";
 import { useToast } from "../../lib/toast";
@@ -7,7 +8,13 @@ import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 import SentNotices from "./SentNotices";
 
-/* Student Messages (staff): questions from Contact OAS. Oldest open message first. */
+/*
+  Student Messages (staff).
+  - Student questions: messages students sent from Contact OAS. LEFT = the list of messages (newest first);
+    RIGHT = the conversation you opened: the student's message, the OAS reply, and the reply box.
+  - Invitations sent: one-way notices the OAS sent from AI Recommendations (students cannot answer them here).
+  /staff/messages?open=<id> opens that conversation (used by the staff bell).
+*/
 const TABS = [
   ["open", "Waiting for a reply"],
   ["answered", "Answered"],
@@ -18,12 +25,17 @@ const TABS = [
 export default function MessagesPage() {
   const toast = useToast();
 
-  const [status, setStatus] = useState("open");
+  const location = useLocation();
+  // /staff/messages?open=<id> (from the staff bell) shows that conversation in the "All" tab, so it is never
+  // filtered out. The layout opens the page fresh when the address changes, so reading it once is enough.
+  const wantedId = Number(new URLSearchParams(location.search).get("open")) || null;
+  const [status, setStatus] = useState(wantedId ? "all" : "open");
   const [query, setQuery] = useState("");
   const [data, setData] = useState(null);
   const [replies, setReplies] = useState({}); // message id -> reply text
   const [busy, setBusy] = useState(null);
   const [view, setView] = useState("questions"); // questions | invitations
+  const [openId, setOpenId] = useState(wantedId);
 
   function fetchMessages(nextStatus = status, q = query) {
     return api
@@ -81,10 +93,15 @@ export default function MessagesPage() {
   if (!data) return <Loading />;
 
   const counts = data.counts || {};
+  // The conversation shown on the right: the one picked, else the newest in the list.
+  const current = data.messages.find((m) => m.id === openId) || data.messages[0] || null;
 
   return (
     <div>
-      <PageHeader title="Student Messages" subtitle="Questions students sent from Contact OAS, and the invitations the OAS sent" />
+      <PageHeader
+        title="Student Messages"
+        subtitle="Student questions = messages students sent from Contact OAS (you reply here). Invitations sent by OAS = one-way notices from AI Recommendations."
+      />
 
       <div className="filter-row" role="group" aria-label="Messages or sent invitations">
         <button
@@ -101,7 +118,7 @@ export default function MessagesPage() {
           aria-pressed={view === "invitations"}
           onClick={() => setView("invitations")}
         >
-          Sent invitations
+          Invitations sent by OAS
         </button>
       </div>
 
@@ -151,77 +168,117 @@ export default function MessagesPage() {
         {data.messages.length === 0 ? (
           <EmptyState message={status === "open" ? "No messages waiting. Well done!" : "No messages here."} />
         ) : (
-          <ul className="message-list">
-            {data.messages.map((item) => {
-              const s = item.student || {};
-              return (
-                <li key={item.id} className="message-item">
-                  <div className="message-head">
-                    <strong>{item.subject}</strong>
-                    <span className="muted small">{timeAgo(item.created_at)}</span>
-                  </div>
-                  <small className="muted">
-                    <strong className="student-name">
-                      {s.first_name} {s.last_name}
-                    </strong>{" "}
-                    · {s.student_id} · {s.course}
-                    {s.year_level ? `, ${s.year_level}` : ""} · {data.topics[item.topic] || item.topic}
-                    {s.user?.email ? ` · ${s.user.email}` : ""}
-                    {s.contact_number ? ` · ${s.contact_number}` : ""}
-                  </small>
-                  <p className="message-body">{item.message}</p>
+          <div className="msg-layout">
+            <div>
+              <p className="muted small">Messages · newest first</p>
+              <ul className="msg-index" aria-label="Messages, newest first">
+                {data.messages.map((item) => {
+                  const s = item.student || {};
+                  return (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        className={`msg-row${current?.id === item.id ? " active" : ""}${item.status === "open" ? " is-open" : ""}`}
+                        aria-pressed={current?.id === item.id}
+                        onClick={() => setOpenId(item.id)}
+                      >
+                        <span className="msg-row-top">
+                          <strong>
+                            {s.last_name}, {s.first_name}
+                          </strong>
+                          <span className="muted small">{timeAgo(item.created_at)}</span>
+                        </span>
+                        <span className="msg-row-subject">{item.subject}</span>
+                        <span className="muted small">{STATUS_LABEL[item.status] || item.status}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
 
-                  {item.reply && (
-                    <div className="message-reply">
-                      <strong>Reply</strong>
-                      <small className="muted">
-                        {" "}
-                        · {item.replier?.name || "OAS"} · {formatDateTime(item.replied_at)}
-                        {item.reply_read_at ? " · seen by the student" : " · not seen yet"}
-                      </small>
-                      <p>{item.reply}</p>
-                    </div>
-                  )}
-
-                  {item.status !== "closed" && (
-                    <div className="message-answer">
-                      <label htmlFor={`reply-${item.id}`} className="sr-only">
-                        Reply to {s.first_name}
-                      </label>
-                      <textarea
-                        id={`reply-${item.id}`}
-                        rows={3}
-                        maxLength={3000}
-                        value={replies[item.id] ?? ""}
-                        onChange={(event) => setReplies((current) => ({ ...current, [item.id]: event.target.value }))}
-                        placeholder={item.reply ? "Write another reply (replaces the one above)" : "Write your reply"}
-                      />
-                      <div className="button-row">
-                        <button className="button button-small button-primary" disabled={busy === item.id} onClick={() => reply(item, false)}>
-                          Send reply
-                        </button>
-                        <button className="button button-small button-secondary" disabled={busy === item.id} onClick={() => reply(item, true)}>
-                          Send and close
-                        </button>
-                        <button className="button button-small button-secondary" disabled={busy === item.id} onClick={() => setMessageStatus(item, "closed")}>
-                          Close without reply
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {item.status === "closed" && (
-                    <button className="link-button" onClick={() => setMessageStatus(item, "open")}>
-                      Reopen
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+            {current && (
+              <Conversation
+                item={current}
+                topics={data.topics}
+                busy={busy === current.id}
+                reply={replies[current.id] ?? ""}
+                onReplyChange={(text) => setReplies((old) => ({ ...old, [current.id]: text }))}
+                onSend={(close) => reply(current, close)}
+                onStatus={(next) => setMessageStatus(current, next)}
+              />
+            )}
+          </div>
         )}
       </section>
       )}
     </div>
+  );
+}
+
+const STATUS_LABEL = { open: "Waiting for a reply", answered: "Answered", closed: "Closed" };
+
+// One conversation: the student's message first, then the OAS reply, then the reply box.
+function Conversation({ item, topics, busy, reply, onReplyChange, onSend, onStatus }) {
+  const s = item.student || {};
+  return (
+    <article className="msg-thread" aria-label={`Conversation with ${s.first_name} ${s.last_name}`}>
+      <header className="msg-thread-head">
+        <strong>{item.subject}</strong>
+        <small className="muted">
+          <strong className="student-name">
+            {s.first_name} {s.last_name}
+          </strong>{" "}
+          · {s.student_id} · {s.course}
+          {s.year_level ? `, ${s.year_level}` : ""} · {topics[item.topic] || item.topic}
+          {s.user?.email ? ` · ${s.user.email}` : ""}
+          {s.contact_number ? ` · ${s.contact_number}` : ""}
+        </small>
+      </header>
+
+      <div className="msg-bubble from-student">
+        <small className="muted">Student · {formatDateTime(item.created_at)}</small>
+        <p className="message-body">{item.message}</p>
+      </div>
+
+      {item.reply && (
+        <div className="msg-bubble from-oas">
+          <small className="muted">
+            {item.replier?.name || "OAS"} · {formatDateTime(item.replied_at)}
+            {item.reply_read_at ? " · seen by the student" : " · not seen yet"}
+          </small>
+          <p>{item.reply}</p>
+        </div>
+      )}
+
+      {item.status !== "closed" ? (
+        <div className="message-answer">
+          <label htmlFor={`reply-${item.id}`}>{item.reply ? "Change the reply (the student sees the new text)" : "Your reply"}</label>
+          <textarea
+            id={`reply-${item.id}`}
+            rows={4}
+            maxLength={3000}
+            value={reply}
+            onChange={(event) => onReplyChange(event.target.value)}
+            placeholder="Write your reply"
+          />
+          <div className="button-row">
+            <button className="button button-small button-primary" disabled={busy} onClick={() => onSend(false)}>
+              Send reply
+            </button>
+            <button className="button button-small button-secondary" disabled={busy} onClick={() => onSend(true)}>
+              Send and close
+            </button>
+            <button className="button button-small button-secondary" disabled={busy} onClick={() => onStatus("closed")}>
+              Close without reply
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button className="link-button" onClick={() => onStatus("open")}>
+          Reopen
+        </button>
+      )}
+    </article>
   );
 }

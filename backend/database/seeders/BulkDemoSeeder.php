@@ -111,7 +111,7 @@ class BulkDemoSeeder extends Seeder
         $this->loadPrograms();
 
         DB::transaction(function () {
-            for ($i = 0; $i < self::STUDENTS; $i++) {
+            for ($i = 0; $i < (int) config('demo.bulk_students', self::STUDENTS); $i++) {
                 $this->seedStudent($this->makePerson($i));
             }
         });

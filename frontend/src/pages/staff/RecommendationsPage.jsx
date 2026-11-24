@@ -152,6 +152,7 @@ export default function RecommendationsPage() {
         message:
           "Dear [Student Name],\n\nYou have been identified as a potential candidate for [Scholarship Name] based on the information currently available in CSU UniScholar.\n\nYou may review the scholarship requirements and apply through CSU UniScholar if you are interested.\n\nPlease note that this notification does not constitute official scholarship approval or final confirmation of eligibility. Your application remains subject to the scholarship requirements and OAS review.",
         skipDuplicates: true,
+        addMatchDetails: true,
       });
     } catch (err) {
       toast.error(errMsg(err, "Unable to check the selected students."));
@@ -166,6 +167,7 @@ export default function RecommendationsPage() {
         recommendation_ids: [...selectedIds],
         message: notification.message,
         skip_duplicates: true,
+        add_match_details: notification.addMatchDetails !== false,
       });
       toast.success(result.message);
       setNotification(null);
@@ -406,7 +408,7 @@ export default function RecommendationsPage() {
           <EmptyState message="No students in this list. Try another program tab or “Show”." />
         ) : (
           <div className="table-wrapper">
-            <table className="rec-table">
+            <table className="rec-table numbered">
               <thead>
                 <tr>
                   <th>
@@ -479,6 +481,12 @@ export default function RecommendationsPage() {
                         <small className="muted account-note">
                           {row.reason_summary || "Open Why? for the criteria details."}
                         </small>
+                        {["invited", "added"].includes(row.staff_status) && (
+                          <small className="account-note">
+                            <strong>{row.staff_status === "added" ? "Draft started" : "Notified"}</strong>
+                            {row.invited_at ? ` on ${new Date(row.invited_at).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}` : ""}
+                          </small>
+                        )}
                       </td>
                       <td className="nowrap">
                         <div className="score">
@@ -497,6 +505,11 @@ export default function RecommendationsPage() {
                           </small>
                         )}
                         {row.verdict !== "eligible" && <Badge map={VERDICTS} value={row.verdict} />}
+                        {row.match_level && (
+                          <span className={`match-badge match-${row.match_level}`} title="Decides the wording of the invitation">
+                            {{ high: "High match", partial: "Partial match", low: "Low match" }[row.match_level]}
+                          </span>
+                        )}
                         {row.fit?.level === "high" && (
                           <small className="fit-tag" title="AI field fit: this program is for the student's field of study">
                             Field: {row.fit.fields.join(", ")}
@@ -589,6 +602,19 @@ export default function RecommendationsPage() {
           <p className="muted small">
             [Student Name] and [Scholarship Name] are personalized for each recipient. This is an opportunity notice,
             not an approval or an application.
+          </p>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={notification.addMatchDetails !== false}
+              onChange={(event) => setNotification({ ...notification, addMatchDetails: event.target.checked })}
+            />
+            Add each student&apos;s own match below the message (recommended)
+          </label>
+          <p className="muted small">
+            High match: every rule and document met. Partial match: something is missing or not yet verified. Low match: a
+            rule is not met. Each student sees what appears to be met, what is missing, and what to do next, so a student
+            below 100% is not told the same thing as a student who meets everything.
           </p>
         </Modal>
       )}

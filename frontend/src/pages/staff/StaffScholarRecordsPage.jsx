@@ -233,7 +233,7 @@ export default function StaffScholarRecordsPage() {
           <EmptyState message="No scholar records in this list." />
         ) : (
           <div className="table-wrapper">
-            <table>
+            <table className="numbered">
               <thead>
                 <tr>
                   <th>Student</th>

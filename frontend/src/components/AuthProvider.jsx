@@ -1,6 +1,7 @@
 import { useState } from "react";
 import api from "../services/api";
 import { AuthContext, getStoredUser } from "../lib/auth";
+import * as session from "../lib/session";
 
 /* Keeps the logged-in user (read it anywhere with useAuth() from lib/auth). */
 export default function AuthProvider({ children }) {
@@ -8,14 +9,14 @@ export default function AuthProvider({ children }) {
 
   // Called with the /login response: { token, user }
   function login(data) {
-    localStorage.setItem("token", data.token);
-    localStorage.setItem("user", JSON.stringify(data.user));
+    session.setItem("token", data.token);
+    session.setItem("user", JSON.stringify(data.user));
     setUser(data.user);
   }
 
   // After a password change: the server sends the updated user.
   function updateUser(next) {
-    localStorage.setItem("user", JSON.stringify(next));
+    session.setItem("user", JSON.stringify(next));
     setUser(next);
   }
 
@@ -27,8 +28,8 @@ export default function AuthProvider({ children }) {
       // Already expired or server offline: still log out locally.
     }
 
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    session.removeItem("token");
+    session.removeItem("user");
     setUser(null);
   }
 

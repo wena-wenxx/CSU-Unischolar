@@ -270,7 +270,7 @@ export default function StaffPayrollPage() {
           <EmptyState message="No payroll entries in this list." />
         ) : (
           <div className="table-wrapper">
-            <table>
+            <table className="numbered">
               <thead>
                 <tr>
                   <th className="print-hide">
@@ -364,7 +364,7 @@ export default function StaffPayrollPage() {
           <EmptyState message="No payroll has been prepared yet." />
         ) : (
           <div className="table-wrapper">
-            <table>
+            <table className="numbered">
               <thead>
                 <tr>
                   <th>Period</th>

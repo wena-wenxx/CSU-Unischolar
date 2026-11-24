@@ -21,6 +21,10 @@ class SettingController extends Controller
             'oas_facebook' => $values['oas_facebook'],
             'oas_about' => $values['oas_about'],
             'current_period' => PayrollController::currentPeriod(),
+            // One source for every page's academic-year and semester boxes (Admin > Settings, or today's date).
+            'current_school_year' => \App\Models\ExternalGrantee::currentSchoolYear(),
+            'current_semester' => $values['current_semester'] ?: preg_replace('/ AY .*$/', '', PayrollController::currentPeriod()),
+            'semesters' => Setting::SEMESTERS,
         ]);
     }
 

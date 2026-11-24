@@ -24,6 +24,11 @@ return [
     // on any computer with real data.
     'reset_allowed' => (bool) env('DEMO_RESET_ALLOWED', false),
 
+    // How many extra fictional students the demo data makes (besides the 10 named ones).
+    // 120 looks like a full cycle; a smaller number (e.g. 20) keeps the lists short for testing.
+    // Used by "php artisan demo:reset --full" (and migrate --seed).
+    'bulk_students' => max(0, min(500, (int) env('DEMO_BULK_STUDENTS', 120))),
+
     // Show the demo accounts (with their passwords) on the login page. Turn OFF for real use.
     'show_on_login' => (bool) env('DEMO_LOGIN_ACCOUNTS', false),
 ];

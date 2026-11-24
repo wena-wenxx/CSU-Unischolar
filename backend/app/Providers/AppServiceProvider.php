@@ -30,6 +30,18 @@ class AppServiceProvider extends ServiceProvider
             Mail::alwaysTo($to);
         }
 
+        // The AI worker window (php artisan queue:work database --queue=ai) says "I am here" on every loop,
+        // so AI checks are sent to it only while it is really running.
+        \Illuminate\Support\Facades\Queue::looping(function ($event) {
+            if (($event->connectionName ?? null) === 'database') {
+                try {
+                    \App\Support\DocumentChecker::markWorkerAlive();
+                } catch (\Throwable $e) {
+                    // database down: the worker cannot take checks now anyway
+                }
+            }
+        });
+
         // Login: 10 tries a minute for one e-mail on one computer (stops password guessing).
         RateLimiter::for('login', function (Request $request) {
             return Limit::perMinute(10)

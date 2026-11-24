@@ -86,7 +86,7 @@ export default function SentNotices() {
         <EmptyState message="No invitations here." />
       ) : (
         <div className="table-wrap">
-          <table className="table" id="sent-notices-table">
+          <table className="table numbered" id="sent-notices-table">
             <thead>
               <tr>
                 <th>Student</th>

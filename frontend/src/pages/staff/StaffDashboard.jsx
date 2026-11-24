@@ -54,17 +54,19 @@ export default function StaffDashboard() {
       {/* What needs work today first; the overall numbers are folded below. */}
       <h2 className="section-title">Needs your attention</h2>
       <div className="stats-grid attention-grid">
-        <StatCard title="Needs Action" value={stats.needs_action ?? 0} to="/staff/applications?filter=needs_action" hint="Waiting for students" />
+        <StatCard title="Needs Action" value={stats.needs_action ?? 0} to="/staff/applications?filter=needs_action" hint="Waiting for students" icon="clock" attention />
         <StatCard
           title="AI Flags (documents)"
+          icon="flag"
+          attention
           value={stats.ai_flags ?? 0}
           to="/staff/applications?filter=flagged"
           hint={`In ${stats.applications_with_flags ?? 0} applications`}
         />
         <StatCard title="Forwarded to Agency" value={stats.forwarded ?? 0} to="/staff/forwarded" hint="Waiting for the agency" />
-        <StatCard title="Enrollment to Verify" value={stats.enrollment_to_verify ?? 0} to="/staff/enrollment" hint="Verify all at once" />
-        <StatCard title="Payroll Ready" value={stats.payroll_ready ?? 0} to="/staff/payroll?status=ready" />
-        <StatCard title="Student Messages" value={stats.open_messages ?? 0} to="/staff/messages" hint="Waiting for a reply" />
+        <StatCard title="Enrollment to Verify" value={stats.enrollment_to_verify ?? 0} to="/staff/enrollment" hint="Verify all at once" attention />
+        <StatCard title="Payroll Ready" value={stats.payroll_ready ?? 0} to="/staff/payroll?status=ready" attention />
+        <StatCard title="Student Messages" value={stats.open_messages ?? 0} to="/staff/messages" hint="Waiting for a reply" attention />
       </div>
 
       <details className="more-numbers">
@@ -87,6 +89,8 @@ export default function StaffDashboard() {
       />
 
       <div className="dashboard-grid">
+        <InvitationActivity />
+
         <section className="card dashboard-recent">
           <div className="card-header">
             <h2>Recent activity</h2>
@@ -219,5 +223,66 @@ function ResolveModal({ request, onClose, onDone }) {
         placeholder="e.g. Confirmed with the Registrar; your year level will be updated."
       />
     </Modal>
+  );
+}
+
+
+/*
+  AI Recommendations and invitations: what staff did (recalculated, invited, notified) and how students
+  answered (opened, started or sent an application). Loaded on its own, so the rest of the dashboard
+  does not wait for it. Built from saved records only.
+*/
+const ACTIVITY_LABEL = { staff: "OAS", opened: "Opened", applied: "Applied" };
+
+function InvitationActivity() {
+  const [data, setData] = useState(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    api
+      .get("/staff/invitation-activity")
+      .then((response) => setData(response.data))
+      .catch(() => setFailed(true));
+  }, []);
+
+  return (
+    <section className="card">
+      <div className="card-header">
+        <h2>AI Recommendations and invitations</h2>
+        <Link className="button button-small button-secondary" to="/staff/messages">
+          Sent invitations
+        </Link>
+      </div>
+      {failed ? (
+        <EmptyState message="Could not load the invitation activity." />
+      ) : !data ? (
+        <p className="muted small">Loading...</p>
+      ) : (
+        <>
+          <p className="muted small">
+            {data.totals.invited} invitation(s) sent · {data.totals.opened} opened · {data.totals.applied} applied after the invitation
+          </p>
+          {data.events.length === 0 ? (
+            <EmptyState message="No invitations yet. Send them from AI Recommendations." />
+          ) : (
+            data.events.slice(0, 8).map((event, index) => (
+              <div className="list-item" key={`${event.at}-${index}`}>
+                <div>
+                  <strong>{event.who || "OAS"}</strong>
+                  <p className="muted">
+                    {event.text}
+                    <br />
+                    {timeAgo(event.at)}
+                  </p>
+                </div>
+                <span className={`status status-${event.kind === "applied" ? "success" : event.kind === "opened" ? "info" : "neutral"}`}>
+                  {ACTIVITY_LABEL[event.kind] || event.kind}
+                </span>
+              </div>
+            ))
+          )}
+        </>
+      )}
+    </section>
   );
 }

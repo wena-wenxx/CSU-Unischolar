@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import api, { errMsg } from "../../services/api";
+import api, { errMsg, isCancel } from "../../services/api";
 import { fileUrl, formatDate, statusLabel } from "../../lib/format";
 import {
   checkableRow,
@@ -8,8 +8,11 @@ import {
   loadMyDocuments,
 } from "../../lib/documents";
 import { useToast } from "../../lib/toast";
+import { useAiChecks } from "../../lib/aiChecks";
+import { useConfirm } from "../../lib/confirm";
 import PageHeader from "../../components/PageHeader";
 import Loading from "../../components/Loading";
+import FileDrop from "../../components/FileDrop";
 
 function validateDocumentUpload(file) {
   if (!file) return "Choose a file first.";
@@ -52,6 +55,16 @@ export default function MyDocumentsPage() {
     load();
   }, [load]);
 
+  // One "Checking..." state per document; checks running in the AI worker are followed until they finish.
+  const ai = useAiChecks({ toast, onChange: load });
+  const confirm = useConfirm();
+  const uploadControl = useRef(null); // the upload in progress ("Cancel upload")
+  const [uploadingType, setUploadingType] = useState(null); // which card is uploading (shows the Cancel button)
+  const { resume } = ai;
+  useEffect(() => {
+    resume(data?.documents);
+  }, [data, resume]);
+
   async function save(type, current) {
     const file = files[type];
     if (!file) return;
@@ -66,6 +79,9 @@ export default function MyDocumentsPage() {
     if (!current) form.append("document_type", type);
 
     setBusy(type);
+    const controller = new AbortController();
+    uploadControl.current = controller;
+    setUploadingType(type);
 
     try {
       const { data: result } = await api.post(
@@ -73,7 +89,7 @@ export default function MyDocumentsPage() {
           ? `/student/documents/${current.id}/replace`
           : "/student/documents",
         form,
-        { headers: { "Content-Type": "multipart/form-data" } },
+        { headers: { "Content-Type": "multipart/form-data" }, signal: controller.signal },
       );
 
       toast.success(result.message);
@@ -81,36 +97,39 @@ export default function MyDocumentsPage() {
       setInputKeys((k) => ({ ...k, [type]: (k[type] || 0) + 1 }));
       await load();
     } catch (err) {
-      toast.error(errMsg(err, "Upload failed."));
+      if (isCancel(err)) {
+        toast.info("Upload cancelled. The file is still chosen; press Upload to try again.");
+        load(); // show the real state (a file that had fully arrived may have been kept)
+      }
+      else toast.error(errMsg(err, "Upload failed."));
     } finally {
+      uploadControl.current = null;
+      setUploadingType(null);
       setBusy(null);
     }
   }
 
-  async function check(row) {
-    setBusy(`check-${row.id}`);
+  function clearChosen(type) {
+    setFiles((f) => ({ ...f, [type]: null }));
+    setInputKeys((k) => ({ ...k, [type]: (k[type] || 0) + 1 }));
+  }
 
+  // "Delete file": only while no submitted application uses it (the server checks this too).
+  async function remove(type, current) {
+    const ok = await confirm({
+      title: `Delete ${current.original_filename}?`,
+      message: `It is removed from My Documents (${type}). Applications you already submitted keep the copy the OAS is checking.`,
+      confirmLabel: "Delete file",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setBusy(type);
     try {
-      const { data: result } = await api.post(`/documents/${row.id}/validate`);
-      const status = result.document?.status;
-
-      if (status === "validated")
-        toast.success(
-          "The AI check found no issues. OAS staff still review it.",
-        );
-      else if (status === "flagged")
-        toast.info(
-          "AI check: something may need fixing. See the reasons below.",
-        );
-      else
-        toast.info(
-          result.message || "The file could not be read automatically.",
-        );
-
+      const { data: result } = await api.delete(`/student/documents/${current.id}`);
+      toast.success(result.message);
       await load();
     } catch (err) {
-      toast.error(errMsg(err, "The AI check could not run. Try again later."));
-      await load();
+      toast.error(errMsg(err, "Unable to delete the file."));
     } finally {
       setBusy(null);
     }
@@ -204,6 +223,7 @@ export default function MyDocumentsPage() {
                 <label className="sr-only" htmlFor={`doc-${type}`}>
                   File for {type}
                 </label>
+                <FileDrop hint="or drag a file here">
                 <input
                   id={`doc-${type}`}
                   key={inputKeys[type] || 0}
@@ -216,6 +236,7 @@ export default function MyDocumentsPage() {
                     }))
                   }
                 />
+                </FileDrop>
 
                 {files[type] ? (
                   <button
@@ -224,26 +245,47 @@ export default function MyDocumentsPage() {
                     onClick={() => save(type, current)}
                     disabled={busy !== null}
                   >
-                    {busy === type ? "Saving..." : current ? "Replace with this file" : "Upload"}
+                    {busy === type ? "Uploading..." : current ? "Replace with this file" : "Upload"}
                   </button>
                 ) : (
                   <span className="muted small">Choose a file to {current ? "replace this copy" : "upload it"}.</span>
+                )}
+
+                {uploadingType === type && (
+                  <button type="button" className="button button-small button-danger-outline" onClick={() => uploadControl.current?.abort()}>
+                    Cancel upload
+                  </button>
+                )}
+                {files[type] && busy !== type && (
+                  <button type="button" className="button button-small button-secondary" onClick={() => clearChosen(type)}>
+                    Remove chosen file
+                  </button>
                 )}
 
                 {current && row && ["uploaded", "needs_review", "flagged", "processing"].includes(current.status) && (
                   <button
                     type="button"
                     className="button button-small button-secondary"
-                    onClick={() => check(row)}
-                    disabled={busy !== null}
+                    onClick={() => ai.start(row.id)}
+                    disabled={busy !== null || ai.isRunning(row.id) || row.status === "processing"}
                   >
-                    {busy === `check-${row.id}`
+                    {ai.isRunning(row.id) || row.status === "processing"
                       ? "Checking..."
                       : current.status === "needs_review"
                         ? "Retry AI check"
                         : current.status === "flagged"
                           ? "Re-run AI check"
                           : "Run AI check"}
+                  </button>
+                )}
+                {row && (ai.isRunning(row.id) || row.status === "processing") && (
+                  <button type="button" className="button button-small button-danger-outline" onClick={() => ai.cancel(row.id)}>
+                    Cancel check
+                  </button>
+                )}
+                {current && !files[type] && busy === null && (
+                  <button type="button" className="button button-small button-secondary" onClick={() => remove(type, current)}>
+                    Delete file
                   </button>
                 )}
               </div>
@@ -311,6 +353,10 @@ function ValidityBadge({ file }) {
 }
 
 function AiResult({ file, checkable }) {
+  if (file.status === "processing") {
+    return <p className="ai-note muted small"><span className="spinner" aria-hidden="true" /> The AI is reading this file. You can keep working; the result appears here.</p>;
+  }
+
   if (file.status === "validated") {
     const notes = String(file.flags || "").split("\n").filter(Boolean);
     return (

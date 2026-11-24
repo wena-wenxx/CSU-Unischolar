@@ -168,7 +168,7 @@ export default function ActivityLogPage() {
           <EmptyState message="No activity matches." />
         ) : (
           <div className="table-wrapper">
-            <table>
+            <table className="numbered">
               <thead>
                 <tr>
                   <th>When</th>

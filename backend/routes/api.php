@@ -79,6 +79,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\RequirePasswordChange::c
     Route::get('/student/messages', [ContactController::class, 'mine']);
     Route::post('/student/messages', [ContactController::class, 'store']);
     Route::get('/staff/messages', [ContactController::class, 'index']);
+    Route::get('/staff/alerts', [\App\Http\Controllers\StaffAlertController::class, 'index']);        // "what to do next" after a student's action
+    Route::post('/staff/alerts/seen', [\App\Http\Controllers\StaffAlertController::class, 'seen']);
     Route::post('/staff/messages/{id}/reply', [ContactController::class, 'reply']);
     Route::post('/staff/messages/{id}/status', [ContactController::class, 'setStatus']);
 
@@ -86,6 +88,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\RequirePasswordChange::c
     Route::get('/student/documents', [StudentDocumentController::class, 'index']);
     Route::post('/student/documents', [StudentDocumentController::class, 'store']);
     Route::post('/student/documents/{id}/replace', [StudentDocumentController::class, 'replace']);
+    Route::delete('/student/documents/{id}', [StudentDocumentController::class, 'destroy'])->whereNumber('id');
     Route::post('/applications/{id}/documents/reuse', [ApplicationController::class, 'reuseDocument']);
 
     /*
@@ -122,12 +125,14 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\RequirePasswordChange::c
     // Auto-Review: suggestions only; staff press Forward / Send back
     Route::post('/staff/auto-review', [ReviewQueueController::class, 'run']);
     Route::post('/staff/applications/forward', [ReviewQueueController::class, 'forward']);
+    Route::get('/staff/applications/{id}/suggested-remark', [ReviewQueueController::class, 'suggestedRemark']);   // from its own AI flags (suggestion only)
     Route::post('/staff/applications/needs-action', [ReviewQueueController::class, 'needsAction']);
     Route::post('/applications/{applicationId}/verify-enrollment', [EnrollmentController::class, 'verify']);
 
     // Enrollment page: Registrar list + Verify All Enrollments
     Route::get('/staff/enrollment-lists', [EnrollmentListController::class, 'index']);
     Route::post('/staff/enrollment-lists', [EnrollmentListController::class, 'store']);
+    Route::get('/staff/enrollment-lists/{id}/rows', [EnrollmentListController::class, 'rows'])->whereNumber('id');
     Route::post('/staff/enrollment/check', [EnrollmentListController::class, 'check']);
     Route::post('/staff/enrollment/record', [EnrollmentListController::class, 'record']);
 
@@ -152,7 +157,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\RequirePasswordChange::c
     Route::get('/staff/agency-lists', [AgencyListController::class, 'index']);
     Route::post('/staff/agency-lists', [AgencyListController::class, 'store']);
     Route::get('/staff/agency-lists/{id}', [AgencyListController::class, 'show']);
+    Route::post('/staff/agency-lists/{id}/done', [AgencyListController::class, 'markDone']);                   // "Done processing" (changes no application)
     Route::post('/staff/agency-lists/{id}/rows/{row}/link', [AgencyListController::class, 'linkRow']);          // unmatched row -> a student found in Data Bank
+    Route::post('/staff/agency-lists/{id}/set-aside', [AgencyListController::class, 'setAsideRows']);           // several rows, one reason
+    Route::post('/staff/agency-lists/{id}/rows/{row}/resume', [AgencyListController::class, 'resumeRow']);      // undo set aside
     Route::post('/staff/agency-lists/{id}/rows/{row}/set-aside', [AgencyListController::class, 'setAsideRow']); // keep it unmatched, with a note
 
     // Processing batches: one cycle of one program (e.g. TES – 1st Semester AY 2026-2027)
@@ -184,6 +192,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\RequirePasswordChange::c
     Route::get('/staff/recommendations/{id}', [RecommendationController::class, 'show']);
     Route::post('/staff/recommendations/{id}/invite', [RecommendationController::class, 'invite']);
     Route::get('/staff/notices', [RecommendationController::class, 'sentNotices']);   // sent invitations and notices: whom, when, status
+    Route::get('/staff/invitation-activity', [RecommendationController::class, 'activity']);   // dashboard: invitations sent, opened, applied
     Route::post('/staff/recommendations/{id}/add', [RecommendationController::class, 'add']);
     Route::post('/staff/recommendations/{id}/dismiss', [RecommendationController::class, 'dismiss']);
     Route::post('/staff/recommendations/{id}/wrong', [RecommendationController::class, 'wrong']);
@@ -207,6 +216,9 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\RequirePasswordChange::c
     Route::post('/staff/external-grantees/uploads/{id}/discard', [ExternalGranteeController::class, 'discard']);
     Route::post('/staff/read-table', [ExternalGranteeController::class, 'readTable']);   // Approved Lists / Enrollment: Excel, Word, PDF
     Route::post('/staff/forwarded/export', [ForwardedExportController::class, 'export']);
+    Route::get('/staff/agency-submissions', [\App\Http\Controllers\AgencySubmissionController::class, 'index']);
+    Route::post('/staff/agency-submissions', [\App\Http\Controllers\AgencySubmissionController::class, 'store']);     // "Record as sent": one date for the whole list
+    Route::post('/staff/forwarded/documents-zip', [\App\Http\Controllers\AgencySubmissionController::class, 'documentsZip']);   // ticked document types only
     Route::post('/staff/billing-statement', [\App\Http\Controllers\BillingStatementController::class, 'export']);   // billing list (CHED TES Form 2 column order) as Excel or PDF   // Forwarded to Agency as Excel or PDF
     Route::post('/staff/ai/suggest-rules', [AiRulesController::class, 'suggest']);          // AI reads a memo, suggests eligibility rules
 
@@ -231,6 +243,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\RequirePasswordChange::c
 
     Route::post('/applications/{id}/documents', [ApplicationController::class, 'uploadDocument']);
     Route::post('/documents/{documentId}/validate', [AIController::class, 'validateDocument']);
+    Route::get('/documents/{documentId}/check-status', [AIController::class, 'checkStatus']);   // result of a check running in the AI worker
+    Route::post('/documents/{documentId}/cancel-check', [AIController::class, 'cancelCheck']);   // "Cancel" on a running AI check
     Route::post('/documents/{documentId}/verify', [AIController::class, 'verify']);   // staff: "verified genuine"
 
     /*

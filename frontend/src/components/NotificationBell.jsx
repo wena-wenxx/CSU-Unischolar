@@ -3,6 +3,10 @@ import { Link, useLocation } from "react-router-dom";
 import api from "../services/api";
 import { stepLabel, timeAgo } from "../lib/format";
 import { useAuth } from "../lib/auth";
+import { useToast } from "../lib/toast";
+
+// Staff: how often the bell asks for new student actions ("what to do next"). Small request.
+const ALERT_SECONDS = 10;
 
 /*
   Students see application updates and OAS replies. Staff see open messages
@@ -24,6 +28,40 @@ export default function NotificationBell() {
   });
   const [open, setOpen] = useState(false);
   const boxRef = useRef(null);
+  const toast = useToast();
+  const [alerts, setAlerts] = useState({ alerts: [], unseen: 0 });
+  const known = useRef(null); // alert keys already shown, so only new ones pop up
+
+  // Staff: a student did something that needs the OAS -> it appears here within seconds,
+  // with the next step and a button to the right page (and a short pop-up the first time).
+  const loadAlerts = useCallback(() => {
+    if (!isStaff || document.visibilityState !== "visible") return;
+    api
+      .get("/staff/alerts")
+      .then(({ data: fresh }) => {
+        const keys = new Set(fresh.alerts.map((a) => a.key));
+        if (known.current) {
+          fresh.alerts
+            .filter((a) => a.new && !known.current.has(a.key))
+            .slice(0, 3)
+            .forEach((a) => toast.info(`${a.who}: ${a.title}. Next: ${a.next}`));
+        }
+        known.current = keys;
+        setAlerts(fresh);
+      })
+      .catch(() => {});
+  }, [isStaff, toast]);
+
+  useEffect(() => {
+    if (!isStaff) return undefined;
+    loadAlerts();
+    const timer = window.setInterval(loadAlerts, ALERT_SECONDS * 1000);
+    window.addEventListener("focus", loadAlerts);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", loadAlerts);
+    };
+  }, [isStaff, loadAlerts]);
 
   const load = useCallback(() => {
     const request = isStaff ? api.get("/staff/messages", { params: { status: "open" } }) : api.get("/student/notifications");
@@ -57,6 +95,13 @@ export default function NotificationBell() {
     const opening = !open;
     setOpen(opening);
 
+    if (isStaff && opening && alerts.unseen > 0) {
+      api
+        .post("/staff/alerts/seen")
+        .then(() => setAlerts((current) => ({ ...current, unseen: 0 })))
+        .catch(() => {});
+    }
+
     if (!isStaff && opening && data.unread > 0) {
       api
         .post("/student/notifications/read")
@@ -65,7 +110,7 @@ export default function NotificationBell() {
     }
   }
 
-  const count = isStaff ? data.counts?.open || 0 : data.unread + (data.unread_replies || 0);
+  const count = isStaff ? alerts.unseen || data.counts?.open || 0 : data.unread + (data.unread_replies || 0);
 
   return (
     <div className="bell" ref={boxRef}>
@@ -89,28 +134,36 @@ export default function NotificationBell() {
         <div className="bell-panel" role="dialog" aria-label="Notifications">
           {isStaff ? (
             <>
-              <strong className="bell-title">Student messages</strong>
-
-              {data.messages?.length === 0 ? (
-                <p className="muted">No messages waiting.</p>
+              <strong className="bell-title">What to do next</strong>
+              {alerts.alerts.length === 0 ? (
+                <p className="muted">Nothing waiting from students.</p>
               ) : (
                 <ul>
-                  {data.messages.map((item) => {
-                    const student = item.student || {};
-                    const studentName = [student.first_name, student.last_name].filter(Boolean).join(" ");
-
-                    return (
-                      <li key={item.id} className="unread">
-                        <Link to="/staff/messages" onClick={() => setOpen(false)}>
-                          <strong>{item.subject}</strong>
-                          <span>{studentName || "Student"}</span>
-                          <small className="muted">{timeAgo(item.created_at)}</small>
+                  {alerts.alerts.slice(0, 8).map((item) => (
+                    <li key={item.key} className={item.new ? "unread" : ""}>
+                      <Link to={item.link} onClick={() => setOpen(false)}>
+                        <strong>{item.who}</strong>
+                        <span>{item.title}</span>
+                        <span className="bell-next">Next: {item.next}</span>
+                        <small className="muted">{timeAgo(item.at)}</small>
+                      </Link>
+                      <span className="button-row">
+                        <Link className="button button-small button-primary" to={item.link} onClick={() => setOpen(false)}>
+                          {item.action}
                         </Link>
-                      </li>
-                    );
-                  })}
+                      </span>
+                    </li>
+                  ))}
                 </ul>
               )}
+
+              {/* One list only: student messages are part of "What to do next" above (newest first). */}
+              <p className="bell-footer">
+                <Link to="/staff/messages" onClick={() => setOpen(false)}>
+                  All student messages
+                  {data.counts?.open ? ` (${data.counts.open} waiting for a reply)` : ""} →
+                </Link>
+              </p>
             </>
           ) : (
             <>

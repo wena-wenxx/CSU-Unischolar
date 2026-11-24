@@ -95,7 +95,10 @@ class EligibilityEngine
     | Staff decisions (invited, dismissed, ...) are kept; only the numbers change.
     | Returns ['students' => n, 'scholarships' => n, 'rows' => n, 'eligible' => n].
     */
-    public static function recalculate(?array $studentIds = null): array
+    /** When every student was last scored (Cache, kept forever). */
+    public const FULL_RUN_KEY = 'ai_recommendations_full_run_at';
+
+    public static function recalculate(?array $studentIds = null, bool $withFit = true): array
     {
         $scholarships = self::scoredScholarships();
 
@@ -164,8 +167,14 @@ class EligibilityEngine
                 ->each(fn ($r) => $r->delete());
         });
 
+        // A full run (every student) is remembered, so the staff page knows the whole list was scored.
+        // Re-scoring ONE student (profile change, upload) does not count as a full run.
+        if ($studentIds === null) {
+            \Illuminate\Support\Facades\Cache::forever(self::FULL_RUN_KEY, now()->toIso8601String());
+        }
+
         // AI field fit (ranks and explains only; skipped quietly when the AI service is off).
-        $fit = FitScorer::refresh($studentIds);
+        $fit = $withFit ? FitScorer::refresh($studentIds) : ['ok' => true, 'skipped' => 'recent'];
 
         return [
             'students' => $students->count(),

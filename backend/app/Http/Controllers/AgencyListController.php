@@ -438,6 +438,40 @@ class AgencyListController extends Controller
     }
 
     /*
+    | POST /staff/agency-lists/{id}/done   Body: done (true | false), note
+    | "Done processing": staff say they finished this list (rows checked, unmatched rows linked or set
+    | aside). It changes no application and deletes nothing; the list stays open to look at, and it can
+    | be marked not done again. Rows still to resolve need a note.
+    */
+    public function markDone(Request $request, $id)
+    {
+        $this->staffOnly($request);
+        $data = $request->validate(['done' => 'required|boolean', 'note' => 'nullable|string|max:500']);
+        $upload = AgencyListUpload::with('scholarship:id,name')->findOrFail($id);
+        $open = $upload->openRowCount();
+
+        if ($data['done'] && $open > 0 && trim((string) ($data['note'] ?? '')) === '') {
+            return response()->json([
+                'message' => "{$open} row(s) still need a decision (link the student or set the row aside). Write a short note to mark the list done anyway.",
+                'open_rows' => $open,
+            ], 422);
+        }
+
+        $upload->update($data['done']
+            ? ['done_at' => now(), 'done_by' => $request->user()->id, 'done_note' => $data['note'] ?? null]
+            : ['done_at' => null, 'done_by' => null, 'done_note' => null]);
+
+        \App\Models\ActivityLog::record($request->user(), $data['done'] ? 'agency_list.done' : 'agency_list.reopened',
+            ($data['done'] ? 'Marked done processing' : 'Marked not done')." the approved list {$upload->file_name} ({$upload->scholarship?->name}).", $upload);
+
+        return response()->json([
+            'message' => $data['done'] ? 'Marked as done processing. You can upload and process another list.' : 'Marked as not done.',
+            'upload' => $upload->fresh(['scholarship:id,name', 'uploader:id,name', 'processingBatch:id,name,status'])
+                ->setAttribute('open_rows', $open),
+        ]);
+    }
+
+    /*
     | POST /staff/agency-lists/{id}/rows/{row}/link
     | Body: student_id (the id of a student in the Data Bank), confirm_name (when the names differ)
     | Staff found the student of an unmatched row (e.g. the list had no or a wrong Student ID).
@@ -576,6 +610,76 @@ class AgencyListController extends Controller
             'upload' => $upload->fresh(['scholarship:id,name', 'uploader:id,name', 'processingBatch:id,name,status'])
                 ->setAttribute('open_rows', $upload->fresh()->openRowCount()),
         ]);
+    }
+
+    /*
+    | POST /staff/agency-lists/{id}/set-aside   Body: rows [row numbers], note
+    | Several open rows with the SAME reason, in one step (each row keeps the note, who and when).
+    | Rows with different reasons are set aside one by one. Nothing is matched or approved.
+    */
+    public function setAsideRows(Request $request, $id)
+    {
+        $this->staffOnly($request);
+        $data = $request->validate(['rows' => 'required|array|min:1|max:500', 'rows.*' => 'integer', 'note' => 'required|string|max:500']);
+
+        $upload = AgencyListUpload::findOrFail($id);
+        $details = $upload->details ?? [];
+        $done = [];
+        foreach (array_unique($data['rows']) as $row) {
+            [$index, $line] = $this->openRow($upload, (int) $row);
+            if ($index === null) {
+                continue;
+            }
+            $details[$index] = $line + ['resolved_note' => trim($data['note']), 'resolved_by' => $request->user()->name,
+                'resolved_at' => now()->toDateTimeString(), 'set_aside' => true];
+            $done[] = $row;
+        }
+        if (!$done) {
+            return response()->json(['message' => 'None of the chosen rows is open any more.'], 422);
+        }
+        $upload->update(['details' => $details]);
+
+        ActivityLog::record($request->user(), 'agency_list.rows_set_aside',
+            'Set aside rows '.implode(', ', $done)." of {$upload->file_name}: {$data['note']}", $upload);
+
+        return response()->json([
+            'message' => count($done).' row(s) set aside with the same reason.',
+            'upload' => $upload->fresh(['scholarship:id,name', 'uploader:id,name', 'processingBatch:id,name,status'])
+                ->setAttribute('open_rows', $upload->fresh()->openRowCount()),
+        ]);
+    }
+
+    /*
+    | POST /staff/agency-lists/{id}/rows/{row}/resume
+    | Undo "set aside" when the problem was solved (e.g. the student's ID was corrected): the row is open
+    | again so it can be linked. The earlier note is kept in the row's history.
+    */
+    public function resumeRow(Request $request, $id, $row)
+    {
+        $this->staffOnly($request);
+        $upload = AgencyListUpload::findOrFail($id);
+        $details = $upload->details ?? [];
+
+        foreach ($details as $index => $line) {
+            if ((int) ($line['row'] ?? 0) === (int) $row && !empty($line['set_aside'])) {
+                $line['history'] = array_merge((array) ($line['history'] ?? []), [[
+                    'set_aside_note' => $line['resolved_note'] ?? null, 'by' => $line['resolved_by'] ?? null, 'at' => $line['resolved_at'] ?? null,
+                    'resumed_by' => $request->user()->name, 'resumed_at' => now()->toDateTimeString(),
+                ]]);
+                unset($line['resolved_note'], $line['resolved_by'], $line['resolved_at'], $line['set_aside']);
+                $details[$index] = $line;
+                $upload->update(['details' => $details]);
+                ActivityLog::record($request->user(), 'agency_list.row_resumed', "Opened row {$row} of {$upload->file_name} again.", $upload);
+
+                return response()->json([
+                    'message' => "Row {$row} is open again. Link it to the student when ready.",
+                    'upload' => $upload->fresh(['scholarship:id,name', 'uploader:id,name', 'processingBatch:id,name,status'])
+                        ->setAttribute('open_rows', $upload->fresh()->openRowCount()),
+                ]);
+            }
+        }
+
+        return response()->json(['message' => "Row {$row} is not set aside."], 422);
     }
 
     /** [index in details, the row] of an open row, or [null, null]. */

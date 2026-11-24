@@ -67,6 +67,7 @@ class RecommendationNotificationTest extends TestCase
             'recommendation_ids' => [$recommendation->id],
             'message' => 'Dear [Student Name], review [Scholarship Name].',
             'skip_duplicates' => true,
+            'add_match_details' => false,
         ])->assertOk()->assertJsonPath('sent', 1);
 
         $this->assertDatabaseHas('scholarship_notifications', [
@@ -168,5 +169,34 @@ class RecommendationNotificationTest extends TestCase
             'message' => 'Hello [Student Name], you may apply to [Scholarship Name].',
         ])->assertStatus(422);
         $this->assertDatabaseCount('scholarship_notifications', 0);
+    }
+
+    public function test_the_notice_explains_the_students_own_match_and_is_not_a_promise(): void
+    {
+        [$staff, , $student, $scholarship, $recommendation] = $this->fixture();
+        Sanctum::actingAs($staff);
+
+        $this->postJson('/api/staff/recommendations/notifications', [
+            'scholarship_id' => $scholarship->id,
+            'recommendation_ids' => [$recommendation->id],
+            'message' => 'Dear [Student Name], review [Scholarship Name].',
+        ])->assertOk();
+
+        $message = ScholarshipNotification::where('student_id', $student->id)->value('message');
+        // Documents are missing, so this is a partial match, not "you meet the criteria".
+        $this->assertStringContainsString('Partial match', $message);
+        $this->assertStringContainsString('Missing or not yet checked: Documents', $message);
+        $this->assertStringContainsString('not an approval', $message);
+    }
+
+    public function test_match_levels_follow_the_rule_checks(): void
+    {
+        $make = fn ($verdict, $score, $checks) => new AiRecommendation(['verdict' => $verdict, 'score' => $score, 'checks' => $checks]);
+        $met = ['label' => 'GWA', 'result' => 'met', 'must' => true, 'points' => 1];
+
+        $this->assertSame('high', \App\Support\InvitationText::level($make('eligible', 100, [$met])));
+        $this->assertSame('partial', \App\Support\InvitationText::level($make('eligible', 90, [$met, ['label' => 'COR', 'result' => 'no_data']])));
+        $this->assertSame('partial', \App\Support\InvitationText::level($make('no_data', 50, [$met])));
+        $this->assertSame('low', \App\Support\InvitationText::level($make('not_eligible', 60, [$met, ['label' => 'Income', 'result' => 'not_met']])));
     }
 }

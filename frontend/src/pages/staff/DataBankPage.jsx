@@ -415,7 +415,7 @@ export default function DataBankPage() {
           <EmptyState message="No students matched your search." />
         ) : (
           <div className="table-wrapper">
-            <table>
+            <table className="numbered">
               <thead>
                 <tr>
                   <th>Name (last, first)</th>

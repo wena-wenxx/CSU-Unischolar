@@ -1,0 +1,1316 @@
+/* =====================================================================
+   CSU UniScholar / ScholarGuide: DESIGN SYSTEM (UI refresh, round 28)
+   ---------------------------------------------------------------------
+   Loaded AFTER index.css (see main.jsx), so these rules give every page
+   the same finish without rewriting the page-specific rules in index.css.
+   Change the look of the whole system here.
+
+   Brand: Caraga State University colours are green and gold (university
+   infobox; the shades come from the CSU logo already used in the app).
+   Green carries the identity (navigation, primary actions); gold is an
+   accent (active marker, highlights); everything else is neutral, so the
+   pages stay calm. Status colours (green / amber / red) are only used for
+   statuses.
+
+   Sections: 1 tokens · 2 base type · 3 shell (sidebar, top bar) · 4 page
+   header · 5 cards · 6 buttons · 7 forms · 8 tables · 9 badges · 10 stat
+   cards and dashboard · 11 overlays (modal, toast, dropdowns) · 12 loading
+   · 13 carousel · 14 motion · 15 responsive · 16 reduced motion
+   ===================================================================== */
+
+/* ---------- 1. Tokens ---------- */
+:root {
+  /* neutrals (slightly green-tinted greys, easy on the eyes) */
+  --ds-bg: #f4f6f5;
+  --ds-surface: #ffffff;
+  --ds-surface-2: #f8faf9; /* table heads, quiet panels */
+  --ds-line: #e4e8e6; /* borders */
+  --ds-line-strong: #cfd6d2;
+  --ds-ink: #14201a; /* headings */
+  --ds-text: #33413a; /* body text: 10.9:1 on white */
+  --ds-muted: #5d6b64; /* secondary text: 5.6:1 on white */
+
+  /* brand */
+  --ds-green: var(--primary-color, #004d26);
+  --ds-green-600: #0b6235;
+  --ds-green-700: #003d1f;
+  --ds-green-50: #eef6f1;
+  --ds-green-100: #dcede3;
+  --ds-gold: var(--accent-color, #d4af37);
+  --ds-gold-50: #fbf6e4;
+
+  /* shape */
+  --ds-r-sm: 8px;
+  --ds-r: 10px; /* buttons, inputs */
+  --ds-r-lg: 14px; /* cards */
+  --ds-r-xl: 18px; /* hero, modal */
+
+  /* elevation: soft and neutral */
+  --ds-shadow-xs: 0 1px 2px rgba(16, 24, 20, 0.05);
+  --ds-shadow-sm: 0 1px 3px rgba(16, 24, 20, 0.06), 0 1px 2px rgba(16, 24, 20, 0.04);
+  --ds-shadow-md: 0 6px 16px -4px rgba(16, 24, 20, 0.1), 0 2px 6px -2px rgba(16, 24, 20, 0.06);
+  --ds-shadow-lg: 0 20px 40px -12px rgba(16, 24, 20, 0.22);
+  --ds-ring: 0 0 0 3px rgba(11, 98, 53, 0.22);
+
+  /* motion */
+  --ds-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ds-fast: 120ms;
+  --ds-mid: 200ms;
+
+  /* the older names follow the new values, so old rules match */
+  --border: var(--ds-line);
+  --border-strong: var(--ds-line-strong);
+  --text-muted: var(--ds-muted);
+  --page-bg: var(--ds-bg);
+  --surface-muted: #eef1ef;
+  --surface-hover: #f6f8f7;
+}
+
+/* ---------- 2. Base typography ---------- */
+body {
+  background: var(--ds-bg);
+  color: var(--ds-text);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: var(--ds-ink);
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+h2 {
+  font-size: 1.125rem;
+  font-weight: 650;
+}
+
+h3 {
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+/* long student and programme names wrap instead of pushing the layout
+   (break-word only breaks a word that cannot fit, so Student IDs stay whole) */
+td {
+  overflow-wrap: break-word;
+}
+
+.card h2,
+.card h3,
+.stat-card span,
+.message-head strong {
+  overflow-wrap: anywhere;
+}
+
+.muted {
+  color: var(--ds-muted);
+}
+
+/* numbers line up in tables and totals */
+td,
+.stat-card strong,
+.numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+a {
+  color: var(--ds-green-600);
+  text-underline-offset: 2px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ds-green-600);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--ds-green-100);
+}
+
+/* ---------- 3. App shell ---------- */
+.content {
+  padding: 28px 32px 40px;
+  max-width: 1440px;
+}
+
+.sidebar {
+  background: var(--ds-surface);
+  border-right: 1px solid var(--ds-line);
+  border-top: 0;
+  box-shadow: none;
+  padding: 18px 12px 14px;
+}
+
+/* a thin gold line at the very top of the menu: the CSU accent */
+.sidebar::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--ds-green) 0 70%, var(--ds-gold) 70% 100%);
+}
+
+.sidebar-brand {
+  padding: 4px 8px 14px;
+}
+
+.sidebar nav {
+  gap: 2px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-left: 0;
+  border-radius: var(--ds-r);
+  color: var(--ds-text);
+  font-size: 14px;
+  font-weight: 550;
+  transition:
+    background var(--ds-fast) var(--ds-ease),
+    color var(--ds-fast) var(--ds-ease);
+}
+
+.nav-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--ds-muted);
+  transition: color var(--ds-fast) var(--ds-ease);
+}
+
+.nav-item:hover {
+  background: var(--ds-green-50);
+  color: var(--ds-green-700);
+}
+
+.nav-item:hover .nav-icon {
+  color: var(--ds-green-600);
+}
+
+.nav-item.active,
+.nav-item.active:hover {
+  position: relative;
+  background: var(--ds-green-50);
+  color: var(--ds-green-700);
+  font-weight: 700;
+  border-left: 0;
+}
+
+.nav-item.active .nav-icon {
+  color: var(--ds-green);
+}
+
+/* gold marker on the active page */
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--ds-gold);
+}
+
+.nav-heading {
+  margin: 14px 12px 4px;
+  color: var(--ds-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.logout-button {
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-r);
+  color: var(--ds-text);
+  font-weight: 600;
+  transition:
+    background var(--ds-fast) var(--ds-ease),
+    border-color var(--ds-fast) var(--ds-ease);
+}
+
+.logout-button:hover {
+  background: var(--ds-green-50);
+  border-color: var(--ds-green-600);
+}
+
+.topbar {
+  height: 64px;
+  padding: 0 32px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: saturate(1.4) blur(10px);
+  -webkit-backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: 1px solid var(--ds-line);
+}
+
+.topbar-title {
+  color: var(--ds-ink);
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.menu-button {
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-r);
+  background: var(--ds-surface);
+  transition: background var(--ds-fast) var(--ds-ease);
+}
+
+.menu-button:hover {
+  background: var(--ds-green-50);
+}
+
+.role-label {
+  background: var(--ds-gold-50);
+  color: #6b5410;
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.55);
+  letter-spacing: 0.06em;
+}
+
+.office-footer {
+  border-top: 1px solid var(--ds-line);
+  color: var(--ds-muted);
+}
+
+/* ---------- 4. Page header ---------- */
+.page-header {
+  margin-bottom: 22px;
+  align-items: flex-end;
+}
+
+.page-header h1 {
+  margin: 0 0 4px;
+}
+
+.page-header p {
+  color: var(--ds-muted);
+  max-width: 72ch;
+}
+
+.section-title {
+  margin: 4px 0 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ds-ink);
+}
+
+/* ---------- 5. Cards ---------- */
+.card {
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-r-lg);
+  box-shadow: var(--ds-shadow-xs);
+  padding: 22px 24px;
+  margin-bottom: 20px;
+}
+
+.card-header {
+  margin-bottom: 16px;
+}
+
+.card-header h2,
+.card > h2:first-child {
+  font-size: 1.0625rem;
+}
+
+/* a card inside a card is a quiet panel, not another box */
+.card .card {
+  box-shadow: none;
+  background: var(--ds-surface-2);
+}
+
+.scholarship-card,
+.doc-card {
+  border-top-width: 1px;
+  border-top-color: var(--ds-line);
+  position: relative;
+  overflow: hidden;
+  transition:
+    box-shadow var(--ds-mid) var(--ds-ease),
+    transform var(--ds-mid) var(--ds-ease),
+    border-color var(--ds-mid) var(--ds-ease);
+}
+
+.scholarship-card::before,
+.doc-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--ds-green);
+}
+
+.scholarship-card:hover,
+.doc-card:hover {
+  box-shadow: var(--ds-shadow-md);
+  border-color: var(--ds-line-strong);
+}
+
+.alert {
+  border-radius: var(--ds-r);
+}
+
+.empty-state {
+  border-radius: var(--ds-r-lg);
+  color: var(--ds-muted);
+}
+
+/* ---------- 6. Buttons ---------- */
+.button,
+.link-button.button {
+  position: relative;
+  min-height: 40px;
+  padding: 9px 16px;
+  border-radius: var(--ds-r);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.005em;
+  transition:
+    background-color var(--ds-fast) var(--ds-ease),
+    border-color var(--ds-fast) var(--ds-ease),
+    color var(--ds-fast) var(--ds-ease),
+    box-shadow var(--ds-fast) var(--ds-ease),
+    transform var(--ds-fast) var(--ds-ease);
+}
+
+.button-small {
+  min-height: 32px;
+  padding: 6px 11px;
+  font-size: 12.5px;
+  border-radius: var(--ds-r-sm);
+}
+
+.button:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.button:not(:disabled):active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: none;
+}
+
+.button:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-ring);
+}
+
+/* primary: CSU green */
+.button-primary {
+  background: var(--ds-green);
+  color: #fff;
+  box-shadow: var(--ds-shadow-xs), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.button-primary:not(:disabled):hover {
+  background: var(--ds-green-600);
+  color: #fff;
+  box-shadow: 0 4px 12px -2px rgba(0, 77, 38, 0.35);
+}
+
+/* secondary: white with a line */
+.button-secondary {
+  background: var(--ds-surface);
+  color: var(--ds-green-700);
+  border-color: var(--ds-line-strong);
+  box-shadow: var(--ds-shadow-xs);
+}
+
+.button-secondary:not(:disabled):hover {
+  background: var(--ds-green-50);
+  border-color: var(--ds-green-600);
+  color: var(--ds-green-700);
+}
+
+/* approve / success */
+.button-success {
+  background: #11683f;
+  color: #fff;
+}
+
+.button-success:not(:disabled):hover {
+  background: #0d5733;
+  box-shadow: 0 4px 12px -2px rgba(17, 104, 63, 0.35);
+}
+
+/* needs action: amber with dark text */
+.button-warning {
+  background: #f0a23b;
+  color: #2b1a04;
+}
+
+.button-warning:not(:disabled):hover {
+  background: #e08f22;
+}
+
+/* reject / delete */
+.button-danger {
+  background: #b42318;
+  color: #fff;
+}
+
+.button-danger:not(:disabled):hover {
+  background: #912018;
+  box-shadow: 0 4px 12px -2px rgba(180, 35, 24, 0.35);
+}
+
+/* cancel something running */
+.button-danger-outline {
+  background: var(--ds-surface);
+  color: #a3261b;
+  border: 1px solid #e4a39d;
+}
+
+.button-danger-outline:not(:disabled):hover {
+  background: #fdf1f0;
+  border-color: #b42318;
+}
+
+/* disabled: clearly off, no lift */
+.button:disabled,
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* loading: <button aria-busy="true"> shows a small spinner before the label */
+.button[aria-busy="true"] {
+  cursor: progress;
+}
+
+.button[aria-busy="true"]::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: ds-spin 0.7s linear infinite;
+}
+
+/* text links that look like buttons */
+.link-button {
+  color: var(--ds-green-600);
+  font-weight: 600;
+  border-radius: 6px;
+  transition: color var(--ds-fast) var(--ds-ease);
+}
+
+.link-button:hover {
+  color: var(--ds-green-700);
+  text-decoration: underline;
+}
+
+/* round icon buttons (×, bell, arrows) */
+.close-button,
+.bell-button,
+.carousel-arrow,
+.toast-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  transition:
+    background var(--ds-fast) var(--ds-ease),
+    color var(--ds-fast) var(--ds-ease);
+}
+
+.close-button:hover,
+.bell-button:hover,
+.carousel-arrow:hover {
+  background: var(--ds-green-50);
+}
+
+/* filter chips (tabs made of small buttons) */
+.filter-row .button-small {
+  border-radius: 999px;
+}
+
+/* ---------- 7. Forms ---------- */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+select,
+textarea {
+  min-height: 42px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-r);
+  background: var(--ds-surface);
+  color: var(--ds-ink);
+  transition:
+    border-color var(--ds-fast) var(--ds-ease),
+    box-shadow var(--ds-fast) var(--ds-ease),
+    background var(--ds-fast) var(--ds-ease);
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):hover,
+select:hover,
+textarea:hover {
+  border-color: #b5c0ba;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--ds-green-600);
+  box-shadow: var(--ds-ring);
+}
+
+/* an answer the browser marks as wrong (after the user typed in it) */
+input:user-invalid,
+select:user-invalid,
+textarea:user-invalid {
+  border-color: #d92d20;
+  box-shadow: 0 0 0 3px rgba(217, 45, 32, 0.15);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #8a968f;
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background: var(--ds-surface-2);
+  color: var(--ds-muted);
+}
+
+label {
+  color: var(--ds-ink);
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+/* required fields: <label className="required-label"> or a label next to a required input */
+.required-label::after,
+label:has(+ input:required)::after,
+label:has(+ select:required)::after,
+label:has(+ textarea:required)::after {
+  content: " *";
+  color: #b42318;
+  font-weight: 700;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--ds-green);
+}
+
+/* "Choose File": the button inside the file box looks like our buttons */
+input[type="file"] {
+  max-width: 100%;
+  color: var(--ds-muted);
+  font-size: 13.5px;
+}
+
+input[type="file"]::file-selector-button {
+  margin-right: 10px;
+  padding: 7px 12px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-r-sm);
+  background: var(--ds-surface);
+  color: var(--ds-green-700);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--ds-fast) var(--ds-ease),
+    border-color var(--ds-fast) var(--ds-ease);
+}
+
+input[type="file"]::file-selector-button:hover {
+  background: var(--ds-green-50);
+  border-color: var(--ds-green-600);
+}
+
+/* drag-and-drop areas */
+.file-drop {
+  border: 1.5px dashed var(--ds-line-strong);
+  border-radius: var(--ds-r);
+  background: var(--ds-surface-2);
+  transition:
+    border-color var(--ds-mid) var(--ds-ease),
+    background var(--ds-mid) var(--ds-ease),
+    box-shadow var(--ds-mid) var(--ds-ease);
+}
+
+.file-drop:hover {
+  border-color: #9fb3a8;
+}
+
+.file-drop-over {
+  border-color: var(--ds-green-600);
+  background: var(--ds-green-50);
+  box-shadow: var(--ds-ring);
+}
+
+.file-drop-big {
+  padding: 18px;
+}
+
+.file-drop-hint {
+  color: var(--ds-muted);
+}
+
+/* ---------- 8. Tables ---------- */
+.table-wrapper {
+  border-radius: var(--ds-r);
+}
+
+table {
+  color: var(--ds-text);
+  font-size: 14px;
+}
+
+th {
+  background: var(--ds-surface-2);
+  color: var(--ds-muted);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--ds-line);
+  padding: 11px 12px;
+}
+
+th:first-child {
+  border-top-left-radius: var(--ds-r-sm);
+}
+
+th:last-child {
+  border-top-right-radius: var(--ds-r-sm);
+}
+
+td {
+  padding: 12px;
+  border-bottom: 1px solid #edf0ee;
+}
+
+tbody tr {
+  transition: background var(--ds-fast) var(--ds-ease);
+}
+
+tbody tr:hover {
+  background: #f7faf8;
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+tr.row-selected,
+tr.row-selected:hover {
+  background: var(--ds-green-50);
+}
+
+/* ---------- 9. Status badges ---------- */
+.status {
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  box-shadow: none !important;
+}
+
+/* a small dot in the badge colour */
+.status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+  flex: none;
+}
+
+.status-success {
+  background: #e7f5ec;
+  color: #11683f;
+}
+
+.status-warning {
+  background: #fdf1e1;
+  color: #8a4510;
+}
+
+.status-danger {
+  background: #fdecea;
+  color: #a3261b;
+}
+
+.status-neutral {
+  background: #eef1ef;
+  color: #46524c;
+}
+
+.chip {
+  border-radius: 999px;
+}
+
+/* ---------- 10. Stat cards and dashboard ---------- */
+.stats-grid {
+  gap: 16px;
+}
+
+.stat-card,
+.metric-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 118px;
+  padding: 16px 18px;
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-line);
+  border-left: 1px solid var(--ds-line);
+  border-top: 1px solid var(--ds-line);
+  border-radius: var(--ds-r-lg);
+  box-shadow: var(--ds-shadow-xs);
+  transition:
+    transform var(--ds-mid) var(--ds-ease),
+    box-shadow var(--ds-mid) var(--ds-ease),
+    border-color var(--ds-mid) var(--ds-ease);
+}
+
+.stat-card span {
+  margin: 0 0 6px;
+  padding-right: 44px; /* room for the icon */
+  color: var(--ds-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stat-card strong {
+  color: var(--ds-ink);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.stat-card .stat-link {
+  margin-top: auto;
+  padding-top: 8px;
+  color: var(--ds-green-600);
+  font-size: 12.5px;
+}
+
+/* the icon tile in the corner */
+.stat-icon {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--ds-green-50);
+  color: var(--ds-green);
+}
+
+.stat-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* a number that needs attention gets a gold tile */
+.stat-card.has-value .stat-icon {
+  background: var(--ds-gold-50);
+  color: #7a6012;
+}
+
+a.stat-card:hover,
+.metric-card:hover,
+.stat-card:has(a):hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ds-shadow-md);
+  border-color: var(--ds-line-strong);
+}
+
+.dashboard-grid {
+  gap: 20px;
+}
+
+/* dashboard hero: calmer, rounder */
+.dashboard-hero {
+  border-radius: var(--ds-r-xl);
+  box-shadow: var(--ds-shadow-sm);
+  overflow: hidden;
+}
+
+/* quick actions: clickable tiles */
+.quick-action,
+.quick-actions a,
+.quick-actions .quick-action {
+  border-radius: var(--ds-r-lg);
+  transition:
+    transform var(--ds-mid) var(--ds-ease),
+    box-shadow var(--ds-mid) var(--ds-ease),
+    border-color var(--ds-mid) var(--ds-ease);
+}
+
+.quick-actions a:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ds-shadow-md);
+  border-color: var(--ds-line-strong);
+}
+
+/* ---------- 11. Overlays ---------- */
+.modal-backdrop {
+  background: rgba(12, 22, 17, 0.45);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: ds-fade var(--ds-mid) var(--ds-ease);
+}
+
+.modal {
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-r-xl);
+  box-shadow: var(--ds-shadow-lg);
+  animation: ds-pop var(--ds-mid) var(--ds-ease);
+}
+
+.modal-footer {
+  border-top: 1px solid var(--ds-line);
+}
+
+/* toasts slide in from the right; a coloured line shows the kind */
+.toast {
+  position: relative;
+  border: 1px solid var(--ds-line);
+  border-left: 4px solid var(--ds-green);
+  border-radius: var(--ds-r);
+  background: var(--ds-surface);
+  color: var(--ds-ink);
+  box-shadow: var(--ds-shadow-md);
+  animation: ds-toast-in 260ms var(--ds-ease);
+}
+
+.toast-success {
+  border-left-color: #12a150;
+}
+
+.toast-error {
+  border-left-color: #d92d20;
+}
+
+.toast-info {
+  border-left-color: var(--ds-gold);
+}
+
+.toast.leaving {
+  animation: ds-toast-out 180ms var(--ds-ease) forwards;
+}
+
+.toast-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+}
+
+.toast-success .toast-icon {
+  color: #12a150;
+}
+
+.toast-error .toast-icon {
+  color: #d92d20;
+}
+
+.toast-info .toast-icon {
+  color: #a8861b;
+}
+
+/* dropdowns: bell, profile menu, export menu */
+.bell-panel,
+.profile-menu,
+.export-menu-list,
+.search-results {
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-r-lg);
+  box-shadow: var(--ds-shadow-lg);
+  animation: ds-drop var(--ds-mid) var(--ds-ease);
+  transform-origin: top right;
+}
+
+/* ---------- 12. Loading ---------- */
+.loading.skeleton {
+  display: grid;
+  align-items: stretch;
+  justify-content: stretch;
+  justify-items: stretch;
+  min-height: 0;
+  text-align: left;
+  padding: 4px 0;
+  width: 100%;
+}
+
+.loading.skeleton .skeleton-row,
+.loading.skeleton .skeleton-panel {
+  width: 100%;
+}
+
+.skeleton {
+  display: grid;
+  gap: 16px;
+}
+
+.skeleton-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.skeleton-block {
+  border-radius: var(--ds-r-lg);
+  background: linear-gradient(90deg, #e9edeb 0%, #f4f6f5 45%, #e9edeb 90%);
+  background-size: 300% 100%;
+  animation: ds-shimmer 1.3s ease-in-out infinite;
+}
+
+.skeleton-title {
+  width: min(320px, 60%);
+  height: 30px;
+}
+
+.skeleton-text {
+  width: min(520px, 85%);
+  height: 14px;
+}
+
+.skeleton-card {
+  height: 112px;
+}
+
+.skeleton-panel {
+  height: 260px;
+}
+
+.loading-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ds-muted);
+  font-size: 13px;
+}
+
+/* ---------- 13. Carousel ---------- */
+.carousel {
+  border-radius: var(--ds-r-lg);
+  overflow: hidden;
+}
+
+.carousel-track {
+  transition: transform 520ms var(--ds-ease);
+}
+
+.carousel-image {
+  border-radius: var(--ds-r);
+  object-fit: cover;
+}
+
+.carousel-arrow {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--ds-line);
+  background: var(--ds-surface);
+  color: var(--ds-green-700);
+  font-size: 20px;
+  box-shadow: var(--ds-shadow-xs);
+}
+
+.carousel-dots button {
+  transition:
+    width var(--ds-mid) var(--ds-ease),
+    background var(--ds-mid) var(--ds-ease);
+}
+
+.carousel-dots button.active {
+  width: 22px;
+  border-radius: 999px;
+  background: var(--ds-green);
+}
+
+/* ---------- 14. Motion ---------- */
+/* each page appears with a short rise (index.css staggers the sections) */
+.content > div > * {
+  animation-duration: 260ms;
+  animation-timing-function: var(--ds-ease);
+}
+
+.sidebar {
+  transition:
+    transform 260ms var(--ds-ease),
+    box-shadow 260ms var(--ds-ease);
+}
+
+.sidebar-overlay {
+  animation: ds-fade var(--ds-mid) var(--ds-ease);
+}
+
+details > summary {
+  cursor: pointer;
+}
+
+details[open] > :not(summary) {
+  animation: ds-fade var(--ds-mid) var(--ds-ease);
+}
+
+@keyframes ds-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ds-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes ds-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+
+@keyframes ds-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+}
+
+@keyframes ds-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+
+@keyframes ds-toast-out {
+  to {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+
+@keyframes ds-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: 0 0;
+  }
+}
+
+/* ---------- 15. Responsive ---------- */
+@media (max-width: 1100px) {
+  .content {
+    padding: 24px;
+  }
+}
+
+@media (max-width: 900px) {
+  .topbar {
+    padding: 0 14px;
+  }
+
+  .content {
+    padding: 18px 16px 32px;
+  }
+
+  .sidebar-overlay {
+    background: rgba(12, 22, 17, 0.45);
+    backdrop-filter: blur(2px);
+  }
+}
+
+@media (max-width: 600px) {
+  body {
+    font-size: 14.5px;
+  }
+
+  h1 {
+    font-size: 1.45rem;
+  }
+
+  .card {
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .stat-card,
+  .metric-card {
+    min-height: 104px;
+    padding: 14px;
+  }
+
+  .stat-card strong {
+    font-size: 24px;
+  }
+
+  .stat-icon {
+    width: 30px;
+    height: 30px;
+    top: 12px;
+    right: 12px;
+  }
+
+  .stat-card span {
+    padding-right: 34px;
+  }
+
+  /* forms and selects never push the page sideways */
+  select,
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea {
+    max-width: 100%;
+  }
+
+  .button {
+    min-height: 42px; /* easier to tap */
+  }
+
+  .button-small {
+    min-height: 36px;
+  }
+
+  .topbar-title {
+    font-size: 16px;
+  }
+}
+
+/* ---------- 16. Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .button:not(:disabled):hover,
+  a.stat-card:hover,
+  .metric-card:hover,
+  .quick-actions a:hover,
+  .scholarship-card:hover,
+  .doc-card:hover {
+    transform: none;
+  }
+
+  .skeleton-block,
+  .button[aria-busy="true"]::before {
+    animation: none !important;
+  }
+}
+
+@media print {
+  .sidebar::before,
+  .stat-icon {
+    display: none;
+  }
+
+  .card,
+  .stat-card {
+    box-shadow: none;
+  }
+}
+
+/* ---------- small additions used by the components ---------- */
+.toast > span {
+  flex: 1;
+}
+
+.spinner.spinner-small {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  border-width: 2px;
+  display: inline-block;
+  vertical-align: -2px;
+}
+
+/* No sideways scrolling on phones: grid and flex children may shrink, and a dropdown with a long
+   option never grows wider than its box (it was pushing Reports 450 px wide). */
+.form-grid > *,
+.profile-grid > *,
+.detail-grid > *,
+.dashboard-grid > *,
+.card-grid > *,
+.stats-grid > * {
+  min-width: 0;
+}
+
+select {
+  max-width: 100%;
+  text-overflow: ellipsis;
+}
+
+/* Dashboard shortcut tiles: line icon in a green tile, like the number cards */
+.quick-tile {
+  border-radius: var(--ds-r-lg);
+  box-shadow: var(--ds-shadow-xs);
+}
+
+.quick-tile:hover {
+  border-color: var(--ds-line-strong);
+  box-shadow: var(--ds-shadow-md);
+}
+
+.quick-tile strong {
+  color: var(--ds-ink);
+}
+
+.quick-icon {
+  flex: 0 0 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: var(--ds-green-50);
+  color: var(--ds-green);
+  transition:
+    background var(--ds-mid) var(--ds-ease),
+    color var(--ds-mid) var(--ds-ease);
+}
+
+.quick-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.quick-tile:hover .quick-icon {
+  background: var(--ds-green);
+  color: #fff;
+}
+
+/* Buttons inside the bell keep their own colours (the panel's link colour made them unreadable) */
+.bell-panel a.button-primary,
+.bell-panel a.button-primary:hover {
+  color: #fff;
+}
+
+.bell-panel a.button-secondary {
+  color: var(--ds-green-700);
+}
+
+/* The file box inside a drop area is not a second box */
+.file-drop input[type="file"] {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 2px 0;
+  min-height: 0;
+}

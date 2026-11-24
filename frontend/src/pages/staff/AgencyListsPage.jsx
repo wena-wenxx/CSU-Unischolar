@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import api, { errMsg } from "../../services/api";
+import api, { errMsg, isCancel } from "../../services/api";
 import { LIST_ACCEPT, readListFile } from "../../lib/listFile";
 import { downloadCSV, formatDateTime } from "../../lib/format";
 import { useToast } from "../../lib/toast";
+import { SEMESTERS, yearChoices } from "../../lib/terms";
 import Modal from "../../components/Modal";
 import { useConfirm } from "../../lib/confirm";
 import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 import ListPreview from "../../components/ListPreview";
+import FileDrop from "../../components/FileDrop";
 
 const RESULT_LABELS = {
   approved: ["Approved", "success"],
@@ -88,6 +90,9 @@ export default function AgencyListsPage() {
   const [fileKey, setFileKey] = useState(0);
   const [processing, setProcessing] = useState(false);
   const [reading, setReading] = useState(false);
+  const [readingName, setReadingName] = useState("");
+  const readControl = useRef(null); // "Cancel" while a file is being read
+  const [pendingFile, setPendingFile] = useState(null);
   const [result, setResult] = useState(null);
   const [metadata, setMetadata] = useState({});
   const [details, setDetails] = useState({
@@ -155,15 +160,23 @@ export default function AgencyListsPage() {
   }
 
   // CSV is read here; Excel and Word by Laravel; PDF and pictures by the AI service.
-  async function readFile(event) {
-    const file = event.target.files?.[0];
+  // Choosing a file only remembers it; staff press "Read file" when ready (nothing is read or saved before).
+  function chooseFile(event) {
+    setPendingFile(event.target.files?.[0] || null);
+  }
+
+  async function readFile() {
+    const file = pendingFile;
     setResult(null);
 
     if (!file) return;
+    setReadingName(file.name);
     setReading(true);
 
     try {
-      const { rows: parsed, cells: cellInfo, warnings, metadata: detected, method: how } = await readListFile(file);
+      const controller = new AbortController();
+      readControl.current = controller;
+      const { rows: parsed, cells: cellInfo, warnings, metadata: detected, method: how } = await readListFile(file, { signal: controller.signal });
       if (parsed.length === 0) {
         toast.error("The file is empty.");
         return;
@@ -193,9 +206,14 @@ export default function AgencyListsPage() {
       setDateColumn(guessColumn(head, [/approv.*date/, /date/]));
       setNameColumn(guessColumn(head, [/^(full\s*)?name$/, /^name of/, /^(student|grantee|scholar|awardee)('?s)?\s*name$/]));
     } catch (err) {
+      if (isCancel(err)) {
+        toast.info("Reading cancelled. Nothing was saved. The file is still chosen: press Read file to try again.");
+        return;
+      }
       toast.error(errMsg(err, err.message || "The file could not be read."));
       setFileKey((k) => k + 1);
     } finally {
+      readControl.current = null;
       setReading(false);
     }
   }
@@ -224,6 +242,7 @@ export default function AgencyListsPage() {
     setNameColumn("");
     setMetadata({});
     setConfirmedMismatch(false);
+    setPendingFile(null);
     setFileKey((k) => k + 1);
   }
 
@@ -274,7 +293,7 @@ export default function AgencyListsPage() {
         agency_name: agency.trim(),
         file_name: fileName,
         file_sha256: fileSha,
-        processing_batch_id: batchId === "" ? null : Number(batchId),
+        processing_batch_id: batchId === "" || batchId === "new" ? null : Number(batchId),
         ...details,
         expected_count: details.expected_count === "" ? null : Number(details.expected_count),
         expected_total: details.expected_total === "" ? null : Number(details.expected_total),
@@ -334,7 +353,8 @@ export default function AgencyListsPage() {
 
   // A Student ID column is best; a list with names only can still be matched (exact, one-of-a-kind names).
   const hasNames = nameColumn !== "" || headers.some((h) => /^(last\s*name|surname)$/i.test(h.trim()));
-  const ready = scholarshipId && agency.trim() && fileName && (idColumn !== "" || hasNames) && dataRows.length > 0;
+  // A "+ New batch" that was not created yet must be created (or cancelled) before processing.
+  const ready = scholarshipId && agency.trim() && fileName && (idColumn !== "" || hasNames) && dataRows.length > 0 && batchId !== "new";
   const amountColumn = guessColumn(headers, [/tes.?amount/, /^amount$/, /total.?amount/]);
   const countMismatch = details.expected_count !== "" && Number(details.expected_count) !== dataRows.length;
   const amountSum = dataRows.reduce((sum, row) => sum + (Number(String(row[amountColumn] || "").replaceAll(",", "")) || 0), 0);
@@ -381,13 +401,27 @@ export default function AgencyListsPage() {
           <div>
             <label htmlFor="agency-batch">Processing batch</label>
             <select id="agency-batch" value={batchId} onChange={(event) => setBatchId(event.target.value)} disabled={!scholarshipId}>
-              <option value="">Automatic: the open batch of this program and period</option>
+              <option value="">Use this program's open batch (or make a new one)</option>
               {programBatches.map((b) => (
                 <option key={b.id} value={String(b.id)}>
                   {b.name}
                 </option>
               ))}
+              <option value="new">+ New batch for this list…</option>
             </select>
+            {batchId === "new" && (
+              <NewBatchForm
+                program={scholarships.find((s) => String(s.id) === scholarshipId)}
+                schoolYear={details.school_year || defaults.current_school_year || ""}
+                semester={details.semester || defaults.current_semester || ""}
+                agencyBatch={details.batch}
+                onCancel={() => setBatchId("")}
+                onCreated={(batch) => {
+                  setOpenBatches((old) => [...old, batch]);
+                  setBatchId(String(batch.id));
+                }}
+              />
+            )}
             <span className="muted small">
               Students added from this list go into this batch. Manage batches in{" "}
               <Link to="/staff/batches">Processing Batches</Link>.
@@ -396,13 +430,48 @@ export default function AgencyListsPage() {
 
           <div className="full-column">
             <label htmlFor="agency-file">Approved list (Excel, CSV, Word or PDF)</label>
-            <input id="agency-file" key={fileKey} type="file" accept={LIST_ACCEPT} onChange={readFile} disabled={reading} />
+            <div className="button-row">
+              <FileDrop hint="or drag the list file here">
+                <input id="agency-file" key={fileKey} type="file" accept={LIST_ACCEPT} onChange={chooseFile} disabled={reading} />
+              </FileDrop>
+              <button aria-busy={reading}
+                type="button"
+                className="button button-primary"
+                onClick={readFile}
+                disabled={!pendingFile || reading}
+              >
+                {reading ? "Reading..." : "Read file"}
+              </button>
+              {reading && (
+                <button type="button" className="button button-danger-outline" onClick={() => readControl.current?.abort()}>
+                  Cancel reading
+                </button>
+              )}
+              {pendingFile && !reading && (
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={() => {
+                    setPendingFile(null);
+                    setFileKey((k) => k + 1);
+                  }}
+                >
+                  Remove chosen file
+                </button>
+              )}
+            </div>
+            {pendingFile && !reading && !rows.length && (
+              <p className="small">
+                Chosen: <strong>{pendingFile.name}</strong> ({Math.max(1, Math.round(pendingFile.size / 1024))} KB). Press{" "}
+                <strong>Read file</strong> to read it. Nothing is saved until you check the rows and press Process.
+              </p>
+            )}
             <p className="muted small">
               Excel (.xlsx), CSV, Word (.docx), PDF or a photo. PDFs and photos are read by the AI service, so keep it
               running for those. The list needs a column with the Student ID; an approval date column is optional. Old
               .xls/.doc files: open them and Save As .xlsx/.docx first.
             </p>
-            {reading && <p className="muted small"><strong>Reading and organizing the file...</strong></p>}
+            {reading && <ReadingProgress fileName={readingName} />}
           </div>
         </div>
       </section>
@@ -440,7 +509,7 @@ export default function AgencyListsPage() {
             {[
               ["school_year", "Academic year", "select"],
               ["semester", "Semester", "select"],
-              ["batch", "TES batch", "select"],
+              ["batch", "Agency batch number", "select"],
               ["campus", "HEI campus", "text"],
               ["reference_number", "Agency reference number", "text"],
               ["list_date", "List date", "date"],
@@ -453,7 +522,7 @@ export default function AgencyListsPage() {
                 {key === "school_year" ? (
                   <select id={`list-${key}`} value={details[key]} onChange={(event) => setDetails({ ...details, [key]: event.target.value })}>
                     <option value="">Choose academic year</option>
-                    {["2024-2025", "2025-2026", "2026-2027", "2027-2028", "2028-2029", "2029-2030"].map((year) =>
+                    {[...new Set([...yearChoices(defaults.current_school_year), details.school_year].filter(Boolean))].map((year) =>
                       <option key={year} value={year}>{year}</option>
                     )}
                   </select>
@@ -467,7 +536,7 @@ export default function AgencyListsPage() {
                 ) : type === "select" ? (
                   <select id={`list-${key}`} value={details[key]} onChange={(event) => setDetails({ ...details, [key]: event.target.value })}>
                     <option value="">Choose semester</option>
-                    <option>1st Semester</option><option>2nd Semester</option><option>Summer</option>
+                    {SEMESTERS.map((term) => <option key={term}>{term}</option>)}
                   </select>
                 ) : (
                   <input id={`list-${key}`} type={type} value={details[key]} onChange={(event) => setDetails({ ...details, [key]: event.target.value })} />
@@ -553,11 +622,26 @@ export default function AgencyListsPage() {
             <button className="button button-secondary" onClick={reset}>
               Choose another file
             </button>
-            <button className="button button-primary" onClick={() => process()} disabled={!ready || processing || ((countMismatch || amountMismatch) && !confirmedMismatch)}>
+            <button aria-busy={processing} className="button button-primary" onClick={() => process()} disabled={!ready || processing || ((countMismatch || amountMismatch) && !confirmedMismatch)}>
               {processing ? "Processing..." : `4. Process ${dataRows.length} rows`}
             </button>
           </div>
         </section>
+      )}
+
+      {result && (
+        <p className="button-row">
+          <button
+            className="button button-secondary"
+            onClick={() => {
+              setResult(null);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+          >
+            Upload another list
+          </button>
+          <span className="muted small">Each list keeps its own batch; another program or batch can be processed while this one is still open.</span>
+        </p>
       )}
 
       {result && (
@@ -605,8 +689,20 @@ function Summary({ upload }) {
 }
 
 function Details({ upload, onChanged }) {
+  const toast = useToast();
   const [linking, setLinking] = useState(null);
-  const [settingAside, setSettingAside] = useState(null);
+  const [settingAside, setSettingAside] = useState(null); // array of rows
+  const [chosen, setChosen] = useState([]); // open row numbers picked for "Set aside selected"
+
+  async function resume(line) {
+    try {
+      const { data } = await api.post(`/staff/agency-lists/${upload.id}/rows/${line.row}/resume`);
+      toast.success(data.message);
+      onChanged(data.upload);
+    } catch (err) {
+      toast.error(errMsg(err, "Unable to open this row again."));
+    }
+  }
 
   // Problems first, so staff see what needs attention.
   const order = { error: 0, check: 1, unmatched: 2, created: 3, approved: 4, already: 5 };
@@ -614,13 +710,25 @@ function Details({ upload, onChanged }) {
     (a, b) => Number(openRow(b)) - Number(openRow(a)) || order[a.result] - order[b.result] || a.row - b.row
   );
   const canAct = Boolean(onChanged) && upload.processing_batch?.status !== "completed";
+  const openLines = sorted.filter(openRow);
+  const chosenLines = openLines.filter((l) => chosen.includes(l.row));
 
   return (
     <>
+      {canAct && openLines.length > 1 && (
+        <div className="button-row selection-bar">
+          <span className="muted small">{chosenLines.length} open row(s) selected</span>
+          <button className="button button-small button-secondary" disabled={!chosenLines.length} onClick={() => setSettingAside(chosenLines)}>
+            Set aside selected (same reason)
+          </button>
+          <span className="muted small">Rows with different reasons: set them aside one by one.</span>
+        </div>
+      )}
       <div className="table-wrapper">
-        <table>
+        <table className="numbered">
           <thead>
             <tr>
+              {canAct && openLines.length > 1 && <th></th>}
               <th>Row</th>
               <th>Student ID</th>
               <th>Student</th>
@@ -632,6 +740,18 @@ function Details({ upload, onChanged }) {
           <tbody>
             {sorted.map((line) => (
               <tr key={line.row}>
+                {canAct && openLines.length > 1 && (
+                  <td>
+                    {openRow(line) && (
+                      <input
+                        type="checkbox"
+                        aria-label={`Select row ${line.row}`}
+                        checked={chosen.includes(line.row)}
+                        onChange={() => setChosen((old) => (old.includes(line.row) ? old.filter((r) => r !== line.row) : [...old, line.row]))}
+                      />
+                    )}
+                  </td>
+                )}
                 <td>{line.row}</td>
                 <td>{line.student_id || "—"}</td>
                 <td>{line.student || [line.first_name, line.last_name].filter(Boolean).join(" ") || "—"}</td>
@@ -656,10 +776,15 @@ function Details({ upload, onChanged }) {
                         <button className="button button-small button-primary" onClick={() => setLinking(line)}>
                           Link to student
                         </button>
-                        <button className="button button-small button-secondary" onClick={() => setSettingAside(line)}>
+                        <button className="button button-small button-secondary" onClick={() => setSettingAside([line])}>
                           Set aside
                         </button>
                       </div>
+                    )}
+                    {line.set_aside && (
+                      <button className="link-button small" onClick={() => resume(line)}>
+                        Open again
+                      </button>
                     )}
                   </td>
                 )}
@@ -683,10 +808,11 @@ function Details({ upload, onChanged }) {
       {settingAside && (
         <SetAsideModal
           upload={upload}
-          line={settingAside}
+          lines={settingAside}
           onClose={() => setSettingAside(null)}
           onDone={(fresh) => {
             setSettingAside(null);
+            setChosen([]);
             onChanged(fresh);
           }}
         />
@@ -777,7 +903,7 @@ function LinkRowModal({ upload, line, onClose, onDone }) {
       )}
       {found && found.length > 0 && (
         <div className="table-wrapper">
-          <table>
+          <table className="numbered">
             <thead>
               <tr>
                 <th>Student</th>
@@ -818,19 +944,42 @@ function LinkRowModal({ upload, line, onClose, onDone }) {
   );
 }
 
-function SetAsideModal({ upload, line, onClose, onDone }) {
+// Common reasons, so staff do not type the same note again and again (they can still edit it).
+const ASIDE_REASONS = [
+  "Not a CSU student: the Student ID is not in the system.",
+  "The Student ID on the list looks wrong; asked the agency for a correction.",
+  "Duplicate row on the agency's list.",
+  "The name on the list does not match the student with this ID; checking with the agency.",
+  "The student already holds another active scholarship; referred to the OAS head for a decision.",
+  "Waiting for the agency's corrected list.",
+];
+
+// The reason that fits what the system found on this row (only a suggestion).
+function suggestReason(line) {
+  const text = `${line?.note || ""} ${line?.message || ""}`.toLowerCase();
+  if (/twice|duplicate|more than once/.test(text)) return ASIDE_REASONS[2];
+  if (/name differs|does not match|different name|name on the list/.test(text)) return ASIDE_REASONS[3];
+  if (/scholarship|grantee/.test(text) && line?.result === "error") return ASIDE_REASONS[4];
+  if (line?.result === "unmatched") return ASIDE_REASONS[0];
+  return "";
+}
+
+function SetAsideModal({ upload, lines, onClose, onDone }) {
   const toast = useToast();
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState(() => suggestReason(lines[0]));
   const [saving, setSaving] = useState(false);
+  const several = lines.length > 1;
 
   async function save() {
     setSaving(true);
     try {
-      const { data } = await api.post(`/staff/agency-lists/${upload.id}/rows/${line.row}/set-aside`, { note: note.trim() });
+      const { data } = several
+        ? await api.post(`/staff/agency-lists/${upload.id}/set-aside`, { rows: lines.map((l) => l.row), note: note.trim() })
+        : await api.post(`/staff/agency-lists/${upload.id}/rows/${lines[0].row}/set-aside`, { note: note.trim() });
       toast.success(data.message);
       onDone(data.upload);
     } catch (err) {
-      toast.error(errMsg(err, "Unable to set this row aside."));
+      toast.error(errMsg(err, "Unable to set aside."));
     } finally {
       setSaving(false);
     }
@@ -838,7 +987,7 @@ function SetAsideModal({ upload, line, onClose, onDone }) {
 
   return (
     <Modal
-      title={`Set aside row ${line.row}`}
+      title={several ? `Set aside ${lines.length} rows (same reason)` : `Set aside row ${lines[0].row}`}
       onClose={onClose}
       footer={
         <div className="button-row">
@@ -852,10 +1001,20 @@ function SetAsideModal({ upload, line, onClose, onDone }) {
       }
     >
       <p className="muted">
-        The row stays on the list as it is, with your reason. Nothing else changes. Use this when, for example, the
-        student is not in the system or the agency will send a correction.
+        The row{several ? "s stay" : " stays"} on the list as {several ? "they are" : "it is"}, with your reason. Nothing is
+        matched or approved. You can open {several ? "them" : "it"} again later when the problem is solved.
       </p>
-      <label htmlFor="aside-note">Reason</label>
+      {several && <p className="small">Rows: {lines.map((l) => l.row).join(", ")}</p>}
+      <label htmlFor="aside-template">Common reasons</label>
+      <select id="aside-template" value="" onChange={(event) => event.target.value && setNote(event.target.value)}>
+        <option value="">Choose a common reason…</option>
+        {ASIDE_REASONS.map((reason) => (
+          <option key={reason} value={reason}>
+            {reason}
+          </option>
+        ))}
+      </select>
+      <label htmlFor="aside-note">Reason {note && suggestReason(lines[0]) === note ? "(suggested from what the system found; edit if needed)" : ""}</label>
       <textarea id="aside-note" rows={3} value={note} maxLength={500} onChange={(event) => setNote(event.target.value)} />
     </Modal>
   );
@@ -880,9 +1039,65 @@ function UploadResult({ upload, onChanged }) {
         gets no payroll. Unmatched rows stay open until you link them to a student or set them aside.
       </p>
 
+      <DoneControl upload={upload} onChanged={onChanged} />
       <Details upload={upload} onChanged={onChanged} />
     </section>
   );
+}
+
+// "Done processing": staff say this list is finished. It changes no application and can be undone.
+function DoneControl({ upload, onChanged }) {
+  const toast = useToast();
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  if (!onChanged) return null;
+
+  async function mark(done) {
+    setBusy(true);
+    try {
+      const { data } = await api.post(`/staff/agency-lists/${upload.id}/done`, { done, note: note.trim() || null });
+      toast.success(data.message);
+      setNote("");
+      onChanged(data.upload);
+    } catch (err) {
+      toast.error(errMsg(err, "Unable to change the status of this list."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (upload.done_at) {
+    return (
+      <div className="ai-note ok small">
+        ✓ Done processing on {formatDateTime(upload.done_at)}{upload.done_note ? ` (${upload.done_note})` : ""}.{" "}
+        <button className="link-button small" onClick={() => mark(false)} disabled={busy}>Mark as not done</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="button-row done-row">
+      {upload.open_rows > 0 && (
+        <input
+          aria-label="Note (needed while rows are open)"
+          placeholder={`${upload.open_rows} row(s) still open: write why the list is done anyway`}
+          value={note}
+          maxLength={500}
+          onChange={(event) => setNote(event.target.value)}
+        />
+      )}
+      <button className="button button-small button-primary" onClick={() => mark(true)} disabled={busy || (upload.open_rows > 0 && !note.trim())}>
+        {busy ? "Saving..." : "Done processing"}
+      </button>
+      <span className="muted small">Marks this list finished. No application changes; you can still open it later.</span>
+    </div>
+  );
+}
+
+function listState(item) {
+  if (item.done_at) return ["Done", "success"];
+  if (item.open_rows > 0) return ["Needs attention", "warning"];
+  return ["Processed, not marked done", "neutral"];
 }
 
 function HistoryTable({ history, onChanged }) {
@@ -921,6 +1136,7 @@ function HistoryTable({ history, onChanged }) {
               <th className="numeric">Unmatched</th>
               <th className="numeric">Errors</th>
               <th className="numeric">To resolve</th>
+              <th>Status</th>
               <th></th>
             </tr>
           </thead>
@@ -940,6 +1156,9 @@ function HistoryTable({ history, onChanged }) {
                 <td className="numeric">{item.error_count}</td>
                 <td className="numeric">
                   {item.open_rows ? <span className="text-warning">{item.open_rows}</span> : 0}
+                </td>
+                <td>
+                  <span className={`status status-${listState(item)[1]}`}>{listState(item)[0]}</span>
                 </td>
                 <td>
                   <button className="button button-small button-secondary" onClick={() => show(item)}>
@@ -962,9 +1181,122 @@ function HistoryTable({ history, onChanged }) {
             <p className="muted small">This batch is completed, so its rows can no longer be changed. Reopen it in Processing Batches first.</p>
           )}
           <Summary upload={open} />
+          <DoneControl upload={open} onChanged={reopen} />
           <Details upload={open} onChanged={reopen} />
         </Modal>
       )}
     </>
+  );
+}
+
+
+/*
+  Shown while a list is being read. It says honestly what is happening and how long it has taken
+  (the server does not report a percentage, so none is shown): typed files take seconds; scanned PDFs and
+  photos are read page by page with OCR and can take about a minute per page.
+*/
+function ReadingProgress({ fileName }) {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const scanned = /\.(pdf|png|jpe?g)$/i.test(fileName || "");
+  return (
+    <div className="reading-panel" role="status" aria-live="polite">
+      <span className="spinner" aria-hidden="true" />
+      <div>
+        <strong>Reading and organizing “{fileName}”…</strong> <span className="muted small">{seconds} s</span>
+        <ol className="small">
+          <li>Sending the file to be read</li>
+          <li>{scanned ? "Reading each page (scans and photos are read with OCR: about a minute per page)" : "Reading the rows and columns"}</li>
+          <li>Putting the values into rows and columns, and marking cells to check</li>
+        </ol>
+        <span className="muted small">
+          Nothing is saved yet: you will see every row and choose which column is which before you press Process.
+          {seconds > 90 && scanned ? " Long scanned files take a few minutes; keep this page open." : ""}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+
+/*
+  A new processing batch, made here without leaving the page. The name says what it is:
+  program · semester · academic year (AY 2026-2027) · the agency's batch number (Batch 2), so a batch
+  number is never mistaken for a year. The server refuses a name the program already has.
+*/
+function NewBatchForm({ program, schoolYear, semester, agencyBatch, onCancel, onCreated }) {
+  const toast = useToast();
+  const [year, setYear] = useState(schoolYear);
+  const [term, setTerm] = useState(semester);
+  const [number, setNumber] = useState(String(agencyBatch || "").replace(/\D/g, ""));
+  const [busy, setBusy] = useState(false);
+  const yearOk = /^\d{4}-\d{4}$/.test(year) && Number(year.slice(5)) === Number(year.slice(0, 4)) + 1;
+  const name = [program?.short_name || program?.name, term, yearOk ? `AY ${year}` : "", number ? `Batch ${number}` : ""]
+    .filter(Boolean)
+    .join(" - ");
+
+  async function create() {
+    setBusy(true);
+    try {
+      const { data } = await api.post("/staff/processing-batches", {
+        scholarship_id: program.id,
+        school_year: year,
+        semester: term || null,
+        name,
+      });
+      toast.success(data.message);
+      onCreated(data.batch);
+    } catch (err) {
+      toast.error(errMsg(err, "Unable to create the batch."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!program) return <p className="small warning">Choose the program first.</p>;
+
+  return (
+    <div className="new-batch">
+      <div className="form-grid">
+        <div>
+          <label htmlFor="nb-year">Academic year</label>
+          <select id="nb-year" value={year} onChange={(event) => setYear(event.target.value)}>
+            <option value="">Choose</option>
+            {yearChoices(schoolYear).map((y) => (
+              <option key={y} value={y}>
+                AY {y}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="nb-term">Semester</label>
+          <select id="nb-term" value={term} onChange={(event) => setTerm(event.target.value)}>
+            <option value="">Whole year</option>
+            {SEMESTERS.map((t) => (
+              <option key={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="nb-number">Agency batch number (optional)</label>
+          <input id="nb-number" inputMode="numeric" value={number} maxLength={3} onChange={(event) => setNumber(event.target.value.replace(/\D/g, ""))} placeholder="e.g. 2" />
+        </div>
+      </div>
+      <p className="small">
+        New batch: <strong>{name || "—"}</strong>
+      </p>
+      <div className="button-row">
+        <button type="button" className="button button-small button-primary" onClick={create} disabled={busy || !yearOk}>
+          {busy ? "Creating..." : "Create batch"}
+        </button>
+        <button type="button" className="button button-small button-secondary" onClick={onCancel} disabled={busy}>
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }

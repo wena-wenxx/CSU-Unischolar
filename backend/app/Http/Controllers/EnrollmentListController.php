@@ -42,6 +42,14 @@ class EnrollmentListController extends Controller
             'lists' => EnrollmentList::with('uploader:id,name')->latest()->latest('id')->limit(20)->get(),
             'waiting' => Application::where('status', 'approved')->where('enrollment_verified', false)->inOpenWork()->count(),
             'grantees' => ScholarRecord::where('status', 'active')->count(),
+            // Why the list can be empty (shown on the page instead of a silent "0"):
+            'why_empty' => [
+                // approved, not verified, but their processing batch was already marked completed
+                'in_completed_batches' => Application::where('status', 'approved')->where('enrollment_verified', false)
+                    ->whereHas('processingBatch', fn ($b) => $b->where('status', 'completed'))->count(),
+                'already_verified' => Application::where('status', 'approved')->where('enrollment_verified', true)->count(),
+                'forwarded_waiting_for_agency' => Application::where('status', 'complete')->count(),
+            ],
         ]);
     }
 
@@ -100,6 +108,69 @@ class EnrollmentListController extends Controller
             'message' => "Registrar list saved: {$list->rows_count} students".($skipped ? " ({$skipped} empty or repeated rows skipped)" : '').'.',
             'list' => $list->load('uploader:id,name'),
         ], 201);
+    }
+
+    /*
+    | GET /staff/enrollment-lists/{id}/rows
+    | Every row of a saved Registrar list with what the system found for it. Read-only: it shows staff that
+    | the whole list was read (e.g. 55 rows) and which rows matter. Nothing is recorded as enrolled here.
+    |   waiting        approved applicant waiting for enrollment verification  -> Verify All, then Record
+    |   grantee        active grantee (start-of-semester check)                 -> Verify All "Active grantees"
+    |   verified       approved applicant already verified                      -> nothing to do
+    |   no_grant       student in the system, no approved application or grant -> nothing to do
+    |   name_differs   Student ID found, but the surname is different           -> check who this is
+    |   not_in_system  no student with this Student ID (other enrolled students) -> nothing to do
+    */
+    public function rows(Request $request, int $id)
+    {
+        $this->staffOnly($request);
+        $list = EnrollmentList::with('uploader:id,name')->findOrFail($id);
+        $entries = EnrollmentListEntry::where('enrollment_list_id', $list->id)->orderBy('id')->get();
+
+        $students = \App\Models\Student::whereNotNull('student_id')->get(['id', 'student_id', 'last_name', 'first_name'])
+            ->keyBy(fn ($s) => EnrollmentList::normalizeId($s->student_id));
+        $ids = $students->pluck('id');
+        $approved = Application::with('scholarship:id,short_name,name')->whereIn('student_id', $ids)->where('status', 'approved')
+            ->get(['id', 'student_id', 'scholarship_id', 'enrollment_verified'])->groupBy('student_id');
+        $grants = ScholarRecord::with('scholarship:id,short_name,name')->whereIn('student_id', $ids)->where('status', 'active')
+            ->get(['id', 'student_id', 'scholarship_id'])->groupBy('student_id');
+
+        $label = fn ($x) => $x->scholarship?->short_name ?: $x->scholarship?->name;
+        $out = $entries->values()->map(function ($e, $i) use ($students, $approved, $grants, $label) {
+            $student = $students[$e->student_number] ?? null;
+            $row = ['no' => $i + 1, 'student_id' => $e->student_number, 'last_name' => $e->last_name,
+                'first_name' => $e->first_name, 'course' => $e->course, 'student' => null, 'programs' => null];
+
+            if (!$student) {
+                return $row + ['result' => 'not_in_system', 'note' => 'No student with this Student ID in the system. Nothing to do.'];
+            }
+            $row['student'] = trim($student->last_name.', '.$student->first_name);
+            $row['student_id'] = $student->student_id;   // as written in the system (with its dash)
+            if ($e->last_name && EnrollmentList::normalizeName($e->last_name) !== EnrollmentList::normalizeName($student->last_name)) {
+                return array_merge($row, ['result' => 'name_differs', 'note' => "In the system this Student ID is {$student->last_name}, {$student->first_name}. Check who this is."]);
+            }
+            $waiting = collect($approved[$student->id] ?? [])->where('enrollment_verified', false);
+            if ($waiting->isNotEmpty()) {
+                return array_merge($row, ['result' => 'waiting', 'programs' => $waiting->map($label)->filter()->join(', '),
+                    'note' => 'Approved applicant waiting for verification: press Verify All Enrollments, then Record.']);
+            }
+            if (!empty($grants[$student->id])) {
+                return array_merge($row, ['result' => 'grantee', 'programs' => collect($grants[$student->id])->map($label)->filter()->join(', '),
+                    'note' => 'Active grantee: choose "Active grantees" in Verify All Enrollments for the start-of-semester check.']);
+            }
+            if (!empty($approved[$student->id])) {
+                return array_merge($row, ['result' => 'verified', 'programs' => collect($approved[$student->id])->map($label)->filter()->join(', '),
+                    'note' => 'Approved applicant, enrollment already verified.']);
+            }
+
+            return array_merge($row, ['result' => 'no_grant', 'note' => 'Student in the system, but no approved application or grant. Nothing to do.']);
+        });
+
+        return response()->json([
+            'list' => $list,
+            'summary' => $out->countBy('result')->all() + ['total' => $out->count()],
+            'rows' => $out,
+        ]);
     }
 
     /*

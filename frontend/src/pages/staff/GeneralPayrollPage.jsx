@@ -74,7 +74,7 @@ export default function GeneralPayrollPage() {
 function Person({ person }) {
   return (
     <div className="gp-person">
-      <strong>{person?.name ? person.name.toUpperCase() : " "}</strong>
+      <strong>{person?.name ? signName(person.name) : " "}</strong>
       <span>{person?.title}</span>
     </div>
   );
@@ -284,4 +284,10 @@ function Sheet({ form, sheet }) {
       </p>
     </section>
   );
+}
+
+// As the OAS form prints a signatory: the name in capitals, the degree after the comma as written ("…, MSc", "…, PhD").
+function signName(name) {
+  const [who, ...rest] = String(name).split(",");
+  return who.trim().toUpperCase() + (rest.length ? `, ${rest.join(",").trim()}` : "");
 }

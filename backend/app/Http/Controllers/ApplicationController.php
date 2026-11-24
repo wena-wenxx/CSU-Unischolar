@@ -251,15 +251,16 @@ class ApplicationController extends Controller
 
         $applications = Application::query()
             ->select(['id', 'student_id', 'scholarship_id', 'school_year', 'semester', 'processing_batch_id', 'status', 'remarks', 'submitted_at', 'forwarded_at',
-                'enrollment_verified', 'enrollment_verified_at', 'enrollment_method', 'created_at', 'updated_at'])
+                'agency_submission_id', 'enrollment_verified', 'enrollment_verified_at', 'enrollment_method', 'created_at', 'updated_at'])
             ->with([
                 'student:id,user_id,student_id,first_name,middle_name,last_name,sex,course,year_level,college,contact_number',
                 'student.user:id,email',
                 'scholarship:id,name,short_name,provider,category,amount,status,application_mode',
                 'scholarship.requirements:id,scholarship_id,name,is_required',
-                'documents:id,application_id,scholarship_requirement_id,status',
+                'documents:id,application_id,scholarship_requirement_id,status,staff_verified_at',
                 'latestLog',
                 'processingBatch:id,name,status',
+                'agencySubmission:id,sent_on,sent_by_way,agency_name',
             ])
             ->when($statuses, fn ($q) => $q->whereIn('status', $statuses))
             ->when($request->integer('processing_batch_id') ?: null, fn ($q, $id) => $q->where('processing_batch_id', $id))
@@ -272,7 +273,8 @@ class ApplicationController extends Controller
                     ->where('is_required', true)
                     ->reject(fn ($r) => in_array($r->id, $covered))
                     ->pluck('name')->values() ?? []);
-                $application->setAttribute('flagged_count', $application->documents->where('status', 'flagged')->count());
+                // A flag a staff member already checked and verified is not counted as open.
+                $application->setAttribute('flagged_count', $application->documents->where('status', 'flagged')->whereNull('staff_verified_at')->count());
                 $application->setAttribute('documents_count', $application->documents->count());
                 $application->setRelation('documents', collect());
                 $application->makeHidden('documents');

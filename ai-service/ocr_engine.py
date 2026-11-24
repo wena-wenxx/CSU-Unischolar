@@ -7,6 +7,7 @@ ocr_status = 'failed' and OAS staff review them manually.
 """
 import os
 import tempfile
+import threading
 
 try:
     import pymupdf as fitz  # PyMuPDF (new name)
@@ -17,32 +18,112 @@ _ocr = None
 _ocr_error = None
 
 
+# PaddleOCR is not safe to use from two requests at the same time; every use goes through this lock.
+# (The FastAPI endpoints run in worker threads so the service keeps answering other requests.)
+_OCR_LOCK = threading.Lock()
+_LOAD_LOCK = threading.Lock()
+
+# Pages and pictures bigger than this (longest side, pixels) are made smaller before OCR.
+# A phone photo of 4000 px takes several times longer to read and is not read better.
+MAX_IMAGE_SIDE = int(os.getenv("OCR_MAX_IMAGE_SIDE", "2200"))
+
+
+class _LockedOCR:
+    """The PaddleOCR object, used by one request at a time."""
+
+    def __init__(self, inner):
+        self._inner = inner
+        if hasattr(inner, "predict"):
+            self.predict = self._predict
+
+    def _predict(self, *args, **kwargs):
+        with _OCR_LOCK:
+            return self._inner.predict(*args, **kwargs)
+
+    def ocr(self, *args, **kwargs):
+        with _OCR_LOCK:
+            return self._inner.ocr(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+
+def _paddle_options():
+    """
+    PaddleOCR 3.x settings. Optional, in the AI service's environment:
+      OCR_DET_MODEL / OCR_REC_MODEL   lighter models, e.g. PP-OCRv5_mobile_det and en_PP-OCRv5_mobile_rec
+                                      (faster on a laptop CPU, a little less accurate; NOT TESTED on the OAS files)
+      OCR_DET_LIMIT                   longest side (pixels) the text detector works at, e.g. 1600
+                                      (not set = PaddleOCR's own setting; the TES list reader is tuned for that)
+    """
+    options = {}
+    if os.getenv("OCR_DET_MODEL"):
+        options["text_detection_model_name"] = os.getenv("OCR_DET_MODEL")
+    if os.getenv("OCR_REC_MODEL"):
+        options["text_recognition_model_name"] = os.getenv("OCR_REC_MODEL")
+    if os.getenv("OCR_DET_LIMIT"):
+        options["text_det_limit_side_len"] = int(os.getenv("OCR_DET_LIMIT"))
+        options["text_det_limit_type"] = "max"
+    return options
+
+
 def get_ocr():
-    """Load PaddleOCR once (first call is slow: it downloads models)."""
+    """Load PaddleOCR once and reuse it (the service also loads it at start-up, so the first check is not slow)."""
     global _ocr, _ocr_error
     if _ocr is not None:
         return _ocr
     if _ocr_error is not None:
         return None
-    try:
-        # Paddle 3.x on Windows CPUs can stop with "ConvertPirAttribute2RuntimeAttribute not support"
-        # when its oneDNN (MKL-DNN) speed-up is on. Turning it off fixes it; OCR is a little slower.
-        os.environ.setdefault("FLAGS_use_mkldnn", "0")
-        os.environ.setdefault("FLAGS_enable_pir_api", "0")
-        from paddleocr import PaddleOCR
-        try:  # PaddleOCR 3.x style
-            _ocr = PaddleOCR(
+    with _LOAD_LOCK:
+        if _ocr is not None:
+            return _ocr
+        try:
+            # Paddle 3.x on Windows CPUs can stop with "ConvertPirAttribute2RuntimeAttribute not support"
+            # when its oneDNN (MKL-DNN) speed-up is on. Turning it off fixes it; OCR is a little slower.
+            os.environ.setdefault("FLAGS_use_mkldnn", "0")
+            os.environ.setdefault("FLAGS_enable_pir_api", "0")
+            from paddleocr import PaddleOCR
+            base = dict(
                 lang="en",
                 use_doc_orientation_classify=False,
                 use_doc_unwarping=False,
                 use_textline_orientation=False,
                 enable_mkldnn=False,
             )
-        except (TypeError, ValueError):  # PaddleOCR 2.x style
-            _ocr = PaddleOCR(lang="en", use_angle_cls=True)
-        return _ocr
-    except Exception as e:  # not installed, or failed to load
-        _ocr_error = f"{type(e).__name__}: {e}"
+            inner = None
+            try:  # PaddleOCR 3.x (with the optional settings above)
+                inner = PaddleOCR(**base, **_paddle_options())
+            except (TypeError, ValueError):
+                try:  # PaddleOCR 3.x without them (older 3.x)
+                    inner = PaddleOCR(**base)
+                except (TypeError, ValueError):  # PaddleOCR 2.x style
+                    inner = PaddleOCR(lang="en", use_angle_cls=True)
+            _ocr = _LockedOCR(inner)
+            return _ocr
+        except Exception as e:  # not installed, or failed to load
+            _ocr_error = f"{type(e).__name__}: {e}"
+            return None
+
+
+def warm_up():
+    """Called when the service starts: loads PaddleOCR in the background."""
+    threading.Thread(target=get_ocr, name="ocr-warm-up", daemon=True).start()
+
+
+def _smaller_copy(path):
+    """A temporary smaller copy of a big picture (or None when it is small enough)."""
+    try:
+        from PIL import Image, ImageOps
+        with Image.open(path) as image:
+            if max(image.size) <= MAX_IMAGE_SIDE:
+                return None
+            image = ImageOps.exif_transpose(image).convert("RGB")
+            image.thumbnail((MAX_IMAGE_SIDE, MAX_IMAGE_SIDE))
+            fd, small = tempfile.mkstemp(suffix=".png")
+            os.close(fd)
+            image.save(small)
+            return small
+    except Exception:
         return None
 
 
@@ -140,10 +221,20 @@ def ocr_engine_name() -> str:
 
 
 def _ocr_image(path: str):
+    small = _smaller_copy(path)
+    try:
+        return _ocr_image_as_is(small or path)
+    finally:
+        if small:
+            os.remove(small)
+
+
+def _ocr_image_as_is(path: str):
     ocr = get_ocr()
     if ocr is None:
         if ocr_engine_name() == "tesseract":
-            return _tesseract_text(path)
+            with _OCR_LOCK:
+                return _tesseract_text(path)
         raise RuntimeError(_ocr_error or "PaddleOCR is not installed")
     try:
         if hasattr(ocr, "predict"):
@@ -153,6 +244,11 @@ def _ocr_image(path: str):
     except Exception:
         result = ocr.ocr(path)
     return "\n".join(collect_texts(result))
+
+
+# A document for the AI check is a certificate of a page or two. Scanned pages after this number are
+# not read (a 30-page scanned file would otherwise take many minutes); the result says so.
+MAX_OCR_PAGES = int(os.getenv("OCR_MAX_PAGES", "4"))
 
 
 def extract_text(path: str, filename: str = "") -> dict:
@@ -165,12 +261,15 @@ def extract_text(path: str, filename: str = "") -> dict:
             if getattr(doc, "needs_pass", False):
                 return {"text": "", "engine": None, "ocr_status": "failed",
                         "error": "the PDF is password-protected; ask the student for a copy without a password"}
-            parts, used_ocr = [], False
+            parts, used_ocr, ocr_pages, skipped = [], False, 0, 0
             for page in doc:
                 text = page.get_text().strip()
                 if len(text) >= 30:
                     parts.append(text)
+                elif ocr_pages >= MAX_OCR_PAGES:
+                    skipped += 1
                 else:  # scanned page -> render to PNG and OCR it
+                    ocr_pages += 1
                     pix = page.get_pixmap(dpi=200)
                     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
                         tmp_path = tmp.name
@@ -180,8 +279,10 @@ def extract_text(path: str, filename: str = "") -> dict:
                         used_ocr = True
                     finally:
                         os.remove(tmp_path)
+            note = (f"Only the first {MAX_OCR_PAGES} scanned pages were read; {skipped} more scanned "
+                    f"page(s) were skipped. Upload only the pages of this document.") if skipped else None
             return {"text": "\n".join(parts), "engine": (ocr_engine_name() or "ocr") if used_ocr else "pdf-text",
-                    "ocr_status": "ok", "error": None}
+                    "ocr_status": "ok", "error": None, "note": note, "pages": len(doc)}
 
         # images
         return {"text": _ocr_image(path), "engine": ocr_engine_name() or "ocr", "ocr_status": "ok", "error": None}

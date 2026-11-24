@@ -288,11 +288,17 @@ export const STATUS_HELP = {
 
 // Students see a simple document state, not the raw AI flags:
 // the AI only helps OAS staff, and staff decide what to ask the student.
+// What the student sees for one document. The AI check, the application status and the OAS review are
+// three different things, so the label says which one it is about.
 export function studentDocumentState(document) {
   if (!document) return { label: "Not uploaded", tone: "neutral" };
-  if (document.status === "validated") return { label: "Checked", tone: "success" };
-  if (document.status === "uploaded") return { label: "Uploaded", tone: "success" };
-  return { label: "Being checked by OAS", tone: "warning" };
+  if (document.staff_verified_at) return { label: "Verified by OAS", tone: "success" };
+  if (document.status === "processing") return { label: "AI check running", tone: "info" };
+  if (document.status === "validated") return { label: "AI: no issues found", tone: "success" };
+  if (document.status === "flagged") return { label: "AI: please look at this", tone: "warning" };
+  if (document.status === "needs_review") return { label: "AI could not read it", tone: "warning" };
+  if (document.status === "uploaded") return { label: "Uploaded, not AI-checked", tone: "neutral" };
+  return { label: "Uploaded", tone: "neutral" };
 }
 
 // Wording for one step of an application's history.

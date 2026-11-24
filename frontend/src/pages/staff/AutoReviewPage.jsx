@@ -9,6 +9,7 @@ import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 import SheetTabs from "../../components/SheetTabs";
 import { programTabs } from "../../lib/programs";
+import { ReviewModal, VerifyEnrollmentModal } from "./StaffApplicationsPage";
 
 /*
   Auto-Review (staff). Sorts every submitted / under-review application:
@@ -34,6 +35,28 @@ export default function AutoReviewPage() {
   const [picked, setPicked] = useState([]);
   const [remarks, setRemarks] = useState({}); // id -> edited remark
   const [busy, setBusy] = useState(false);
+  // The review window opens ON this page: closing it keeps you here (same program tab and group)
+  // and the numbers are counted again.
+  const [selected, setSelected] = useState(null);
+  const [verifying, setVerifying] = useState(null);
+
+  async function openReview(id) {
+    try {
+      const { data } = await api.get(`/applications/${id}`);
+      setSelected(data);
+    } catch (err) {
+      toast.error(errMsg(err, "Unable to load application."));
+    }
+  }
+
+  async function reloadReview(id) {
+    try {
+      const { data } = await api.get(`/applications/${id}`);
+      setSelected((current) => (current?.id === id ? data : current));
+    } catch {
+      /* the window keeps the last data */
+    }
+  }
 
   // .then() (not await) so React's lint rule sees the state is set later.
   const run = useCallback(
@@ -183,23 +206,26 @@ export default function AutoReviewPage() {
                     Forward selected to the agency
                   </button>
                 )}
-                {tab === "incomplete" && (
+                {(tab === "incomplete" || tab === "manual") && (
                   <button
                     className="button button-small button-warning"
                     disabled={busy || !pickedRows.length}
                     onClick={() => sendBack(pickedRows)}
                   >
-                    Send selected back (Needs action)
+                    Send remarks to selected (Needs action)
                   </button>
                 )}
                 {tab === "manual" && (
-                  <span className="muted small">Open each one in Applications → Review, then decide.</span>
+                  <span className="muted small">
+                    Each remark is written from that student&apos;s own AI flags. Read and edit it first; for a file you checked
+                    yourself, open the review and press Mark as verified instead.
+                  </span>
                 )}
               </div>
             </div>
 
             <div className="table-wrapper">
-              <table>
+              <table className="numbered">
                 <thead>
                   <tr>
                     <th>
@@ -217,7 +243,7 @@ export default function AutoReviewPage() {
                     {activeProgram === "all" && <th>Program</th>}
                     <th>Submitted</th>
                     <th>{tab === "ready" ? "Check" : "Why"}</th>
-                    {tab === "incomplete" && <th>Remark to the student</th>}
+                    {(tab === "incomplete" || tab === "manual") && <th>Remark to the student (suggested, edit before sending)</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -254,11 +280,11 @@ export default function AutoReviewPage() {
                         ) : (
                           <span className="text-success-soft">✓ All required documents uploaded and checked</span>
                         )}
-                        <Link className="link-button small" to={`/staff/applications?review=${row.id}`}>
+                        <button type="button" className="link-button small" onClick={() => openReview(row.id)}>
                           Open review
-                        </Link>
+                        </button>
                       </td>
-                      {tab === "incomplete" && (
+                      {(tab === "incomplete" || tab === "manual") && (
                         <td>
                           <label className="sr-only" htmlFor={`ar-remark-${row.id}`}>
                             Remark for {row.student}
@@ -266,7 +292,8 @@ export default function AutoReviewPage() {
                           <textarea
                             id={`ar-remark-${row.id}`}
                             className="remark-box"
-                            rows={3}
+                            rows={tab === "manual" ? 5 : 3}
+                            placeholder="Nothing for the student to fix was found (e.g. only files not AI-checked yet). Open the review instead."
                             value={remarks[row.id] ?? row.suggested_remarks ?? ""}
                             onChange={(event) => setRemarks((current) => ({ ...current, [row.id]: event.target.value }))}
                           />
@@ -285,6 +312,30 @@ export default function AutoReviewPage() {
           things out; OAS staff and the agency decide.
         </p>
       </section>
+
+      {selected && (
+        <ReviewModal
+          application={selected}
+          onClose={() => {
+            setSelected(null);
+            run(); // count again: the reviewed student may have moved to another group
+          }}
+          onChanged={() => reloadReview(selected.id)}
+          onVerify={() => setVerifying(selected)}
+        />
+      )}
+
+      {verifying && (
+        <VerifyEnrollmentModal
+          application={verifying}
+          onClose={() => setVerifying(null)}
+          onDone={async () => {
+            const id = verifying.id;
+            setVerifying(null);
+            await reloadReview(id);
+          }}
+        />
+      )}
     </div>
   );
 }

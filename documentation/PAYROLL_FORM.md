@@ -48,10 +48,23 @@ ScholarGuide does **not** compute deductions: no deduction rules were given to u
 
 ## Signatory names
 
-The system admin types them in **System Settings → Payroll form signatories** (Scholarship Coordinator, OAS
-Director, University Registrar, VP for Student Affairs and Auxiliary Services, Chief Accountant, University
-President, University Cashier). The positions are pre-filled; the names start **empty** and print as a blank line
-until they are typed. Real officials' names are not written in the code.
+Since round 27 the form prints the names and positions from the OAS form (TES Batch 1 sheet) by default, so a new
+installation prints a complete signatory section like the paper form:
+
+| Place on the form | Name | Position |
+|---|---|---|
+| Prepared By | the staff member who makes the form (can be typed) | OAS Staff |
+| Noted by | AIRISH PELEMENIANO - JUMONONG, MSc | Scholarship Coordinator |
+| Noted by | SHEILA RAE E. PERMANES, PhD | OAS Director |
+| As to correctness of enrollment data | BENNAJIB J. ABUBAKAR | University Registrar |
+| As to correctness of enrollment data | RISSA L. MERCADO, PhD | VP for Student Affairs and Auxiliary Services |
+| Funds Available | ANNA VICTORIA T. DUCENA, CPA | Chief Accountant |
+| Approved | ROLYN C. DAGUIL, Ph.D. | University President |
+| (3) Paid by | RUDY ROSE P. INCHOCO, MMBM | University Cashier |
+| (4) Witnesses | two blank lines | |
+
+When an official changes, the admin types the new name in **System Settings → Payroll form signatories**; a saved
+name always wins over the default. Names print in capitals with the degree as written ("MSc", "PhD"), like the form.
 
 ## PDF and printing
 

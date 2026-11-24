@@ -9,6 +9,7 @@ import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 import StatusBadge from "../../components/StatusBadge";
+import { yearChoices } from "../../lib/terms";
 
 /*
   Processing Batches (staff): one batch = one processing cycle of one program,
@@ -22,11 +23,6 @@ import StatusBadge from "../../components/StatusBadge";
 const batchBadge = (batch) => (
   <StatusBadge status={batch.status === "open" ? "processing" : "completed"} label={batch.status === "open" ? "Open" : "Completed"} />
 );
-
-function yearChoices(current) {
-  const start = Number(String(current || "").slice(0, 4)) || new Date().getFullYear();
-  return [start - 2, start - 1, start, start + 1].map((y) => `${y}-${y + 1}`);
-}
 
 export default function ProcessingBatchesPage() {
   const toast = useToast();
@@ -119,7 +115,7 @@ export default function ProcessingBatchesPage() {
           <EmptyState message="No batches yet. One is made automatically with the first application or approved list of a program and period." />
         ) : (
           <div className="table-wrapper">
-            <table>
+            <table className="numbered">
               <thead>
                 <tr>
                   <th>Batch</th>

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import api, { errMsg } from "../../services/api";
+import api, { errMsg, isCancel } from "../../services/api";
 import { downloadCSV, formatDate, formatDateTime } from "../../lib/format";
 import { EXTERNAL_CATEGORIES, MATCH_RESULT } from "../../lib/recommend";
 import { useToast } from "../../lib/toast";
@@ -10,6 +10,7 @@ import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 import SearchField from "../../components/SearchField";
 import SheetTabs from "../../components/SheetTabs";
+import FileDrop from "../../components/FileDrop";
 
 /*
   External Grantees (staff): students who already hold a scholarship from an
@@ -72,6 +73,7 @@ export default function ExternalGranteesPage() {
   const [file, setFile] = useState(null);
   const [fileKey, setFileKey] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const uploadControl = useRef(null); // "Cancel" while the list is sent and read
   const [showUpload, setShowUpload] = useState(false);
 
   const [review, setReview] = useState(null);
@@ -148,8 +150,10 @@ export default function ExternalGranteesPage() {
     body.append("file", file);
 
     setUploading(true);
+    const controller = new AbortController();
+    uploadControl.current = controller;
     try {
-      const { data } = await api.post("/staff/external-grantees/uploads", body);
+      const { data } = await api.post("/staff/external-grantees/uploads", body, { signal: controller.signal });
       toast.success(data.message);
       setReview(data.upload);
       setDecisions(startDecisions(data.upload.rows));
@@ -160,8 +164,12 @@ export default function ExternalGranteesPage() {
       await loadHistory();
       setTimeout(() => document.getElementById("review")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
     } catch (err) {
-      toast.error(errMsg(err, "The list could not be read."));
+      if (isCancel(err)) {
+        toast.info("Cancelled. If the server had already finished reading, the list waits in Upload history: press Discard there.");
+        await loadHistory();
+      } else toast.error(errMsg(err, "The list could not be read."));
     } finally {
+      uploadControl.current = null;
       setUploading(false);
     }
   }
@@ -418,13 +426,15 @@ export default function ExternalGranteesPage() {
           </div>
           <div className="full-column">
             <label htmlFor="ext-file">List file</label>
+            <FileDrop className="file-drop-big" hint="or drag the list file here">
             <input
-              key={fileKey}
-              id="ext-file"
-              type="file"
-              accept=".pdf,.docx,.xlsx,.csv,.png,.jpg,.jpeg"
-              onChange={(event) => setFile(event.target.files?.[0] || null)}
-            />
+                key={fileKey}
+                id="ext-file"
+                type="file"
+                accept=".pdf,.docx,.xlsx,.csv,.png,.jpg,.jpeg"
+                onChange={(event) => setFile(event.target.files?.[0] || null)}
+              />
+            </FileDrop>
             <p className="muted small">
               PDF, Word (.docx), Excel (.xlsx), CSV, or a photo (PNG/JPG). The AI reads the names and Student IDs and
               suggests the matching students; you confirm before anything is saved. Photos and scans are read with OCR, so
@@ -435,6 +445,11 @@ export default function ExternalGranteesPage() {
             <button className="button button-primary" disabled={uploading}>
               {uploading ? "Reading the file..." : "Upload and read"}
             </button>
+            {uploading && (
+              <button type="button" className="button button-danger-outline" onClick={() => uploadControl.current?.abort()}>
+                Cancel
+              </button>
+            )}
           </div>
         </form>
       </section>
@@ -504,7 +519,7 @@ export default function ExternalGranteesPage() {
           <EmptyState message="Nothing here yet. Upload a list above." />
         ) : (
           <div className="table-wrapper">
-            <table>
+            <table className="numbered">
               <thead>
                 <tr>
                   <th>Student</th>
@@ -609,7 +624,7 @@ export default function ExternalGranteesPage() {
           <EmptyState message="No lists uploaded yet." />
         ) : (
           <div className="table-wrapper">
-            <table>
+            <table className="numbered">
               <thead>
                 <tr>
                   <th>Uploaded</th>

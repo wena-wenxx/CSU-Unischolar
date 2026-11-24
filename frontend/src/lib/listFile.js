@@ -24,7 +24,8 @@ export async function csvText(file) {
   }
 }
 
-export async function readListFile(file) {
+// options.signal: an AbortController signal, for the "Cancel" button while a file is read.
+export async function readListFile(file, { signal } = {}) {
   const name = file.name.toLowerCase();
 
   if (file.size <= 0) {
@@ -48,7 +49,7 @@ export async function readListFile(file) {
 
   const body = new FormData();
   body.append("file", file);
-  const { data } = await api.post("/staff/read-table", body);
+  const { data } = await api.post("/staff/read-table", body, { signal });
 
   const allCells = Array.isArray(data.cells) ? data.cells : null;
   const kept = (data.rows || [])

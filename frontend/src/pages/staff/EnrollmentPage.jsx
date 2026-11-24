@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import api, { errMsg } from "../../services/api";
+import api, { errMsg, isCancel } from "../../services/api";
 import { LIST_ACCEPT, readListFile } from "../../lib/listFile";
 import { downloadCSV, formatDateTime } from "../../lib/format";
 import { useToast } from "../../lib/toast";
@@ -8,6 +8,8 @@ import { useConfirm } from "../../lib/confirm";
 import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
+import { SEMESTERS } from "../../lib/terms";
+import FileDrop from "../../components/FileDrop";
 
 /*
   Enrollment (staff):
@@ -28,6 +30,21 @@ function guessColumn(headers, patterns) {
   return index >= 0 ? String(index) : "";
 }
 
+// Used only when the server could not send its term list (e.g. MySQL was stopped), so the Term box is
+// never empty. Same wording as the server: "1st Semester AY 2026-2027".
+function fallbackTerms() {
+  const now = new Date();
+  const start = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1; // school year starts in August
+  const names = SEMESTERS;
+  const list = [];
+  for (const year of [start - 1, start]) {
+    for (const name of names) list.push(`${name} AY ${year}-${year + 1}`);
+  }
+  const month = now.getMonth();
+  const current = `${month >= 7 ? names[0] : month <= 4 ? names[1] : names[2]} AY ${start}-${start + 1}`;
+  return { current, periods: list };
+}
+
 export default function EnrollmentPage() {
   const toast = useToast();
   const confirm = useConfirm();
@@ -42,6 +59,9 @@ export default function EnrollmentPage() {
   const [columns, setColumns] = useState({ id: "", last: "", first: "", course: "" });
   const [fileKey, setFileKey] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [reading, setReading] = useState(""); // name of the file being read
+  const readControl = useRef(null); // "Cancel reading"
+  const [viewing, setViewing] = useState(null); // an earlier list whose rows are shown
 
   // verify
   const [scope, setScope] = useState("approved");
@@ -62,6 +82,9 @@ export default function EnrollmentPage() {
         .catch((err) => {
           toast.error(errMsg(err, "Unable to load this page."));
           setInfo({ lists: [], waiting: 0, grantees: 0 });
+          const terms = fallbackTerms();
+          setPeriods((old) => (old.periods.length ? old : terms));
+          setPeriod((current) => current || terms.current);
         }),
     [toast]
   );
@@ -78,8 +101,11 @@ export default function EnrollmentPage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    const controller = new AbortController();
+    readControl.current = controller;
+    setReading(file.name);
     try {
-      const { rows: parsed, warnings } = await readListFile(file);
+      const { rows: parsed, warnings } = await readListFile(file, { signal: controller.signal });
       if (parsed.length < 2) {
         toast.error("The file has no student rows.");
         return;
@@ -95,8 +121,12 @@ export default function EnrollmentPage() {
         course: guessColumn(head, [/course/, /program/, /degree/]),
       });
     } catch (err) {
-      toast.error(errMsg(err, err.message || "The file could not be read."));
+      if (isCancel(err)) toast.info("Reading cancelled. Nothing was saved.");
+      else toast.error(errMsg(err, err.message || "The file could not be read."));
       setFileKey((k) => k + 1);
+    } finally {
+      readControl.current = null;
+      setReading("");
     }
   }
 
@@ -203,7 +233,7 @@ export default function EnrollmentPage() {
       />
 
       <section className="card">
-        <h2>1. Registrar's enrollment list</h2>
+        <h2>1. Upload the Registrar&apos;s enrollment list</h2>
 
         {latest ? (
           <p>
@@ -221,6 +251,7 @@ export default function EnrollmentPage() {
             <div>
               <label htmlFor="enr-period">Term</label>
               <select id="enr-period" value={period} onChange={(event) => setPeriod(event.target.value)}>
+                {!period && <option value="">Choose the term of this list</option>}
                 {periods.periods.map((p) => (
                   <option key={p} value={p}>
                     {p}
@@ -231,7 +262,17 @@ export default function EnrollmentPage() {
             </div>
             <div>
               <label htmlFor="enr-file">Registrar's list (Excel, CSV, Word or PDF)</label>
-              <input id="enr-file" key={fileKey} type="file" accept={LIST_ACCEPT} onChange={readFile} />
+              <FileDrop hint="or drag the Registrar's list here">
+                <input id="enr-file" key={fileKey} type="file" accept={LIST_ACCEPT} onChange={readFile} disabled={Boolean(reading)} />
+              </FileDrop>
+              {reading && (
+                <p className="small">
+                  <span className="spinner" aria-hidden="true" /> Reading {reading}...{" "}
+                  <button type="button" className="button button-small button-danger-outline" onClick={() => readControl.current?.abort()}>
+                    Cancel reading
+                  </button>
+                </p>
+              )}
             </div>
           </div>
           <p className="muted small">
@@ -266,14 +307,17 @@ export default function EnrollmentPage() {
                   </div>
                 ))}
               </div>
-              <p className="muted small">
-                {fileName}: {dataRows.length} rows. First row: {dataRows[0]?.join(" · ")}
+              <p className="small">
+                <strong>{fileName}</strong>: <strong>{dataRows.length} rows read</strong>. Check them below. Nothing is
+                saved yet, and saving the list does NOT record anyone as enrolled: it only keeps the Registrar&apos;s list
+                to check against in step 3.
               </p>
+              <ReadPreview rows={dataRows} columns={columns} />
               <div className="button-row">
                 <button className="button button-secondary" onClick={resetFile}>
                   Choose another file
                 </button>
-                <button
+                <button aria-busy={uploading}
                   className="button button-primary"
                   onClick={upload}
                   disabled={uploading || columns.id === "" || !period}
@@ -286,12 +330,17 @@ export default function EnrollmentPage() {
         </details>
       </section>
 
+      {(viewing || latest) && <ListRows key={(viewing || latest).id} list={viewing || latest} latestId={latest?.id} onBack={() => setViewing(null)} />}
+
       <section className="card">
-        <h2>2. Verify all enrollments</h2>
+        <h2>3. Verify all enrollments</h2>
         <p className="muted small">
+          Checks the people who need it (approved applicants waiting, and/or active grantees) against the latest list.
           The system only suggests; nothing is saved until you press a Record button. Approved applicants waiting:{" "}
           <strong>{info.waiting}</strong> · active grantees: <strong>{info.grantees}</strong>.
         </p>
+        {!latest && <p className="small warning">Upload the Registrar&apos;s list in step 1 first: the button stays off until there is one.</p>}
+        {latest && !info.waiting && !info.grantees && <WhyEmpty why={info.why_empty} />}
 
         <div className="inline-form">
           <label htmlFor="enr-scope" className="sr-only">
@@ -359,7 +408,7 @@ export default function EnrollmentPage() {
                 </div>
 
                 <div className="table-wrapper">
-                  <table>
+                  <table className="numbered">
                     <thead>
                       <tr>
                         <th>
@@ -423,7 +472,7 @@ export default function EnrollmentPage() {
         <section className="card">
           <h2>Earlier lists</h2>
           <div className="table-wrapper">
-            <table>
+            <table className="numbered">
               <thead>
                 <tr>
                   <th>Uploaded</th>
@@ -431,6 +480,7 @@ export default function EnrollmentPage() {
                   <th>File</th>
                   <th className="numeric">Students</th>
                   <th>By</th>
+                  <th>Rows</th>
                 </tr>
               </thead>
               <tbody>
@@ -441,6 +491,11 @@ export default function EnrollmentPage() {
                     <td>{list.file_name}</td>
                     <td className="numeric">{list.rows_count}</td>
                     <td>{list.uploader?.name || "—"}</td>
+                    <td>
+                      <button type="button" className="link-button small" onClick={() => setViewing(list)}>
+                        View rows
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -448,6 +503,152 @@ export default function EnrollmentPage() {
           </div>
         </section>
       )}
+    </div>
+  );
+}
+
+
+// Before saving: every row that was read, in the chosen columns (so staff see all 55, not only the first).
+function ReadPreview({ rows, columns }) {
+  const cell = (row, key) => (columns[key] === "" ? "" : row[Number(columns[key])] || "");
+  return (
+    <div className="table-wrapper preview-scroll">
+      <table className="numbered">
+        <thead>
+          <tr>
+            <th>Student ID</th>
+            <th>Last name</th>
+            <th>First name</th>
+            <th>Course</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i} className={cell(row, "id").trim() ? "" : "row-muted"}>
+              <td>{cell(row, "id") || <span className="text-warning small">no Student ID: skipped</span>}</td>
+              <td>{cell(row, "last")}</td>
+              <td>{cell(row, "first")}</td>
+              <td>{cell(row, "course")}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+const ROW_GROUPS = [
+  ["all", "All rows"],
+  ["waiting", "Approved, waiting for verification"],
+  ["grantee", "Active grantees"],
+  ["name_differs", "Name differs"],
+  ["verified", "Already verified"],
+  ["no_grant", "In the system, no grant"],
+  ["not_in_system", "Not in the system"],
+];
+
+// Step 2: every row of a saved list with what the system found. Read-only.
+function ListRows({ list, latestId, onBack }) {
+  const toast = useToast();
+  const [data, setData] = useState(null);
+  const [group, setGroup] = useState("all");
+
+  useEffect(() => {
+    api
+      .get(`/staff/enrollment-lists/${list.id}/rows`)
+      .then(({ data: result }) => setData(result))
+      .catch((err) => {
+        toast.error(errMsg(err, "Unable to show the rows of this list."));
+        setData({ summary: { total: 0 }, rows: [] });
+      });
+  }, [list.id, toast]);
+
+  const shown = data ? data.rows.filter((row) => group === "all" || row.result === group) : [];
+
+  return (
+    <section className="card">
+      <h2>2. What is in the list</h2>
+      <p className="muted small">
+        {list.file_name} · {list.period} · <strong>{list.rows_count} students</strong>
+        {list.id !== latestId && (
+          <>
+            {" "}
+            (an earlier list){" "}
+            <button type="button" className="link-button small" onClick={onBack}>
+              Show the latest list
+            </button>
+          </>
+        )}
+        . Every row is matched by Student ID. This only shows what was found; nobody is recorded as enrolled here.
+      </p>
+      {!data ? (
+        <Loading />
+      ) : (
+        <>
+          <div className="filter-row" role="group" aria-label="Rows">
+            {ROW_GROUPS.filter(([k]) => k === "all" || data.summary[k]).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                className={group === k ? "button button-small button-primary" : "button button-small button-secondary"}
+                aria-pressed={group === k}
+                onClick={() => setGroup(k)}
+              >
+                {label} ({k === "all" ? data.summary.total : data.summary[k]})
+              </button>
+            ))}
+          </div>
+          <div className="table-wrapper preview-scroll">
+            <table className="numbered">
+              <thead>
+                <tr>
+                  <th>Student ID</th>
+                  <th>Name on the list</th>
+                  <th>Course</th>
+                  <th>In the system</th>
+                  <th>What it means</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((row) => (
+                  <tr key={`${row.no}-${row.student_id}`}>
+                    <td>{row.student_id}</td>
+                    <td>{[row.last_name, row.first_name].filter(Boolean).join(", ")}</td>
+                    <td>{row.course}</td>
+                    <td>
+                      {row.student || "—"}
+                      {row.programs && <small className="muted account-note">{row.programs}</small>}
+                    </td>
+                    <td className="small">{row.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+// Why there is nobody to verify, from the real counts (instead of an empty list with no reason).
+function WhyEmpty({ why }) {
+  if (!why) return null;
+  const reasons = [];
+  if (why.forwarded_waiting_for_agency)
+    reasons.push(`${why.forwarded_waiting_for_agency} application(s) are forwarded and still waiting for the agency. Record the agency's answer in Approved Lists first.`);
+  if (why.in_completed_batches)
+    reasons.push(`${why.in_completed_batches} approved application(s) are in a processing batch that was marked completed. Reopen that batch in Processing Batches to verify them.`);
+  if (why.already_verified) reasons.push(`${why.already_verified} approved application(s) were already verified.`);
+  if (!reasons.length) reasons.push("No application has been approved by an agency yet, and nobody is an active grantee.");
+  return (
+    <div className="ai-note review small">
+      <strong>Why nobody is listed:</strong>
+      <ul>
+        {reasons.map((reason) => (
+          <li key={reason}>{reason}</li>
+        ))}
+      </ul>
     </div>
   );
 }

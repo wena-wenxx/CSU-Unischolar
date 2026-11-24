@@ -6,6 +6,7 @@ import { useAuth } from "../../lib/auth";
 import { downloadFile } from "../../lib/download";
 import PageHeader from "../../components/PageHeader";
 import Loading from "../../components/Loading";
+import { SEMESTERS } from "../../lib/terms";
 
 const STATUSES = ["submitted", "under_review", "needs_action", "complete", "approved", "rejected", "draft"];
 
@@ -339,9 +340,9 @@ export default function StaffReportsPage() {
               <label htmlFor="bill-semester">Semester</label>
               <select id="bill-semester" value={billSemester} onChange={(event) => setBillSemester(event.target.value)}>
                 <option value="">Whole school year</option>
-                <option value="1st Semester">1st Semester</option>
-                <option value="2nd Semester">2nd Semester</option>
-                <option value="Summer">Summer</option>
+                {SEMESTERS.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
               </select>
             </div>
           </div>

@@ -56,9 +56,11 @@ class RecommendationController extends Controller
         return AiRecommendation::query()
             ->when($f['view'] ?? 'recommended', function ($q, $view) {
                 match ($view) {
-                    'recommended' => $q->where('verdict', 'eligible')->whereNotIn('staff_status', ['dismissed', 'wrong']),
-                    'no_data' => $q->where('verdict', 'no_data')->whereNotIn('staff_status', ['dismissed', 'wrong']),
-                    'not_eligible' => $q->where('verdict', 'not_eligible')->whereNotIn('staff_status', ['dismissed', 'wrong']),
+                    // Students already invited or notified (or added) leave the work lists and appear under
+                    // "Previously notified", so new recommendations stand out. Nothing is deleted.
+                    'recommended' => $q->where('verdict', 'eligible')->whereNotIn('staff_status', ['dismissed', 'wrong', 'invited', 'added']),
+                    'no_data' => $q->where('verdict', 'no_data')->whereNotIn('staff_status', ['dismissed', 'wrong', 'invited', 'added']),
+                    'not_eligible' => $q->where('verdict', 'not_eligible')->whereNotIn('staff_status', ['dismissed', 'wrong', 'invited', 'added']),
                     'acted' => $q->whereIn('staff_status', ['invited', 'added']),
                     'dismissed' => $q->where('staff_status', 'dismissed'),
                     'wrong' => $q->where('staff_status', 'wrong'),
@@ -199,18 +201,33 @@ class RecommendationController extends Controller
 
     /*
     | Staff do not have to press Recalculate after editing a program. Student changes (profile, uploads,
-    | AI checks) already re-score that student. Here the whole list is re-scored when it was never
-    | calculated, or when a program or one of its requirements changed after the last calculation.
+    | AI checks) already re-score that student. Here the WHOLE list is re-scored when it was never scored
+    | in full, when a program or requirement changed after the last full run, or when an active student
+    | has no score at all (e.g. after the records were cleared, re-scoring one student used to look like
+    | "already calculated", so the page showed only that one student).
     */
     private function refreshIfRulesChanged(): void
     {
-        $last = AiRecommendation::max('computed_at');
+        $full = \Illuminate\Support\Facades\Cache::get(EligibilityEngine::FULL_RUN_KEY);
         $changed = collect([
             Scholarship::max('updated_at'),
             \App\Models\ScholarshipRequirement::max('updated_at'),
         ])->filter()->max();
 
-        if ($last === null || ($changed !== null && \Illuminate\Support\Carbon::parse($changed)->gt(\Illuminate\Support\Carbon::parse($last)))) {
+        $stale = $full === null
+            || ($changed !== null && \Illuminate\Support\Carbon::parse($changed)->gt(\Illuminate\Support\Carbon::parse($full)));
+
+        // An active student with no row at all was never scored (a student who already holds every
+        // program has no rows either, so this is counted only among students without an active grant).
+        // (At most every 10 minutes, so a student who can never get a row does not slow every page load.)
+        $unscored = !$stale && \Illuminate\Support\Facades\Cache::add('ai_recommendations_unscored_check', 1, 600)
+            && \App\Models\Student::query()
+            ->whereHas('user', fn ($q) => $q->where('role', 'student')->where('is_active', true))
+            ->whereDoesntHave('scholarRecords', fn ($q) => $q->where('status', 'active'))
+            ->whereNotIn('id', AiRecommendation::query()->select('student_id'))
+            ->exists();
+
+        if (($stale || $unscored) && EligibilityEngine::scoredScholarships()->isNotEmpty()) {
             EligibilityEngine::recalculate();
         }
     }
@@ -238,6 +255,7 @@ class RecommendationController extends Controller
             'met_count' => $r->met_count,
             'total_count' => $r->total_count,
             'verdict' => $r->verdict,
+            'match_level' => \App\Support\InvitationText::level($r),
             'checks' => $checks,
             'reason_summary' => $r->verdict === 'eligible'
                 ? ($met ? 'Matched: '.$met : 'Review the configured rules.')
@@ -394,6 +412,7 @@ class RecommendationController extends Controller
             'recommendation_ids.*' => 'integer|distinct|exists:ai_recommendations,id',
             'message' => 'required|string|min:10|max:5000',
             'skip_duplicates' => 'boolean',
+            'add_match_details' => 'boolean',
         ]);
 
         [$scholarship, $recommendations] = $this->notificationRecipients($request, $data);
@@ -455,6 +474,13 @@ class RecommendationController extends Controller
                 // A notice must say whom it is for, even if the [Student Name] tag was removed.
                 if (mb_stripos($message, $fullName) === false) {
                     $message = "Dear {$fullName},\n\n".$message;
+                }
+                // The same staff message for everyone, followed by THIS student's match: a student with
+                // missing data does not get the same promise as a student who meets every listed rule.
+                if (!empty($data['add_match_details'] ?? true)) {
+                    $message .= "\n\nAbout your match (".\App\Support\InvitationText::levelLabel(\App\Support\InvitationText::level($recommendation))."):\n"
+                        .\App\Support\InvitationText::details($recommendation)
+                        ."\n\nThis notice is not an approval. The OAS and the scholarship provider make the decision.";
                 }
 
                 ScholarshipNotification::create([
@@ -572,10 +598,8 @@ class RecommendationController extends Controller
 
         // The invitation is saved in the system first (the student sees it under the bell, staff see it
         // under Messages > Sent invitations); the e-mail is extra and may be turned off.
-        $message = "Dear {$name},\n\nThe Office of Admission and Scholarship invites you to apply for {$r->scholarship->name}. "
-            .'Based on the information in CSU UniScholar, you may be eligible. Please review the requirements and apply in CSU UniScholar if you are interested.'
-            .($note ? "\n\nNote from the OAS: {$note}" : '')
-            ."\n\nThis invitation is not an approval. Your application is still subject to the scholarship requirements, OAS review, and the decision of the scholarship provider.";
+        // The wording follows the student's match (high / partial / low), with what is met and missing.
+        $message = \App\Support\InvitationText::invitation($r, $name, $note);
 
         // One notice per student and program (a database rule): sending again refreshes it and
         // shows it as unread again.
@@ -838,5 +862,53 @@ class RecommendationController extends Controller
             })->values();
 
         return response()->json(['counts' => $counts, 'notices' => $rows]);
+    }
+
+    /*
+    | GET /staff/invitation-activity
+    | Latest AI Recommendations work and the students' answers, newest first, for the staff
+    | dashboard: recalculations, invitations and notices sent, students who opened them, and
+    | students who applied afterwards. Built from the saved records (activity log, notices,
+    | applications), so it shows only what really happened.
+    */
+    public function activity(Request $request)
+    {
+        $this->staffOnly($request);
+        $events = collect();
+
+        \App\Models\ActivityLog::where(fn ($q) => $q->where('action', 'like', 'recommendation%'))
+            ->latest('created_at')->limit(15)->get()
+            ->each(fn ($log) => $events->push([
+                'at' => $log->created_at, 'kind' => 'staff', 'who' => $log->user_name, 'text' => $log->description,
+            ]));
+
+        $notices = ScholarshipNotification::with(['student:id,first_name,last_name,student_id', 'scholarship:id,name,short_name'])
+            ->where('type', self::NOTIFICATION_TYPE)
+            ->latest('sent_at')->limit(200)->get();
+
+        $notices->whereNotNull('read_at')->sortByDesc('read_at')->take(15)->each(fn ($n) => $events->push([
+            'at' => $n->read_at, 'kind' => 'opened', 'who' => $n->student?->fullName(),
+            'text' => 'Opened the invitation for '.($n->scholarship?->name ?? 'a scholarship').'.',
+        ]));
+
+        $applied = Application::with(['student:id,first_name,last_name', 'scholarship:id,name'])
+            ->whereIn('student_id', $notices->pluck('student_id')->unique())
+            ->latest('created_at')->limit(200)->get()
+            ->filter(fn ($a) => $notices->contains(fn ($n) => $n->student_id === $a->student_id && $n->scholarship_id === $a->scholarship_id
+                && $n->sent_at && $a->created_at >= $n->sent_at->copy()->subDay()))
+            ->take(15);
+        $applied->each(fn ($a) => $events->push([
+            'at' => $a->created_at, 'kind' => 'applied', 'who' => $a->student?->fullName(),
+            'text' => ($a->status === 'draft' ? 'Started an application for ' : 'Applied for ').($a->scholarship?->name ?? 'a scholarship').' after the invitation.',
+        ]));
+
+        return response()->json([
+            'events' => $events->filter(fn ($e) => $e['at'])->sortByDesc(fn ($e) => $e['at']->timestamp)->take(20)->values(),
+            'totals' => [
+                'invited' => $notices->count(),
+                'opened' => $notices->whereNotNull('read_at')->count(),
+                'applied' => $applied->count(),
+            ],
+        ]);
     }
 }

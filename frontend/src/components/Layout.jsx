@@ -7,6 +7,8 @@ import NotificationBell from "./NotificationBell";
 import SearchBox from "./SearchBox";
 import SidebarProfile from "./SidebarProfile";
 import WelcomeModal from "./WelcomeModal";
+import Icon from "./Icon";
+import { iconFor } from "../lib/icons";
 
 const NAVIGATION = {
   // A student's order: find a program, prepare documents, apply, follow it.
@@ -134,7 +136,8 @@ export default function Layout() {
                 to={item[0]}
                 className={({ isActive }) => (isActive ? "nav-item active" : "nav-item")}
               >
-                {item[1]}
+                <Icon name={iconFor(item[0])} className="nav-icon" />
+                <span>{item[1]}</span>
               </NavLink>
             ) : (
               <span key={item.heading} className="nav-heading">
@@ -166,7 +169,9 @@ export default function Layout() {
               aria-expanded={menuOpen}
               aria-controls="main-menu"
             >
-              ☰
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d={menuOpen ? "M18 6 6 18M6 6l12 12" : "M4 7h16M4 12h16M4 17h16"} />
+              </svg>
             </button>
 
             <span className="topbar-title">{title}</span>

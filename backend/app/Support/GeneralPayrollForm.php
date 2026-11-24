@@ -150,6 +150,21 @@ class GeneralPayrollForm
         return mb_strtoupper(trim($student->last_name).', '.trim($student->first_name).$initial);
     }
 
+    /**
+     * A signatory name as the OAS form prints it: the name in capitals, the degree after the comma as written
+     * ("Airish Pelemeniano - Jumonong, MSc" -> "AIRISH PELEMENIANO - JUMONONG, MSc"; "PhD" stays "PhD").
+     */
+    public static function signName(?string $name): string
+    {
+        $name = trim((string) $name);
+        if ($name === '') {
+            return '';
+        }
+        $parts = explode(',', $name, 2);
+
+        return mb_strtoupper(trim($parts[0])).(isset($parts[1]) ? ', '.trim($parts[1]) : '');
+    }
+
     public static function money(?float $value): string
     {
         return $value === null ? '' : number_format($value, 2);
@@ -263,7 +278,7 @@ class GeneralPayrollForm
         $red = 'C0392B';
         $sig = $form['signatories'];
         // Name in bold capitals with the position below it, like the OAS form (no line: they sign over the name).
-        $person = fn (string $slot) => self::p(self::run(mb_strtoupper((string) $sig[$slot]['name']) ?: ' ', ['b' => true, 'sz' => 17]))
+        $person = fn (string $slot) => self::p(self::run(self::signName($sig[$slot]['name']) ?: ' ', ['b' => true, 'sz' => 17]))
             .self::p(self::run((string) $sig[$slot]['title'], ['sz' => 16]), 'left', 40);
 
         $body = '';

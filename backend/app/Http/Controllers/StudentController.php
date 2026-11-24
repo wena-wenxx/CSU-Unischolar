@@ -314,7 +314,13 @@ class StudentController extends Controller
     public function matches(Request $request)
     {
         $student = $this->student($request);
-        EligibilityEngine::recalculate([$student->id]);   // fresh after a new upload or profile change
+        // Rules are re-scored every time (fast, no AI). The AI field fit is asked again only when it is older than
+        // 10 minutes: uploads and profile changes already refresh it, and "php artisan serve" answers one request
+        // at a time, so waiting for the AI here held up every other request of the dashboard.
+        // The attempt is remembered too, so a slow or stopped AI service is not asked again on every page.
+        $fitIsFresh = ProgramFit::where('student_id', $student->id)->where('computed_at', '>=', now()->subMinutes(10))->exists()
+            || !\Illuminate\Support\Facades\Cache::add("fit_tried:{$student->id}", 1, 600);
+        EligibilityEngine::recalculate([$student->id], !$fitIsFresh);
 
         $fits = ProgramFit::where('student_id', $student->id)->get()->keyBy('scholarship_id');
 

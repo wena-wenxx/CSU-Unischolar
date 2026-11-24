@@ -830,12 +830,15 @@ def read_generic(path, engine=None, dpi=300, min_rows=2, min_cols=2):
     import cv2
 
     all_rows, all_cells, used, pages, width = [], [], None, 0, None
-    for _number, png, _layer in _render_pages(path, dpi):
+    skipped, per_page, total = [], {}, 0
+    for number, png, _layer in _render_pages(path, dpi):
+        total += 1
         gray = cv2.imread(png, cv2.IMREAD_GRAYSCALE)
         rows_y, cols_x, angle, straight = find_grid(gray)
         h, w = straight.shape
         col_spans = [(a, b) for a, b in zip(cols_x, cols_x[1:]) if b - a >= max(25, w // 80)]
         if len(rows_y) < min_rows + 1 or len(col_spans) < min_cols:
+            skipped.append(number)   # reported to staff: never dropped silently
             continue
         straight_path = png
         if angle:
@@ -866,6 +869,7 @@ def read_generic(path, engine=None, dpi=300, min_rows=2, min_cols=2):
                     width = len(texts)
                 all_rows.append(texts)
                 all_cells.append(infos)
+                per_page[number] = per_page.get(number, 0) + 1
     if not all_rows:
         return None
     # pages with a different number of columns are padded so every row has the same width
@@ -876,4 +880,5 @@ def read_generic(path, engine=None, dpi=300, min_rows=2, min_cols=2):
     # a header repeated on every page is kept only once
     header = [t.lower() for t in all_rows[0]]
     keep = [0] + [i for i in range(1, len(all_rows)) if [t.lower() for t in all_rows[i]] != header]
-    return {"rows": [all_rows[i] for i in keep], "cells": [all_cells[i] for i in keep], "engine": used, "pages": pages}
+    return {"rows": [all_rows[i] for i in keep], "cells": [all_cells[i] for i in keep], "engine": used, "pages": pages,
+            "total_pages": total, "skipped_pages": skipped, "rows_per_page": per_page}

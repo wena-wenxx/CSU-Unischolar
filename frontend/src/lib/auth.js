@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react";
+import * as session from "./session";
 
 /*
   Who is logged in. Any page can read it with useAuth().
@@ -9,7 +10,7 @@ export const AuthContext = createContext(null);
 
 export function getStoredUser() {
   try {
-    return JSON.parse(localStorage.getItem("user"));
+    return JSON.parse(session.getItem("user"));
   } catch {
     return null;
   }

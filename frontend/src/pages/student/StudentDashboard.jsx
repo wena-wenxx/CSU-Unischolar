@@ -109,8 +109,6 @@ export default function StudentDashboard() {
         </div>
       ))}
 
-      {!grant && <MatchesCard />}
-
       <div className="stats-grid">
         <StatCard
           title="Open Scholarships"
@@ -125,39 +123,44 @@ export default function StudentDashboard() {
         />
         <StatCard
           title="Being Processed"
+          icon="clock"
           value={count("submitted", "under_review", "complete")}
           to="/student/applications?status=processing"
         />
         <StatCard
           title="Approved"
+          icon="check"
           value={count("approved")}
           to="/student/applications?status=approved"
         />
       </div>
 
+      {!grant && <MatchesCard />}
+
+
       <QuickActions
         actions={[
           {
             to: "/student/scholarships",
-            icon: "🎓",
+            icon: "award",
             label: "Browse Scholarships",
             text: "See open programs and deadlines",
           },
           {
             to: "/student/applications",
-            icon: "📋",
+            icon: "file",
             label: "My Applications",
             text: "Follow each step",
           },
           {
             to: "/student/documents",
-            icon: "📁",
+            icon: "folder",
             label: "My Documents",
             text: "Upload once, reuse later",
           },
           {
             to: "/student/help",
-            icon: "❓",
+            icon: "help",
             label: "Help",
             text: "How to apply",
           },

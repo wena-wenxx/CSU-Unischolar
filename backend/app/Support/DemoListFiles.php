@@ -135,6 +135,10 @@ class DemoListFiles
      * One-page PDF with a real text table (selectable text, like a list
      * exported from Excel or Word). $columns = [x position, ...] in points.
      */
+    /**
+     * A simple text PDF (real text, so it is read without OCR). Long lists continue on more pages,
+     * with the column header repeated on every page (like a real printed list).
+     */
     public static function pdf(string $path, array $titles, array $header, array $rows, array $columns, string $footer = ''): void
     {
         $str = function (string $text) {
@@ -144,6 +148,7 @@ class DemoListFiles
         };
         $text = fn (string $font, float $size, float $x, float $y, string $value) => "BT 0 0 0 rg /{$font} {$size} Tf {$x} {$y} Td ".$str($value).' Tj ET';
 
+        $pages = [];
         $content = [];
         $y = 790;
         foreach ($titles as $i => $title) {
@@ -151,12 +156,22 @@ class DemoListFiles
             $y -= $i === 0 ? 22 : 16;
         }
         $y -= 14;
-        foreach ($header as $c => $value) {
-            $content[] = $text('F2', 10, $columns[$c], $y, (string) $value);
-        }
-        $content[] = '0.6 0.6 0.6 RG 0.5 w 48 '.($y - 6).' m 547 '.($y - 6).' l S';
-        $y -= 22;
+        $printHeader = function () use (&$content, &$y, $header, $columns, $text) {
+            foreach ($header as $c => $value) {
+                $content[] = $text('F2', 10, $columns[$c], $y, (string) $value);
+            }
+            $content[] = '0.6 0.6 0.6 RG 0.5 w 48 '.($y - 6).' m 547 '.($y - 6).' l S';
+            $y -= 22;
+        };
+        $printHeader();
         foreach ($rows as $row) {
+            if ($y < 70) {   // page full: next page, header again
+                $content[] = $text('F1', 8, 50, 40, 'Page '.(count($pages) + 1).($footer !== '' ? ' - '.$footer : ''));
+                $pages[] = implode("\n", $content);
+                $content = [];
+                $y = 800;
+                $printHeader();
+            }
             foreach (array_values($row) as $c => $value) {
                 if ($value !== '' && $value !== null) {
                     $content[] = $text('F1', 10, $columns[$c], $y, (string) $value);
@@ -164,19 +179,24 @@ class DemoListFiles
             }
             $y -= 20;
         }
-        if ($footer !== '') {
-            $content[] = $text('F1', 8, 50, 40, $footer);
+        if ($footer !== '' || $pages) {
+            $content[] = $text('F1', 8, 50, 40, ($pages ? 'Page '.(count($pages) + 1).($footer !== '' ? ' - ' : '') : '').$footer);
         }
+        $pages[] = implode("\n", $content);
 
-        $stream = implode("\n", $content);
+        // objects: 1 catalog, 2 pages, 3 font, 4 bold font, then per page: page object + contents
+        $count = count($pages);
+        $kids = implode(' ', array_map(fn ($i) => (5 + 2 * $i).' 0 R', range(0, $count - 1)));
         $objects = [
             '<< /Type /Catalog /Pages 2 0 R >>',
-            '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-            '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>',
+            "<< /Type /Pages /Kids [{$kids}] /Count {$count} >>",
             '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
             '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>',
-            '<< /Length '.strlen($stream)." >>\nstream\n".$stream."\nendstream",
         ];
+        foreach ($pages as $i => $stream) {
+            $objects[] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents '.(6 + 2 * $i).' 0 R >>';
+            $objects[] = '<< /Length '.strlen($stream)." >>\nstream\n".$stream."\nendstream";
+        }
 
         $pdf = "%PDF-1.4\n";
         $offsets = [];

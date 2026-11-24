@@ -32,22 +32,23 @@ class Setting extends Model
         'oas_facebook' => 'https://www.facebook.com/carsuoas',
         'oas_about' => 'The Office of Admission and Scholarship is responsible for the development and implementation of programs and initiatives that are aimed at attracting, admitting, and supporting a diverse and talented student body while facilitating access to scholarship opportunities and financial aid resources to promote affordability and student success.',
 
-        // Signatories printed on the General Payroll (General Form No. 6-A).
-        // Titles follow the OAS form; NAMES are typed by the admin in System
-        // Settings (never hard-coded), so they can change with the officials.
-        'payroll_coordinator_name' => null,
+        // Signatories printed on the General Payroll (General Form No. 6-A), as on the OAS form the OAS gave
+        // us (photos of a filled-in TES Batch 1 sheet). These are the officials' names in their official
+        // positions. The admin changes them in System Settings when an official changes; a saved value
+        // always wins over these defaults.
+        'payroll_coordinator_name' => 'AIRISH PELEMENIANO - JUMONONG, MSc',
         'payroll_coordinator_title' => 'Scholarship Coordinator',
-        'payroll_director_name' => null,
+        'payroll_director_name' => 'SHEILA RAE E. PERMANES, PhD',
         'payroll_director_title' => 'OAS Director',
-        'payroll_registrar_name' => null,
+        'payroll_registrar_name' => 'BENNAJIB J. ABUBAKAR',
         'payroll_registrar_title' => 'University Registrar',
-        'payroll_vp_name' => null,
+        'payroll_vp_name' => 'RISSA L. MERCADO, PhD',
         'payroll_vp_title' => 'VP for Student Affairs and Auxiliary Services',
-        'payroll_accountant_name' => null,
+        'payroll_accountant_name' => 'ANNA VICTORIA T. DUCENA, CPA',
         'payroll_accountant_title' => 'Chief Accountant',
-        'payroll_president_name' => null,
+        'payroll_president_name' => 'ROLYN C. DAGUIL, Ph.D.',
         'payroll_president_title' => 'University President',
-        'payroll_cashier_name' => null,
+        'payroll_cashier_name' => 'RUDY ROSE P. INCHOCO, MMBM',
         'payroll_cashier_title' => 'University Cashier',
     ];
 

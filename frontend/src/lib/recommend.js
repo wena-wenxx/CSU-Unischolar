@@ -35,7 +35,7 @@ export const VIEWS = {
   recommended: "Meets the rules (recommended)",
   no_data: "Not enough data",
   not_eligible: "Fails a must-have rule",
-  acted: "Invited or added",
+  acted: "Previously notified / invited",
   dismissed: "Dismissed",
   wrong: "Marked wrong",
   all: "Everything",

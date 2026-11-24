@@ -7,7 +7,7 @@
 @php
     $peso = fn ($v) => $v === null ? '' : number_format((float) $v, 2);
     $s = $form['signatories'];
-    $person = fn ($p) => '<div class="person"><strong>'.e($p['name'] ? mb_strtoupper($p['name']) : ' ').'</strong><span>'.e($p['title'] ?? '').'</span></div>';
+    $person = fn ($p) => '<div class="person"><strong>'.e($p['name'] ? \App\Support\GeneralPayrollForm::signName($p['name']) : ' ').'</strong><span>'.e($p['title'] ?? '').'</span></div>';
 @endphp
 <!doctype html>
 <html>

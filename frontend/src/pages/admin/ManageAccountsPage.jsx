@@ -214,7 +214,7 @@ export default function ManageAccountsPage({ kind }) {
           <EmptyState message="No accounts match." />
         ) : (
           <div className="table-wrapper">
-            <table>
+            <table className="numbered">
               <thead>
                 <tr>
                   <th>Name</th>

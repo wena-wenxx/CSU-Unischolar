@@ -87,6 +87,15 @@ class ReviewQueueController extends Controller
                 }
                 $name = $document->typeName();
 
+                // A person already checked it (e.g. with the issuing office): the AI result does not
+                // override that decision, so it is not sent back to manual review.
+                if ($document->staff_verified_at) {
+                    if ($document->isExpired()) {
+                        $review[] = "{$name} expired on ".$document->expiresAt()?->format('M j, Y');
+                    }
+                    continue;
+                }
+
                 if ($document->status === 'flagged') {
                     $first = trim(strtok((string) $document->validationResult?->flags, "\n;")) ?: 'possible problem';
                     $review[] = "AI flagged {$name}: {$first}";
@@ -103,11 +112,12 @@ class ReviewQueueController extends Controller
 
             $group = $blocking ? 'incomplete' : ($review ? 'manual' : 'ready');
 
+            // A suggested remark built from THIS student's actual problems (staff edit it before sending).
             $remarks = null;
-            if ($group === 'incomplete') {
-                $remarks = $missing
-                    ? 'Please upload the following required document(s), then submit again: '.implode(', ', $missing).'.'
-                    : 'You already hold an active scholarship. Only one active scholarship is allowed; please visit the OAS.';
+            if ($group === 'incomplete' && !$missing) {
+                $remarks = 'You already hold an active scholarship. Only one active scholarship is allowed; please visit the OAS.';
+            } elseif ($group !== 'ready') {
+                $remarks = \App\Support\RemarkSuggester::forApplication($application, $missing ?: []);
             }
 
             return [
@@ -213,6 +223,22 @@ class ReviewQueueController extends Controller
             'message' => "{$done} application(s) sent back to the students.".($errors ? ' '.count($errors).' skipped.' : ''),
             'changed' => $done,
             'errors' => $errors,
+        ]);
+    }
+
+    /*
+    | GET /staff/applications/{id}/suggested-remark
+    | The remark Auto-Review would suggest for this one application (from its own AI flags and missing
+    | documents). Only a suggestion for the Remarks box: nothing is sent or changed.
+    */
+    public function suggestedRemark(Request $request, $id)
+    {
+        $this->staffOnly($request);
+        $application = Application::with(['student', 'scholarship.requirements', 'documents.validationResult', 'documents.requirement:id,name'])
+            ->findOrFail($id);
+
+        return response()->json([
+            'remarks' => \App\Support\RemarkSuggester::forApplication($application, $application->missingRequirementNames()),
         ]);
     }
 }
