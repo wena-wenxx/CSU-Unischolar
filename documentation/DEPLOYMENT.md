@@ -66,10 +66,17 @@ web address of the one before it.
    **except** `.venv`, `__pycache__` and `tests`:
    `Dockerfile`, `.dockerignore`, `main.py`, `ocr_engine.py`, `validation.py`,
    `requirements.txt`, `requirements-ocr.txt`.
-5. Upload `HF_SPACE_README.md` too, then rename it: open it on the Space,
-   click **Edit**, and save it as **`README.md`** (replace the README the
-   Space created). The top block (`sdk: docker`, `app_port: 7860`) tells
-   Hugging Face how to run it.
+5. Open the Space's `README.md` (**Files** → `README.md` → **Edit**) and make
+   its top block read as below, then save. This block tells Hugging Face to
+   build the Dockerfile and open port 7860:
+   ```
+   ---
+   title: CSU UniScholar AI
+   sdk: docker
+   app_port: 7860
+   pinned: false
+   ---
+   ```
 6. Click **Commit changes to main**. Open the **App** tab — it shows
    "Building". The first build takes 10–20 minutes (PaddlePaddle is big).
 7. When it says **Running**, your AI address is:

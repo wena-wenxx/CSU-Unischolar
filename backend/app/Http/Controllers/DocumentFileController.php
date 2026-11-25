@@ -4,13 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Document;
 
-/*
-| GET /api/files/documents/{id}?expires=...&signature=...
-| Opens a student document. The link is signed and expires after 30
-| minutes; the API only gives it to the student who owns the document and
-| to OAS staff (it is in the document data they are allowed to see). A link
-| that was changed, copied after it expired, or guessed does not work.
-*/
 class DocumentFileController extends Controller
 {
     public function show($id)

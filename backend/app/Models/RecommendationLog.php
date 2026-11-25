@@ -5,10 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
-/*
-| Audit trail for AI Recommendations: every recommendation shown to staff
-| and every staff decision, with the score at that moment.
-*/
 class RecommendationLog extends Model
 {
     public const UPDATED_AT = null;
@@ -49,7 +45,6 @@ class RecommendationLog extends Model
         ]);
     }
 
-    /** One "shown" row per recommendation on the page the staff member just opened. */
     public static function recordShown(iterable $recommendations, ?User $user): void
     {
         $now = now();
@@ -74,7 +69,7 @@ class RecommendationLog extends Model
                 DB::table('recommendation_logs')->insert($chunk);
             }
         } catch (\Throwable $e) {
-            report($e); // logging never stops the page from loading
+            report($e);
         }
     }
 }

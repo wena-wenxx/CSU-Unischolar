@@ -1,11 +1,6 @@
 import { createContext, useContext } from "react";
 import * as session from "./session";
 
-/*
-  Who is logged in. Any page can read it with useAuth().
-  The provider component is in components/AuthProvider.jsx.
-*/
-
 export const AuthContext = createContext(null);
 
 export function getStoredUser() {
@@ -16,7 +11,6 @@ export function getStoredUser() {
   }
 }
 
-// Where each role starts. Admin = system administrator.
 export function homePathFor(user) {
   if (!user) return "/login";
   if (user.must_change_password) return "/account/password";
@@ -24,7 +18,6 @@ export function homePathFor(user) {
   return { admin: "/admin/dashboard", staff: "/staff/dashboard" }[user.role] || "/student/dashboard";
 }
 
-// Shown in the sidebar and on profile pages.
 export const ROLE_LABELS = { student: "Student", staff: "OAS Staff", admin: "System Admin" };
 
 export function useAuth() {

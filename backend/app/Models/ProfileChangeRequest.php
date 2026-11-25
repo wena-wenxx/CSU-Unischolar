@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Model;
 
 class ProfileChangeRequest extends Model
 {
-    // Registrar-owned fields a student may ask OAS to correct.
     public const FIELDS = [
         'first_name' => 'First name',
         'middle_name' => 'Middle name',

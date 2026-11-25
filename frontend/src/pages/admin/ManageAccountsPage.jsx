@@ -9,11 +9,6 @@ import Modal from "../../components/Modal";
 import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 
-/*
-  Manage Staff (kind="office": staff and admins) and Manage Students (kind="student").
-  Create accounts, edit details, reset passwords, deactivate / reactivate.
-  Accounts are never deleted, so every record keeps its history.
-*/
 const YEAR_LEVELS = ["1st Year", "2nd Year", "3rd Year", "4th Year", "5th Year"];
 
 const EMPTY = {
@@ -51,9 +46,8 @@ export default function ManageAccountsPage({ kind }) {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(() => (params.get("new") === "1" ? { ...EMPTY[kind] } : null));
-  const [secret, setSecret] = useState(null); // { name, email, password } shown once
+  const [secret, setSecret] = useState(null);
 
-  // One page of accounts. Page 1 replaces the list; later pages are added ("Show more").
   function fetchPage(nextPage, filters = { query, status, role }) {
     return api
       .get("/admin/users", { params: { q: filters.query, status: filters.status || undefined, role: filters.role, page: nextPage } })
@@ -474,7 +468,6 @@ function AccountModal({ initial, isStudent, isSelf, onClose, onSaved }) {
   );
 }
 
-// The temporary password is shown only once.
 function PasswordModal({ secret, onClose }) {
   const toast = useToast();
 

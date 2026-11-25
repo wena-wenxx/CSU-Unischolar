@@ -1,4 +1,3 @@
-/* "Showing 25 of 310 · Show 25 more · Show all" under a long table (see lib/paging.js). */
 export default function ShowMore({ paged }) {
   if (!paged.remaining) return null;
 

@@ -14,26 +14,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 
-/*
-|--------------------------------------------------------------------------
-| External Grantees (staff)
-|--------------------------------------------------------------------------
-| Students who already hold a scholarship from an OUTSIDE party (LGU, CHED
-| list, private foundation). Staff upload the party's list (PDF, Word,
-| Excel, CSV or a picture):
-|
-|   1. upload   the file is kept, and the AI service reads it
-|               (/extract-grantee-list): names + Student IDs, and a
-|               suggested ScholarGuide student for each line (Student ID
-|               first, then RapidFuzz name match >= 80%)
-|   2. review   staff confirm or correct every line (status "review")
-|   3. save     confirmed lines become external_grantees rows (matched,
-|               unmatched and unreadable lines are all kept for the record)
-|
-| A matched, active holding shows on the student's profile and in the Data
-| Bank, and counts for the one-active-scholarship rule (applying, grantee
-| tagging, Auto-Review, AI Recommendations).
-*/
 class ExternalGranteeController extends Controller
 {
     private function staffOnly(Request $request): void
@@ -50,12 +30,6 @@ class ExternalGranteeController extends Controller
         }
     }
 
-    /*
-    | GET /staff/external-grantees
-    | q (name / Student ID), program, status (active | ended | all),
-    | match (matched | unmatched | error | all; default matched), upload_id,
-    | page (50 per page), export=1 (everything, for CSV)
-    */
     public function index(Request $request)
     {
         $this->officeOnly($request);
@@ -119,7 +93,6 @@ class ExternalGranteeController extends Controller
         ]);
     }
 
-    // GET /staff/external-grantees/uploads   History of uploaded files (newest first)
     public function uploads(Request $request)
     {
         $this->officeOnly($request);
@@ -133,7 +106,6 @@ class ExternalGranteeController extends Controller
         );
     }
 
-    // GET /staff/external-grantees/uploads/{id}   One upload with what the AI read
     public function showUpload(Request $request, $id)
     {
         $this->officeOnly($request);
@@ -141,10 +113,6 @@ class ExternalGranteeController extends Controller
         return response()->json(ExternalGranteeUpload::with(['uploader:id,name', 'saver:id,name'])->findOrFail($id));
     }
 
-    /*
-    | POST /staff/external-grantees/uploads   (multipart)
-    | file, program_name, agency, category, school_year
-    */
     public function store(Request $request)
     {
         $this->staffOnly($request);
@@ -222,12 +190,6 @@ class ExternalGranteeController extends Controller
         ], 201);
     }
 
-    /*
-    | POST /staff/external-grantees/uploads/{id}/save
-    | decisions: [{ row, student_id (ScholarGuide students.id or null), include (bool) }]
-    | One decision per line the AI read. include=false leaves the line out
-    | (e.g. a title the AI mistook for a name).
-    */
     public function save(Request $request, $id)
     {
         $this->staffOnly($request);
@@ -265,7 +227,7 @@ class ExternalGranteeController extends Controller
                 $status = $studentId ? 'matched' : (($line['result'] ?? '') === 'error' ? 'error' : 'unmatched');
 
                 if ($studentId && ExternalGrantee::activeFor($studentId)->where('program_name', $upload->program_name)->exists()) {
-                    $counts['already']++;   // recorded by an earlier list; keep that one
+                    $counts['already']++;
                     continue;
                 }
 
@@ -320,7 +282,6 @@ class ExternalGranteeController extends Controller
         ]);
     }
 
-    // POST /staff/external-grantees/uploads/{id}/discard
     public function discard(Request $request, $id)
     {
         $this->staffOnly($request);
@@ -336,7 +297,6 @@ class ExternalGranteeController extends Controller
         return response()->json(['message' => 'Upload discarded. Nothing was saved.']);
     }
 
-    // GET /staff/external-grantees/uploads/{id}/file   The original file, for the record
     public function download(Request $request, $id)
     {
         $this->officeOnly($request);
@@ -349,11 +309,6 @@ class ExternalGranteeController extends Controller
         return Storage::disk('local')->download($upload->file_path, $upload->file_name);
     }
 
-    /*
-    | PATCH /staff/external-grantees/{id}   Body: status (active | ended), note
-    | "Ended": the scholarship finished; it no longer counts for the
-    | one-active-scholarship rule.
-    */
     public function update(Request $request, $id)
     {
         $this->staffOnly($request);
@@ -384,13 +339,6 @@ class ExternalGranteeController extends Controller
         ]);
     }
 
-    /*
-    | POST /staff/read-table   (multipart: file)
-    | Any list file (PDF, Word .docx, Excel .xlsx, CSV, PNG/JPG) -> rows of
-    | cells, read by the AI service. Used by Approved Lists and Enrollment,
-    | where staff then choose the Student ID column (CSV files are read in
-    | the browser and do not come here).
-    */
     public function readTable(Request $request)
     {
         $this->staffOnly($request);
@@ -404,7 +352,6 @@ class ExternalGranteeController extends Controller
         $file = $request->file('file');
         $extension = strtolower($file->getClientOriginalExtension());
 
-        // Word and Excel are read right here (no AI service needed).
         if (in_array($extension, ['docx', 'xlsx'], true)) {
             try {
                 return response()->json(OfficeTable::read($file->getRealPath(), $extension));
@@ -414,8 +361,6 @@ class ExternalGranteeController extends Controller
         }
 
         try {
-            // A scanned CHED form is read page by page with OCR: allow up to 10 minutes.
-            // (On Windows, PHP counts waiting time too, so the script's own limit is raised as well.)
             @set_time_limit(660);
             $response = Http::timeout(600)
                 ->attach('file', file_get_contents($file->getRealPath()), $file->getClientOriginalName())
@@ -432,7 +377,6 @@ class ExternalGranteeController extends Controller
 
         return response()->json([
             'rows' => $response->json('rows') ?? [],
-            // Scanned forms: per-cell confidence and notes, so staff can see which cells to check.
             'cells' => $response->json('cells'),
             'method' => $response->json('method'),
             'warnings' => $response->json('warnings') ?? [],

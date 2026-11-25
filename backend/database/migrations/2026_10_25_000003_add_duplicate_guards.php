@@ -5,14 +5,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-/*
-| The database itself refuses duplicates (the code already checks, but two
-| clicks at the same moment could slip past the code):
-|   scholar_records: one record per student per program
-|   payroll_records: one entry per scholar record per period
-| If old data already has duplicates, the migration stops and lists them so
-| OAS can decide which one to keep (nothing is deleted automatically).
-*/
 return new class extends Migration
 {
     public function up(): void

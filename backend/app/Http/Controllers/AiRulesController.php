@@ -7,14 +7,6 @@ use App\Models\Student;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
-/*
-| POST /staff/ai/suggest-rules
-| Staff paste a scholarship memo (or upload it as PDF, Word, TXT or a picture);
-| the AI service suggests the eligibility rules, each with the sentence it
-| came from. Uses a local language model (Ollama) when it is running, or
-| simple pattern reading. NOTHING is saved here: staff tick the right values,
-| they go into the form, and staff press Save.
-*/
 class AiRulesController extends Controller
 {
     public function suggest(Request $request)
@@ -34,7 +26,6 @@ class AiRulesController extends Controller
             return response()->json(['message' => 'Paste the memo text or choose a file.'], 422);
         }
 
-        // Only these values can be suggested (the same choices as the form).
         $options = [
             'year_levels' => Student::whereNotNull('year_level')->distinct()->orderBy('year_level')->pluck('year_level'),
             'colleges' => Student::whereNotNull('college')->distinct()->orderBy('college')->pluck('college'),

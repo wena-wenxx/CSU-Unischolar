@@ -1,9 +1,4 @@
-/*
-  Text for the first-login welcome guide and the Help page.
-  Kept in one place so both stay the same.
-*/
 
-// The Help page's "Show the welcome guide again" button sends this event.
 export const WELCOME_EVENT = "scholarguide:welcome";
 
 export function showWelcomeAgain() {

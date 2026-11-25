@@ -51,7 +51,6 @@ export default function StaffDashboard() {
     <div>
       <DashboardHero title="OAS Staff Dashboard" subtitle="Scholarship management overview. Click any number to open the matching list." />
 
-      {/* What needs work today first; the overall numbers are folded below. */}
       <h2 className="section-title">Needs your attention</h2>
       <div className="stats-grid attention-grid">
         <StatCard title="Needs Action" value={stats.needs_action ?? 0} to="/staff/applications?filter=needs_action" hint="Waiting for students" icon="clock" attention />
@@ -226,12 +225,6 @@ function ResolveModal({ request, onClose, onDone }) {
   );
 }
 
-
-/*
-  AI Recommendations and invitations: what staff did (recalculated, invited, notified) and how students
-  answered (opened, started or sent an application). Loaded on its own, so the rest of the dashboard
-  does not wait for it. Built from saved records only.
-*/
 const ACTIVITY_LABEL = { staff: "OAS", opened: "Opened", applied: "Applied" };
 
 function InvitationActivity() {

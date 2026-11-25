@@ -1,9 +1,3 @@
-/*
-  Search helpers for lists filtered in the browser.
-  - Not case-sensitive, and accents do not matter: "anuber" finds "AÑUBER".
-  - A Student ID matches with or without the dash: "202600001" finds "2026-00001".
-  - Every word typed must be found.
-*/
 const plain = (text) =>
   String(text ?? "")
     .normalize("NFD")

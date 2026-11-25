@@ -4,10 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-/*
-| Program type, used by the student filter on the Scholarships page:
-| government, csu (CSU-funded), lgu, private. Nullable so older rows still work.
-*/
 return new class extends Migration
 {
     public function up(): void

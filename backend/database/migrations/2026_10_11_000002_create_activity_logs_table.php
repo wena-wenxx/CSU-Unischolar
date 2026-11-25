@@ -4,7 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-// Who did what and when (shown to the admin in Activity Logs).
 return new class extends Migration
 {
     public function up(): void
@@ -12,9 +11,9 @@ return new class extends Migration
         Schema::create('activity_logs', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->string('user_name')->nullable();   // kept even if the account changes
+            $table->string('user_name')->nullable();
             $table->string('role', 20)->nullable();
-            $table->string('action', 60)->index();     // e.g. application.approved, account.created
+            $table->string('action', 60)->index();
             $table->text('description');
             $table->string('subject_type', 60)->nullable();
             $table->unsignedBigInteger('subject_id')->nullable();

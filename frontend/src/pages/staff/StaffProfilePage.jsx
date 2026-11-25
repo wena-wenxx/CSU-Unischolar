@@ -5,7 +5,6 @@ import ProfilePhoto from "../../components/ProfilePhoto";
 import PageHeader from "../../components/PageHeader";
 import ProfileItem from "../../components/ProfileItem";
 
-/* Staff and admin account details. Name and e-mail are changed by the System Admin. */
 export default function StaffProfilePage() {
   const { user } = useAuth();
   const admin = user.role === "admin";

@@ -4,15 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-/*
-| A person's check of a document, next to the AI check:
-|   staff_verified_at / staff_verified_by  OAS staff confirmed the document
-|       is genuine (e.g. scanned the PhilID QR in PhilSys Check, matched the
-|       Registrar's list, called the barangay)
-|   staff_verify_note  how it was checked
-| A staff-verified document counts as met in AI Recommendations even when
-| the AI could not read it.
-*/
 return new class extends Migration
 {
     public function up(): void

@@ -1,7 +1,3 @@
-/*
-  Activity log words for people (the admin's Activity Logs page and dashboard).
-  The server stores codes like "application.approved"; these are the labels.
-*/
 export const ACTION_GROUPS = {
   "": "All activity",
   auth: "Logins and passwords",

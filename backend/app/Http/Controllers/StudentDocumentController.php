@@ -7,20 +7,8 @@ use App\Models\Document;
 use App\Models\ScholarshipRequirement;
 use Illuminate\Http\Request;
 
-/*
-|--------------------------------------------------------------------------
-| My Documents (students)
-|--------------------------------------------------------------------------
-| Every file a student ever uploaded, for any application or saved here
-| directly, so it can be checked, replaced and reused when applying again.
-|
-| A document belongs to a student (documents.student_id). It may also belong
-| to one application (documents.application_id). Reusing a file for another
-| application makes another row that points to the same stored file.
-*/
 class StudentDocumentController extends Controller
 {
-    // The nine document types the OAS asks for.
     public const STANDARD_TYPES = [
         'Certificate of Registration (COR)',
         'Certificate of Grades',
@@ -68,7 +56,6 @@ class StudentDocumentController extends Controller
         ];
     }
 
-    // GET /student/documents
     public function index(Request $request)
     {
         $student = $this->student($request);
@@ -87,7 +74,6 @@ class StudentDocumentController extends Controller
         ]);
     }
 
-    // POST /student/documents   (file + document_type): save a file before applying
     public function store(Request $request)
     {
         $student = $this->student($request);
@@ -107,7 +93,6 @@ class StudentDocumentController extends Controller
         ], 201);
     }
 
-    // POST /student/documents/{id}/replace   (file): a newer copy of the same type
     public function replace(Request $request, $id)
     {
         $student = $this->student($request);
@@ -126,8 +111,6 @@ class StudentDocumentController extends Controller
         $document = $this->saveFile($request, $student->id, $type);
         $updated = $this->updateEditableApplications($student->id, $document);
 
-        // Older copies stay in the list as history; submitted applications
-        // keep the file OAS is already reviewing.
         return response()->json([
             'message' => $this->savedMessage($type, $updated),
             'document' => $this->present($document->load(['requirement', 'validationResult', 'application'])),
@@ -135,12 +118,6 @@ class StudentDocumentController extends Controller
         ], 201);
     }
 
-    /*
-    | DELETE /student/documents/{id}
-    | The student removes one of their own files: a file in My Documents, or a file of an application that
-    | is still theirs to change (draft or needs action). A file of a submitted application is kept: it is
-    | part of what the OAS is reviewing. The stored file is removed when no other row still uses it.
-    */
     public function destroy(Request $request, $id)
     {
         $student = $this->student($request);
@@ -150,12 +127,12 @@ class StudentDocumentController extends Controller
             return response()->json(['message' => 'This file is part of an application you already submitted, so the OAS keeps it. Contact the OAS if it is wrong.'], 422);
         }
         if ($document->status === 'processing') {
-            \App\Support\DocumentChecker::cancel($document);   // the AI check of this file is stopped first
+            \App\Support\DocumentChecker::cancel($document);
         }
 
         $name = $document->original_filename;
         $path = $document->file_path;
-        $document->delete();   // its AI result goes with it
+        $document->delete();
         if ($path) {
             Document::deleteFileIfUnused($path);
         }
@@ -179,11 +156,6 @@ class StudentDocumentController extends Controller
         ]);
     }
 
-    /*
-    | The new file also replaces this type in the student's applications that
-    | can still change (draft or needs action). Submitted ones are left alone.
-    | Returns the names of the scholarships that were updated.
-    */
     private function updateEditableApplications(int $studentId, Document $source): array
     {
         $updated = [];

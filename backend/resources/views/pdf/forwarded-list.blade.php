@@ -1,4 +1,3 @@
-{{-- Forwarded to Agency as a PDF (dompdf: tables and simple CSS only). A plain list, not an agency form. --}}
 <!doctype html>
 <html>
 <head>

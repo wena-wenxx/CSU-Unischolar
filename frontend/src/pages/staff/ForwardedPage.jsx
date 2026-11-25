@@ -17,14 +17,6 @@ import { matchesWords, searchWords } from "../../lib/search";
 import { byLastName, lastFirst, programTabs } from "../../lib/programs";
 import Modal from "../../components/Modal";
 
-/*
-  Forwarded to Agency (staff): every application OAS has sent to an agency
-  (status "complete") and is still waiting for the agency's answer.
-  Export the list per program (Excel, PDF or CSV) to send to the agency. When the agency answers,
-  record it in Approved Lists (or per application in Applications).
-  The CSV is a plain list of the student details OAS keeps; it is NOT any
-  agency's official template.
-*/
 const stamp = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -34,11 +26,10 @@ export default function ForwardedPage() {
   const [rows, setRows] = useState(null);
   const [programId, setProgramId] = useState("all");
   const [query, setQuery] = useState("");
-  const [picked, setPicked] = useState([]); // application ids
-  const [sending, setSending] = useState(null); // "record" | "zip" | null
-  const [programs2, setPrograms2] = useState([]); // scholarships with their requirements (for the ZIP)
+  const [picked, setPicked] = useState([]);
+  const [sending, setSending] = useState(null);
+  const [programs2, setPrograms2] = useState([]);
 
-  // .then() (not await) so React's lint rule sees the state is set later.
   const load = useCallback(
     () =>
       api
@@ -76,12 +67,10 @@ export default function ForwardedPage() {
   });
   const tabs = programTabs(searched, (a) => a.scholarship);
   const active = tabs.some((tab) => tab.key === programId) ? programId : "all";
-  // A to Z by surname on every tab (the "Days waiting" column still shows long waits in orange).
   const shown = searched
     .filter((a) => active === "all" || String(a.scholarship_id) === active)
     .sort((a, b) => byLastName(a.student, b.student));
 
-  // Long lists: 25 rows first, then Show more (resets on another tab or search).
   const page = usePaged(shown, `${active}|${shown.length}|${shown[0]?.id}`);
 
   if (!rows) return <Loading />;
@@ -119,7 +108,6 @@ export default function ForwardedPage() {
     if (!ok) toast.info("Nothing to export.");
   }
 
-  // Excel and PDF are made by the server (same details as the CSV).
   async function exportFile(format) {
     const program = programs.find((p) => String(p?.id) === active);
     try {
@@ -171,7 +159,6 @@ export default function ForwardedPage() {
           </span>
         </div>
 
-        {/* Sending to the agency: one date for the whole list, and the supporting documents only if the agency asks */}
         <div className="button-row selection-bar">
           <span className="muted small">{picked.length} selected</span>
           <button
@@ -287,8 +274,6 @@ export default function ForwardedPage() {
   );
 }
 
-
-// "Record as sent to agency": one date (and how it was sent) for every selected application.
 function RecordSentModal({ rows, onClose, onDone }) {
   const toast = useToast();
   const confirm = useConfirm();
@@ -373,7 +358,6 @@ function RecordSentModal({ rows, onClose, onDone }) {
   );
 }
 
-// Supporting documents as a ZIP: only the document types the agency asked for.
 function DocumentsZipModal({ rows, programs, onClose }) {
   const toast = useToast();
   const programIds = [...new Set(rows.map((a) => a.scholarship_id))];

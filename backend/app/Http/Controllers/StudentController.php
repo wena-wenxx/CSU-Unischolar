@@ -34,15 +34,6 @@ class StudentController extends Controller
         return $student;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | STUDENT - MY PROFILE
-    |--------------------------------------------------------------------------
-    | Returns the logged-in user with their student profile attached.
-    | The frontend reads profile.email and profile.student.*
-    | Students also get their current (active) scholarship, if any.
-    */
-
     public function profile(Request $request)
     {
         $user = $request->user()->load('student');
@@ -54,7 +45,6 @@ class StudentController extends Controller
         }
 
         if ($user->role === 'student') {
-            // Scholarships from outside parties (LGU, foundations) read from OAS lists.
             $user->setAttribute(
                 'external_scholarships',
                 ExternalGrantee::activeFor($user->student->id)
@@ -76,16 +66,6 @@ class StudentController extends Controller
         return response()->json($user);
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | STUDENT - UPDATE CONTACT NUMBER
-    |--------------------------------------------------------------------------
-    | The only field a student may change. Name, student ID, course,
-    | year level and college come from the Registrar (see change requests).
-    | The e-mail is the login account and is managed by the university.
-    */
-
     public function updateProfile(Request $request)
     {
         $student = $this->student($request);
@@ -104,16 +84,6 @@ class StudentController extends Controller
             'student' => $student->fresh(),
         ]);
     }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | STUDENT - GWA AND FAMILY INCOME (scholarship matching)
-    |--------------------------------------------------------------------------
-    | PATCH /profile/eligibility   Body: gwa (1.00-5.00), family_income (pesos)
-    | Used by AI Recommendations. Changing them removes the OAS verification
-    | until OAS checks them again against the Grades and the Parents' ITR.
-    */
 
     public function updateEligibility(Request $request)
     {
@@ -150,15 +120,6 @@ class StudentController extends Controller
         ]);
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | STUDENT - MY SCHOLARSHIP HISTORY
-    |--------------------------------------------------------------------------
-    | Every scholarship this student has been tagged as a grantee for
-    | (active, completed or inactive), newest first, with payroll entries.
-    */
-
     public function history(Request $request)
     {
         $student = $this->student($request);
@@ -174,39 +135,26 @@ class StudentController extends Controller
         return response()->json($records);
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | STUDENT - NOTIFICATIONS
-    |--------------------------------------------------------------------------
-    | Status changes on the student's own applications, newest first.
-    | read_at is set when the student opens the list.
-    */
-
     public function notifications(Request $request)
     {
         $student = $this->student($request);
 
         $logs = ApplicationStatusLog::with('application.scholarship:id,name')
             ->whereHas('application', fn ($q) => $q->where('student_id', $student->id))
-            // A draft the student made is not news; a draft OAS started for them is.
             ->where(fn ($q) => $q->where('to_status', '!=', 'draft')->orWhere('changed_by', '!=', $request->user()->id))
             ->latest()
             ->latest('id')
             ->limit(20)
             ->get();
 
-        // Replies from OAS to the student's Contact OAS messages, not yet seen.
         $replies = \App\Models\ContactMessage::where('student_id', $student->id)
             ->whereNotNull('replied_at')
             ->whereNull('reply_read_at')
             ->count();
 
-        // "You may be eligible" invitations from OAS (AI Recommendations), last 60 days.
         $invitations = AiRecommendation::with('scholarship:id,name')
             ->where('student_id', $student->id)
             ->where('staff_status', 'invited')
-            // invitations saved as a personal notice are listed once, under opportunities
             ->whereNotIn('id', ScholarshipNotification::where('student_id', $student->id)->whereNotNull('ai_recommendation_id')->select('ai_recommendation_id'))
             ->where('invited_at', '>=', now()->subDays(60))
             ->latest('invited_at')
@@ -253,13 +201,6 @@ class StudentController extends Controller
         return response()->json(['message' => 'Notifications marked as read.']);
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | STUDENT - REQUEST A CORRECTION OF REGISTRAR INFORMATION
-    |--------------------------------------------------------------------------
-    */
-
     public function changeRequests(Request $request)
     {
         $student = $this->student($request);
@@ -303,29 +244,15 @@ class StudentController extends Controller
         ], 201);
     }
 
-    /*
-    | GET /student/matches
-    | "Scholarships that fit you": programs whose rules the student meets
-    | (or that only need their GWA / income), with what is left to do.
-    | Only programs students can see now; failed rules, programs already
-    | applied for and matches OAS marked wrong are left out. No percentage
-    | is shown to students: it could be read as a chance of approval.
-    */
     public function matches(Request $request)
     {
         $student = $this->student($request);
-        // Rules are re-scored every time (fast, no AI). The AI field fit is asked again only when it is older than
-        // 10 minutes: uploads and profile changes already refresh it, and "php artisan serve" answers one request
-        // at a time, so waiting for the AI here held up every other request of the dashboard.
-        // The attempt is remembered too, so a slow or stopped AI service is not asked again on every page.
         $fitIsFresh = ProgramFit::where('student_id', $student->id)->where('computed_at', '>=', now()->subMinutes(10))->exists()
             || !\Illuminate\Support\Facades\Cache::add("fit_tried:{$student->id}", 1, 600);
         EligibilityEngine::recalculate([$student->id], !$fitIsFresh);
 
         $fits = ProgramFit::where('student_id', $student->id)->get()->keyBy('scholarship_id');
 
-        // Newest copy of each document type that is inside an application already sent to OAS:
-        // the student cannot check it again (OAS does), so the to-do says "OAS will check it".
         $sentToOas = Document::with('application:id,status')
             ->where('student_id', $student->id)
             ->orderBy('created_at')
@@ -366,14 +293,12 @@ class StudentController extends Controller
             })
             ->sortBy([
                 fn ($a, $b) => ['ready' => 0, 'almost' => 1, 'need_info' => 2][$a['status']] <=> ['ready' => 0, 'almost' => 1, 'need_info' => 2][$b['status']],
-                // AI field fit: programs for the student's field first (then open-to-all, then others).
                 fn ($a, $b) => (['high' => 0, 'medium' => 1, 'any' => 2][$a['fit']['level'] ?? ''] ?? 3) <=> (['high' => 0, 'medium' => 1, 'any' => 2][$b['fit']['level'] ?? ''] ?? 3),
                 fn ($a, $b) => $a['to_do_count'] <=> $b['to_do_count'],
                 fn ($a, $b) => strcmp((string) $a['deadline'] ?: '9999', (string) $b['deadline'] ?: '9999'),
             ])
             ->values();
 
-        // Programs the student applies for at the agency (no rules here), that match their field.
         $listed = $rows->pluck('scholarship_id')->all();
         $applied = $student->applications()->pluck('scholarship_id')->all();
         $alsoFits = $fits->filter(fn ($f) => $f->level === 'high' && !in_array($f->scholarship_id, $listed, true) && !in_array($f->scholarship_id, $applied, true))
@@ -392,11 +317,6 @@ class StudentController extends Controller
         ]);
     }
 
-    /*
-    | PATCH /profile/interests  Body: interests (optional, max 300)
-    | "My field and goals": helps the AI find scholarships for the student's field.
-    | It never affects eligibility.
-    */
     public function updateInterests(Request $request)
     {
         $student = $this->student($request);

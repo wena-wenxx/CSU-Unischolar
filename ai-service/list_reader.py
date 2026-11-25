@@ -1,37 +1,3 @@
-"""
-External grantee lists (ASSISTIVE ONLY).
-
-Reads a list of scholarship grantees that an outside party (LGU, CHED,
-private foundation) gave the OAS, and suggests which student in
-ScholarGuide each line belongs to. OAS staff confirm or correct every
-suggestion before anything is saved.
-
-    read_table(path, filename)    -> rows of cells, whatever the file type
-        .csv         Python's csv module
-        .xlsx        openpyxl (every sheet)
-        .docx        python-docx (tables; otherwise one row per paragraph)
-        .pdf         PyMuPDF words, put back into rows and columns by their
-                     position on the page; a scanned page (no text) goes
-                     through PaddleOCR and is put back the same way
-        .png / .jpg  PaddleOCR
-    parse_records(rows)           -> one record per grantee: name + Student ID
-    match_records(records, students, threshold)
-                                  -> matched / check / unmatched / error,
-                                     with the best candidates for staff
-
-Matching rules (thresholds are 0-100 RapidFuzz scores):
-    1. Student ID found in ScholarGuide -> that student, if the name on the
-       line is similar enough (>= ID_NAME_MIN) or there is no name.
-       ID found but the name looks different -> "check" (staff decide).
-    2. No usable Student ID -> fuzzy name match (token_sort_ratio, so
-       "DELA CRUZ, JUAN M." and "Juan M. Dela Cruz" are the same).
-       best >= threshold (default 80) and clearly ahead of the 2nd best
-       -> "matched"; two students almost equally close -> "check".
-       If the line HAD a Student ID that is not in ScholarGuide, a name
-       match is only a "check", never "matched".
-    3. Nothing close enough -> "unmatched" (with suggestions >= SUGGEST_MIN).
-    4. No name and no Student ID could be read -> "error".
-"""
 import csv
 import os
 import re
@@ -43,14 +9,13 @@ from datetime import datetime
 
 from rapidfuzz import fuzz
 
-ID_NAME_MIN = 60      # Student ID found: the name must be at least this similar
-SUGGEST_MIN = 60      # candidates shown to staff for unmatched / check rows
-AMBIGUOUS_GAP = 3     # best and 2nd-best names closer than this -> "check"
+ID_NAME_MIN = 60
+SUGGEST_MIN = 60
+AMBIGUOUS_GAP = 3
 MAX_ROWS = 5000
 
 LIST_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".csv", ".png", ".jpg", ".jpeg"}
 
-# CSU-style IDs: 221-00001, 2024-10123 (spaces around the dash are tolerated).
 ID_RE = re.compile(r"(?<![\d-])(\d{2,4})\s?-\s?(\d{4,6})(?![\d-])")
 
 HEADER_PATTERNS = {
@@ -73,8 +38,6 @@ HEADER_PATTERNS = {
     "batch": re.compile(r"^(tes\s*batch|batch)$", re.I),
 }
 
-# Government forms are configured here so another form can be added without
-# changing the PDF reader's control flow.
 FORM_TEMPLATES = {
     "tes_continuing_form_2_annex_2": {
         "labels": (
@@ -117,7 +80,6 @@ _TES_FOOTER_TOTAL_RE = re.compile(
 
 
 def bad_text_layer(words):
-    """Return True when embedded PDF text looks like low-quality OCR."""
     texts = [str(w[4] if len(w) > 4 else w).strip() for w in words if str(w[4] if len(w) > 4 else w).strip()]
     joined = " ".join(texts)
     if "\ufffd" in joined or "�" in joined:
@@ -140,7 +102,6 @@ is_bad_text_layer = bad_text_layer
 
 
 def classify_page(text, rows=None):
-    """Classify a page before rows are admitted to the table."""
     text = _clean(text).lower()
     rows = rows or []
     if any(_find_header(row) for row in rows) or re.search(r"\b\d{5}\b", text):
@@ -155,7 +116,6 @@ def classify_page(text, rows=None):
 
 
 def detect_form_template(text, rows=None):
-    """Return a configured form name when its identifying labels are present."""
     haystack = " ".join([text or ""] + [" ".join(row) for row in (rows or [])]).lower()
     for name, template in FORM_TEMPLATES.items():
         if sum(label in haystack for label in template["labels"]) >= 1:
@@ -164,7 +124,6 @@ def detect_form_template(text, rows=None):
 
 
 def extract_metadata(text, template=None):
-    """Extract review-only metadata; missing values remain None."""
     source = text or ""
     date_value = None
     date_match = _DATE_RE.search(source)
@@ -197,7 +156,6 @@ def extract_metadata(text, template=None):
 
 
 def validate_document_rows(rows, metadata=None, template=None):
-    """Return non-blocking document checks and per-row confidence."""
     metadata = metadata or {}
     warnings = []
     if template == "tes_continuing_form_2_annex_2":
@@ -296,7 +254,6 @@ def validate_document_rows(rows, metadata=None, template=None):
 
 
 def _merge_template_rows(rows, template):
-    """Keep data rows and join wrapped cells for a configured form."""
     config = FORM_TEMPLATES.get(template)
     if not config:
         return rows
@@ -310,22 +267,18 @@ def _merge_template_rows(rows, template):
             merged[-1].extend(cell for cell in row if cell)
     return merged
 
-# Cells that are clearly not a person's name (when there is no header row).
 NOT_A_NAME = re.compile(
     r"\b(bachelor|bs[a-z]{0,4}|ab|college|university|department|year|sem(ester)?|course|program|"
     r"scholarship|grantee|list|total|page|republic|province|city|municipal|office|approved|amount|php|"
     r"no\.|number|date|signature|remarks|status|information|technology|science|sciences|education|"
     r"engineering|nursing|agriculture|forestry|accountancy|management|administration|arts|major)\b", re.I)
 
-
-# --------------------------------------------------------------------- reading
-
 def _clean(value) -> str:
     if value is None:
         return ""
     if isinstance(value, float) and value.is_integer():
         value = int(value)
-    if hasattr(value, "strftime"):          # Excel date -> 2026-10-22 (time only when there is one)
+    if hasattr(value, "strftime"):
         value = value.strftime("%Y-%m-%d %H:%M" if getattr(value, "hour", 0) or getattr(value, "minute", 0) else "%Y-%m-%d")
     return re.sub(r"\s+", " ", str(value)).strip()
 
@@ -350,11 +303,10 @@ def _read_csv(path):
 def _read_xlsx(path):
     try:
         from openpyxl import load_workbook
-    except ImportError:          # library not installed: use the built-in reader
+    except ImportError:
         return _read_xlsx_builtin(path)
 
     try:
-        # read_only=False: some files (Google Sheets, older tools) give wrong sizes in read-only mode.
         book = load_workbook(path, data_only=True)
     except zipfile.BadZipFile:
         raise ValueError("This is not a real .xlsx file (maybe an old .xls that was renamed). "
@@ -368,9 +320,6 @@ def _read_xlsx(path):
         book.close()
     return rows
 
-
-# Built-in readers (Python standard library only): a .xlsx / .docx file is a zip
-# folder of XML files. Used when openpyxl / python-docx are not installed.
 _X = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 _W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 _R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
@@ -455,7 +404,7 @@ def _read_xlsx_builtin(path):
                             elif number.is_integer():
                                 value = str(int(number))
                             else:
-                                value = repr(number)        # "32.200000000000003" -> "32.2"
+                                value = repr(number)
                         except ValueError:
                             pass
                     col = _column(c.get("r"))
@@ -506,7 +455,6 @@ def _read_docx_builtin(path):
 
 
 def _split_line(text):
-    """A text line -> cells (tabs, or two or more spaces, separate columns)."""
     parts = [p.strip() for p in re.split(r"\t|\s{2,}|\s\|\s", text) if p.strip()]
     return parts or [text.strip()]
 
@@ -514,7 +462,7 @@ def _split_line(text):
 def _read_docx(path):
     try:
         import docx
-    except ImportError:          # library not installed: use the built-in reader
+    except ImportError:
         return _read_docx_builtin(path)
 
     try:
@@ -526,7 +474,7 @@ def _read_docx(path):
     for table in document.tables:
         for row in table.rows:
             cells = []
-            for cell in row.cells:   # merged cells repeat: keep one copy
+            for cell in row.cells:
                 text = _clean(cell.text)
                 if not cells or cells[-1] != text:
                     cells.append(text)
@@ -540,14 +488,6 @@ def _read_docx(path):
 
 
 def group_boxes(boxes, with_positions=False):
-    """
-    Words with their position -> rows of cells.
-    boxes: [(x0, y0, x1, y1, text), ...]  (PDF words or OCR text boxes)
-    Words whose vertical centres are close form one row; inside a row, a gap
-    wider than about one letter height starts a new cell (a new column).
-    with_positions=True also returns where each cell starts and ends
-    ([[(x0, x1), ...], ...]), used to put cells under the right header.
-    """
     boxes = [b for b in boxes if str(b[4]).strip()]
     if not boxes:
         return ([], []) if with_positions else []
@@ -584,12 +524,10 @@ def group_boxes(boxes, with_positions=False):
 
 
 def ocr_boxes(image_path):
-    """PaddleOCR text boxes [(x0, y0, x1, y1, text)] (2.x and 3.x result formats)."""
-    import ocr_engine  # loaded only when needed (PaddleOCR is slow to start)
+    import ocr_engine
 
     ocr = ocr_engine.get_ocr()
     if ocr is None:
-        # Tesseract (if installed) is the second choice, so scans can still be read.
         try:
             import ruled_table
             return [b[:5] for b in ruled_table._tesseract_boxes(image_path)]
@@ -605,7 +543,7 @@ def ocr_boxes(image_path):
         if page is None:
             continue
         texts = polys = None
-        try:  # 3.x
+        try:
             texts = list(page["rec_texts"])
             polys = page.get("rec_boxes") if hasattr(page, "get") else page["rec_boxes"]
         except Exception:
@@ -619,7 +557,7 @@ def ocr_boxes(image_path):
                 b = [float(v) for v in list(box)[:4]]
                 boxes.append((b[0], b[1], b[2], b[3], text))
             continue
-        if isinstance(page, list):  # 2.x: [[points, (text, score)], ...]
+        if isinstance(page, list):
             for line in page:
                 try:
                     points, (text, _score) = line[0], line[1]
@@ -632,7 +570,6 @@ def ocr_boxes(image_path):
 
 
 def _parse_general_payroll(text):
-    """Extract structured rows from the General Form No. 6-A payroll layout."""
     header = [
         "Sheet",
         "ATM Status",
@@ -749,13 +686,6 @@ def _merge_close(values, gap=3.0):
 
 
 def _tes_rows_from_vector_table(path):
-    """
-    TES billing list saved as a clear PDF (e.g. exported from Excel): the table has drawn lines and
-    real text. Each word is put in the cell its position falls in (16 columns between the vertical
-    lines, one row between two horizontal lines), so wrapped cells (a Student Number or award number
-    on two lines) stay together. Returns [] when the PDF has no such table (the caller then reads the
-    text line by line).
-    """
     try:
         import pymupdf as fitz
     except ImportError:
@@ -794,7 +724,6 @@ def _tes_rows_from_vector_table(path):
             for r in sorted(cells):
                 values = []
                 for c in range(16):
-                    # words on the same line (tops within 3 points; Ñ is taller) left to right, then the next line
                     lines = []
                     for y, x, w in sorted(cells[r].get(c, [])):
                         if lines and abs(y - lines[-1][0]) <= 3:
@@ -802,7 +731,6 @@ def _tes_rows_from_vector_table(path):
                         else:
                             lines.append((y, [(x, w)]))
                     text = " ".join(w for _y, line in lines for _x, w in sorted(line))
-                    # pieces of one value broken over two lines: "2026-" + "00001", "TES-2099..-" + "...".
                     text = re.sub(r"-\s+(?=[0-9A-Z])", "-", text)
                     values.append(text.strip())
                 if re.fullmatch(r"\d{5}", values[0]):
@@ -811,7 +739,6 @@ def _tes_rows_from_vector_table(path):
 
 
 def _parse_tes_continuing(text):
-    """Parse TES Continuing Form 2 - Annex 2 rows into named 16-column fields."""
     header = [
         "Control Number", "Student Number", "TES Award Number", "Last Name",
         "Given Name", "Middle Initial", "Sex at Birth", "Birthdate",
@@ -925,7 +852,6 @@ def _parse_tes_continuing(text):
 
 
 def _tes_layout_rows(page):
-    """Rebuild real TES raster-table rows from positioned PDF text."""
     width = float(page.rect.width)
     words = page.get_text("words")
     controls = []
@@ -998,7 +924,6 @@ def _tes_layout_rows(page):
         else:
             award = ""
 
-        # Only an amount that was really read is kept (never a guessed "10,000.00").
         amount = re.sub(r"\s+", "", values["amount"]).replace("O", "0").replace("o", "0")
         amount = re.sub(r"[^0-9,.]", "", amount)
         amount = amount if re.fullmatch(r"\d{1,3}(?:,\d{3})*\.\d{2}", amount) else ""
@@ -1038,17 +963,15 @@ def _tes_layout_rows(page):
 def _read_pdf(path):
     try:
         import pymupdf as fitz
-    except ImportError:  # older PyMuPDF
+    except ImportError:
         import fitz
 
     rows, layout, used_ocr, page_texts = [], [], False, []
     tes_layout_rows = []
-    # How each page was read: "text" (the PDF's own text layer), "ocr", "text-no-ocr" (scanned, but
-    # OCR is not installed, so the weak text layer was used) or "skipped" (instructions, totals, signatures).
     page_methods = []
     with fitz.open(path) as doc:
         for page_number, page in enumerate(doc, start=1):
-            words = page.get_text("words")  # (x0, y0, x1, y1, word, block, line, word_no)
+            words = page.get_text("words")
             embedded = " ".join(w[4] for w in words)
             structured_text = page.get_text("text").strip()
             use_ocr = bad_text_layer(words)
@@ -1071,7 +994,6 @@ def _read_pdf(path):
                 page_rows, page_layout = group_boxes([(w[0], w[1], w[2], w[3], w[4]) for w in words], True)
                 page_methods.append({"page": page_number, "method": "text"})
             else:
-                # Render suspicious layers as well as truly scanned pages.
                 pix = page.get_pixmap(dpi=200)
                 with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
                     tmp_path = tmp.name
@@ -1084,8 +1006,6 @@ def _read_pdf(path):
                         used_ocr = True
                         page_methods.append({"page": page_number, "method": "ocr"})
                     except (ImportError, RuntimeError):
-                        # Keep the embedded layer as a best-effort fallback when
-                        # the optional offline OCR package is not installed.
                         page_rows, page_layout = group_boxes(
                             [(w[0], w[1], w[2], w[3], w[4]) for w in words], True)
                         page_methods.append({"page": page_number, "method": "text-no-ocr"})
@@ -1118,8 +1038,6 @@ def _read_pdf(path):
                     *unique,
                 ]
             else:
-                # A clear (digital) PDF with real text: read the table by its drawn lines;
-                # otherwise fall back to reading the text line by line.
                 rows = _tes_rows_from_vector_table(path) or _parse_tes_continuing(text)
             printed_total = None
             totals = re.findall(r"\b\d{1,3}(?:,\d{3})*\.\d{2}\b", text)
@@ -1149,7 +1067,7 @@ def _read_pdf(path):
                 if len(row) > 12 and not row[12]:
                     row[12] = batch_number
     if metadata.get("batch"):
-        metadata["batch"] = re.sub(r"\s+", " ", str(metadata["batch"])).strip()     # "Batch\n2" -> "Batch 2"
+        metadata["batch"] = re.sub(r"\s+", " ", str(metadata["batch"])).strip()
     if template in ("general_payroll", "tes_continuing_form_2_annex_2"):
         metadata["printed_total"] = printed_total or None
     checks = validate_document_rows(rows, metadata, template)
@@ -1160,7 +1078,6 @@ def _read_pdf(path):
 
 
 def _scanned_ruled_form(path):
-    """The name of a known ruled form (RULED_TEMPLATES) when the PDF is a scan of it, else None."""
     try:
         import pymupdf as fitz
     except ImportError:
@@ -1177,7 +1094,7 @@ def _scanned_ruled_form(path):
             if len(page.get_images(full=True)) >= 1 and (bad_text_layer(words) or len(words) < 20):
                 scanned = True
             elif len(page.get_images(full=True)) == 1 and float(page.rect.width) >= 700:
-                scanned = True       # one full-page picture with a hidden OCR layer
+                scanned = True
     joined = " ".join(text).lower()
     for name, template in ruled_table.RULED_TEMPLATES.items():
         hits = sum(label in joined for label in template["labels"])
@@ -1185,19 +1102,17 @@ def _scanned_ruled_form(path):
         if scanned and (hits or awards >= 3):
             return name
     if scanned:
-        # The scanner's hidden text can be too garbled to find the title: look at the table lines instead.
         return _ruled_by_lines(path)
     return None
 
 
 def _ruled_by_lines(path):
-    """The known form whose column lines match a page of this PDF (looked at in a small picture), else None."""
     try:
         import pymupdf as fitz
     except ImportError:
         import fitz
     try:
-        import cv2  # comes with PaddleOCR (opencv); without it this look is skipped
+        import cv2
     except ImportError:
         return None
     import ruled_table
@@ -1221,7 +1136,6 @@ def _ruled_by_lines(path):
 
 
 def _read_ruled(path, template):
-    """Scanned CHED form -> the same shape as read_table(), plus per-cell flags. None if no OCR engine."""
     import ruled_table
 
     if not ruled_table.ocr_engines_available():
@@ -1250,7 +1164,6 @@ def _shape_ruled(doc, template):
 
 
 def _is_scanned_pdf(path):
-    """True when the PDF's pages are pictures (no text, or only a scanner's unreliable text)."""
     try:
         import pymupdf as fitz
     except ImportError:
@@ -1264,7 +1177,6 @@ def _is_scanned_pdf(path):
 
 
 def _generic_grid(path):
-    """A scanned list printed with table lines (any layout) -> rows by cell, with unsure cells highlighted."""
     import ruled_table
 
     if not ruled_table.ocr_engines_available():
@@ -1276,8 +1188,6 @@ def _generic_grid(path):
     if not doc or len(doc["rows"]) < 2:
         return None
     skipped = doc.get("skipped_pages") or []
-    # Most pages had no table lines the reader could find: reading the words by their position is better
-    # for this file than reading only the few pages with lines (that once gave 9 rows of a 65-row list).
     if skipped and len(skipped) >= doc.get("pages", 0):
         return None
     warnings = ["This is a scan, so it was read with OCR (" + str(doc["engine"]) + ") cell by cell. Highlighted "
@@ -1303,7 +1213,6 @@ def _generic_grid(path):
 
 
 def _ruled_picture(path):
-    """A photo of one page of a known CHED form (its table lines are found) -> ruled reading, else None."""
     import ruled_table
 
     if not ruled_table.ocr_engines_available():
@@ -1314,12 +1223,10 @@ def _ruled_picture(path):
         original = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     except Exception:
         return None
-    # A phone photo can be sideways: try it as it is, then turned a quarter both ways.
     for turn in (None, cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE):
         gray = original if turn is None else cv2.rotate(original, turn)
         _rows, cols, _angle, straight = ruled_table.find_grid(gray)
         for name, template in ruled_table.RULED_TEMPLATES.items():
-            # quick look first: does the picture have this form's column lines? (no OCR yet)
             _spans, hits = ruled_table.fit_columns(cols, template["lines"], straight.shape[1])
             if hits < len(template["lines"]) - 4:
                 continue
@@ -1344,10 +1251,9 @@ def _ruled_picture(path):
 
 
 def read_table(path, filename=""):
-    """Returns {"rows": [[cell, ...]], "method": str, "warnings": [str]}."""
     ext = os.path.splitext(filename or path)[1].lower()
     warnings = []
-    layout = None   # cell positions (PDF and pictures only)
+    layout = None
     metadata = {}
 
     if ext == ".csv":
@@ -1414,15 +1320,11 @@ def read_table(path, filename=""):
         "metadata": {**metadata, **checks},
     }
 
-
-# --------------------------------------------------------------------- parsing
-
 def normalize_id(text):
-    """First Student ID in the text, as 2024-10123. School years (2026-2027) are skipped."""
     for m in ID_RE.finditer(text or ""):
         a, b = m.group(1), m.group(2)
         if len(a) == 4 and len(b) == 4 and int(b) == int(a) + 1:
-            continue  # "AY 2026-2027" is a school year, not a Student ID
+            continue
         return f"{a}-{b}"
     return ""
 
@@ -1435,7 +1337,6 @@ def normalize_name(text):
 
 
 def _find_header(row):
-    """Column positions if this row is a header row, else None."""
     found = {}
     for index, cell in enumerate(row):
         label = re.sub(r"[:\s]+$", "", cell.strip())
@@ -1458,18 +1359,15 @@ def _looks_like_name(cell):
 
 
 def _guess(row):
-    """No header: Student ID = a cell with an ID; name = a cell that looks like a name."""
     student_id = ""
     for cell in row:
         student_id = normalize_id(cell)
         if student_id:
             break
     names = [c for c in row if _looks_like_name(c)]
-    # Prefer a "LAST, FIRST M." cell; otherwise the first name-like cell
-    # (names usually come before the course or the remarks).
     with_comma = [c for c in names if "," in c]
     name = (with_comma or names or [""])[0]
-    if not name:  # one-cell lines like "2024-10123 Dela Cruz, Juan M."
+    if not name:
         joined = " ".join(row)
         rest = ID_RE.sub(" ", joined)
         rest = re.sub(r"^\s*\d+[.)]?\s+", "", rest).strip(" -|")
@@ -1479,8 +1377,6 @@ def _guess(row):
 
 
 def _align(row, spans, header_starts):
-    """PDF / picture row: put each cell under the header column it starts in
-    (an empty cell, e.g. a missing Student ID, would otherwise shift the rest)."""
     cells = [""] * len(header_starts)
     for text, (x0, _x1) in zip(row, spans):
         column = 0
@@ -1492,10 +1388,7 @@ def _align(row, spans, header_starts):
 
 
 def parse_records(rows, layout=None):
-    """Rows of cells -> [{"row", "name", "student_id", "raw", "note"}]."""
     layout = layout or [None] * len(rows)
-    # A header row (Name, Student ID, ...) anywhere in the first 30 rows:
-    # everything above it is a title (agency name, school year, ...).
     header, start, header_starts = None, 0, None
     for index, row in enumerate(rows[:30]):
         found = _find_header(row)
@@ -1514,7 +1407,7 @@ def parse_records(rows, layout=None):
 
         raw = " | ".join(c for c in row if c)
         if header:
-            if _find_header(row):  # the header repeated at the top of the next page
+            if _find_header(row):
                 continue
 
             def get(key):
@@ -1528,7 +1421,6 @@ def parse_records(rows, layout=None):
                 name = f"{last}, {first} {middle}".strip(" ,") if last else f"{first} {middle}".strip()
             student_id = normalize_id(get("student_id")) if "student_id" in header else normalize_id(raw)
             if not name and not student_id:
-                # a blank, total or repeated-title line inside the table
                 if raw and not re.fullmatch(r"[\d\s.|]*", raw):
                     records.append({"row": number, "name": "", "student_id": "", "raw": raw,
                                     "note": "No name and no Student ID could be read in this line."})
@@ -1536,13 +1428,10 @@ def parse_records(rows, layout=None):
         else:
             name, student_id = _guess(row)
             if not name and not student_id:
-                continue  # titles, page numbers, signatures, ... (not a grantee line)
+                continue
 
         records.append({"row": number, "name": name, "student_id": student_id, "raw": raw, "note": ""})
     return records, header is not None
-
-
-# -------------------------------------------------------------------- matching
 
 def _variants(student):
     first = normalize_name(student.get("first_name"))
@@ -1660,12 +1549,6 @@ def extract_and_match(path, filename, students, threshold=80):
 
 
 def table_rows(path, filename):
-    """
-    Any list file -> plain rows of cells, for pages that let staff pick the
-    columns themselves (Approved Lists, Enrollment). For PDFs and pictures,
-    cells are put under the columns of the widest row near the top (the
-    header), so an empty cell does not shift the rest of the row.
-    """
     table = read_table(path, filename)
     if table.get("cells"):
         return {"rows": table["rows"], "cells": table["cells"], "method": table["method"],

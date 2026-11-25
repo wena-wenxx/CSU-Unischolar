@@ -8,13 +8,6 @@ import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 import SentNotices from "./SentNotices";
 
-/*
-  Student Messages (staff).
-  - Student questions: messages students sent from Contact OAS. LEFT = the list of messages (newest first);
-    RIGHT = the conversation you opened: the student's message, the OAS reply, and the reply box.
-  - Invitations sent: one-way notices the OAS sent from AI Recommendations (students cannot answer them here).
-  /staff/messages?open=<id> opens that conversation (used by the staff bell).
-*/
 const TABS = [
   ["open", "Waiting for a reply"],
   ["answered", "Answered"],
@@ -26,15 +19,13 @@ export default function MessagesPage() {
   const toast = useToast();
 
   const location = useLocation();
-  // /staff/messages?open=<id> (from the staff bell) shows that conversation in the "All" tab, so it is never
-  // filtered out. The layout opens the page fresh when the address changes, so reading it once is enough.
   const wantedId = Number(new URLSearchParams(location.search).get("open")) || null;
   const [status, setStatus] = useState(wantedId ? "all" : "open");
   const [query, setQuery] = useState("");
   const [data, setData] = useState(null);
-  const [replies, setReplies] = useState({}); // message id -> reply text
+  const [replies, setReplies] = useState({});
   const [busy, setBusy] = useState(null);
-  const [view, setView] = useState("questions"); // questions | invitations
+  const [view, setView] = useState("questions");
   const [openId, setOpenId] = useState(wantedId);
 
   function fetchMessages(nextStatus = status, q = query) {
@@ -93,7 +84,6 @@ export default function MessagesPage() {
   if (!data) return <Loading />;
 
   const counts = data.counts || {};
-  // The conversation shown on the right: the one picked, else the newest in the list.
   const current = data.messages.find((m) => m.id === openId) || data.messages[0] || null;
 
   return (
@@ -218,7 +208,6 @@ export default function MessagesPage() {
 
 const STATUS_LABEL = { open: "Waiting for a reply", answered: "Answered", closed: "Closed" };
 
-// One conversation: the student's message first, then the OAS reply, then the reply box.
 function Conversation({ item, topics, busy, reply, onReplyChange, onSend, onStatus }) {
   const s = item.student || {};
   return (

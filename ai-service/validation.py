@@ -1,34 +1,12 @@
-"""
-Document validation rules for CSU UniScholar (ASSISTIVE ONLY).
-
-This file never approves or rejects a student. It only produces FLAGS
-that OAS staff then review. All keyword lists and thresholds below are
-STARTING VALUES - to be confirmed/adjusted with real OAS sample documents.
-"""
 import re
 from itertools import combinations
 
 from rapidfuzz import fuzz
 
-# ---- thresholds (0-100) -------------------------------------------------
-NAME_MATCH_MIN = 95       # >= this  -> name matches (95 lets small OCR slips through but not a different surname)
-NAME_SIMILAR_MIN = 75     # between  -> "similar but not exact" -> staff review
-MIN_TEXT_CHARS = 30       # less than this -> document unreadable / empty
+NAME_MATCH_MIN = 95
+NAME_SIMILAR_MIN = 75
+MIN_TEXT_CHARS = 30
 
-# ---- document kinds -> label patterns + words we expect to see ----------
-# (kind, pattern matched against the requirement name, keywords expected in
-#  the document text, does this document normally show the student ID?,
-#  whose name is on it: "full" = the student's full name,
-#                       "surname" = a parent's document, so only the
-#                                   student's SURNAME is expected)
-# Order matters: the first pattern that matches the requirement name wins.
-#
-# Only DISTINCTIVE words are listed. Generic words such as "CERTIFICATE",
-# "PHILIPPINES", "BARANGAY" or "RESIDENT" appear on almost every Philippine
-# certificate, so they would hide a wrong upload (e.g. a COR uploaded as a
-# Birth Certificate). Short words that hide inside longer ones are avoided
-# too ("BIR" is inside "BIRTH"). A document is flagged as "wrong" only when
-# NONE of the keywords for its kind are found.
 DOC_KINDS = [
     ("registration", r"registration|\bcor\b|enrol",
      ["REGISTRATION", "ENROLL", "UNITS", "SUBJECT", "SEMESTER"], True, "full"),
@@ -52,7 +30,6 @@ DOC_KINDS = [
 
 
 def normalize(text: str) -> str:
-    """UPPERCASE, remove punctuation, collapse spaces. 'Navarro, Juan' -> 'NAVARRO JUAN'"""
     text = (text or "").upper()
     text = re.sub(r"[^A-Z0-9\s]", " ", text)
     return re.sub(r"\s+", " ", text).strip()
@@ -62,11 +39,6 @@ FORM_LABELS = {"FIRST", "MIDDLE", "LAST", "NAME", "GIVEN", "SURNAME", "FAMILY"}
 
 
 def _as_initials(candidate: list, expected_words: list) -> list:
-    """
-    A middle INITIAL in the student's record ('GLESLIMIE B BINAG') matches the full middle name on
-    the document ('GLESLIMIE BITON BINAG'): a word starting with that letter becomes the initial.
-    A different middle name ('GLESLIMIE ANA BINAG') is not changed, so it still lowers the score.
-    """
     initials = [w for w in expected_words if len(w) == 1]
     if not initials:
         return candidate
@@ -80,17 +52,7 @@ def _as_initials(candidate: list, expected_words: list) -> list:
 
 
 def best_name_match(expected_name: str, text: str):
-    """
-    Slide a small window of words across the document text and keep the best
-    fuzzy score.
-    - Word order does not matter ('NAVARRO JUAN' == 'JUAN NAVARRO').
-    - A middle name on the document is allowed ('JUAN LOPEZ NAVARRO' still
-      matches 'Juan Navarro'): we also try dropping extra words from the window.
-    Returns (score 0-100, best_window_text).
-    """
     expected = normalize(expected_name)
-    # Form labels between the parts of a name ("NAME (First) MARIA (Middle) CRUZ (Last) SANTOS" on a
-    # PSA birth certificate) and item numbers are skipped, so the name parts sit next to each other.
     words = [w for w in normalize(text).split() if w not in FORM_LABELS and not w.isdigit()]
     if not expected or not words:
         return 0.0, ""
@@ -103,7 +65,6 @@ def best_name_match(expected_name: str, text: str):
             continue
         for i in range(len(words) - size + 1):
             window = words[i:i + size]
-            # all ways to keep k words (in order); if the window is not longer than k, use it whole
             if size > k:
                 candidates = [list(c) for c in combinations(window, k)]
             else:
@@ -116,7 +77,6 @@ def best_name_match(expected_name: str, text: str):
 
 
 def detect_kind(label: str):
-    """Which kind of document does the requirement label describe?"""
     label = (label or "").lower()
     for kind, pattern, keywords, _shows_id, _name in DOC_KINDS:
         if re.search(pattern, label):
@@ -125,12 +85,10 @@ def detect_kind(label: str):
 
 
 def kind_shows_student_id(kind) -> bool:
-    """Only school documents (COR, grades, ID) are expected to show the student ID."""
     return any(k == kind and shows_id for k, _p, _w, shows_id, _n in DOC_KINDS)
 
 
 def kind_name_mode(kind) -> str:
-    """'surname' for a parent's document (e.g. the parents' ITR), else 'full'."""
     for k, _p, _w, _id, mode in DOC_KINDS:
         if k == kind:
             return mode
@@ -138,7 +96,6 @@ def kind_name_mode(kind) -> str:
 
 
 def student_id_found(expected_id: str, text: str) -> bool:
-    """Compare ignoring dashes/spaces: '2026-00101' also matches '202600101'."""
     a = re.sub(r"[^A-Z0-9]", "", (expected_id or "").upper())
     b = re.sub(r"[^A-Z0-9]", "", (text or "").upper())
     return bool(a) and a in b
@@ -150,7 +107,6 @@ DATE_PATTERNS = (
     r"\b\d{1,2}[/-]\d{1,2}[/-]\d{4}\b",
     r"\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b",
     r"\b\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b",
-    # "this 7th day of July, 2022" (barangay, BIR and school certifications)
     r"\b\d{1,2}(?:st|nd|rd|th|[^\s\d]{1,2})?\s+day\s+of\s+(?:January|February|March|April|May|June|July|August|September|October|November|December),?\s+\d{4}\b",
 )
 
@@ -163,7 +119,6 @@ AUTHORITY_PATTERNS = (
 
 
 def extract_structured_fields(text: str, kind: str | None) -> dict:
-    """Best-effort extraction; values remain reviewable and are never used as an approval verdict."""
     source = text or ""
     dates = []
     for pattern in DATE_PATTERNS:
@@ -193,7 +148,6 @@ def extract_structured_fields(text: str, kind: str | None) -> dict:
 
 
 def school_years_in(text: str) -> list:
-    """School years written on a document: '2024-2025', 'AY 2024 - 2025', 'SY 2024-25'. Newest first."""
     found = []
     for a, b in re.findall(r"\b(20\d{2})\s*[-–/]\s*(20\d{2}|\d{2})\b", text or ""):
         a = int(a)
@@ -202,14 +156,10 @@ def school_years_in(text: str) -> list:
             found.append(f"{a}-{b}")
     return sorted(set(found), reverse=True)
 
-
-# A parent's document (BIR certification, ITR) often names the child it was issued for:
-# "... for scholarship purposes of his/her son/daughter GLESLIMIE B. BINAG".
 RELATION_WORDS = {"SON", "DAUGHTER", "CHILD", "GUARDIAN", "HIS", "HER", "OF", "THE", "MY", "AND", "OR"}
 
 
 def child_named_on_parent_document(text: str):
-    """The child's name written on a parent's document, or None. Used to spot a sibling's copy."""
     words = normalize(text).split()
     for i, word in enumerate(words):
         if word not in {"SON", "DAUGHTER", "CHILD", "GUARDIAN"}:
@@ -226,18 +176,12 @@ def child_named_on_parent_document(text: str):
             return " ".join(name)
     return None
 
-
-# On a birth certificate the parents' names come after these words; the child's own name comes first.
 PARENT_PART = re.compile(r"\b(MOTHER|FATHER|MAIDEN\s+NAME|INFORMANT)\b", re.I)
 
 
 def validate_text(text: str, expected_name: str = "", expected_student_id: str = "",
                   document_label: str = "", expected_last_name: str = "",
                   current_school_year: str = "") -> dict:
-    """
-    Turn extracted text into flags. Returns the dict Laravel stores.
-    current_school_year (e.g. "2026-2027"): a COR for another school year is flagged.
-    """
     flags = []
     text = text or ""
     readable = len(text.strip()) >= MIN_TEXT_CHARS
@@ -248,12 +192,10 @@ def validate_text(text: str, expected_name: str = "", expected_student_id: str =
 
     kind, keywords = detect_kind(document_label)
 
-    # 1) readable?
     if not readable:
         has_missing = True
         flags.append("Very little text could be read from this file (blank, unclear or low quality scan).")
 
-    # 2) name check (a parent's document only needs to show the surname)
     name_score, name_window = (None, "")
     surname_only = kind_name_mode(kind) == "surname"
     if surname_only:
@@ -264,7 +206,6 @@ def validate_text(text: str, expected_name: str = "", expected_student_id: str =
     if target.strip() and readable:
         name_score, name_window = best_name_match(target, text)
         if kind == "birth_certificate" and name_score >= NAME_MATCH_MIN:
-            # The name must be in the CHILD's part, not built from the parents' names further down.
             cut = PARENT_PART.search(text)
             if cut and cut.start() > 0:
                 child_score, child_window = best_name_match(target, text[:cut.start()])
@@ -276,8 +217,6 @@ def validate_text(text: str, expected_name: str = "", expected_student_id: str =
             flags.append("The applicant's name was not found as the child's name on this birth certificate "
                          f"(best match {name_score}%); it appears only in the parents' part. Check whose certificate this is.")
         elif surname_only and name_score >= NAME_MATCH_MIN:
-            # The surname is there. If the document also names the child it was issued for, it must be
-            # the applicant (a brother's or sister's copy has the same surname).
             child = child_named_on_parent_document(text)
             if child and best_name_match(expected_name, child)[0] < NAME_SIMILAR_MIN:
                 has_name_mismatch = True
@@ -295,7 +234,6 @@ def validate_text(text: str, expected_name: str = "", expected_student_id: str =
             has_name_mismatch = True
             flags.append(f"Applicant name not found on the document (best match {name_score}%).")
 
-    # 3) student id (only expected on registration / grades / ID documents)
     id_found = None
     if expected_student_id.strip() and readable:
         id_found = student_id_found(expected_student_id, text)
@@ -303,14 +241,12 @@ def validate_text(text: str, expected_name: str = "", expected_student_id: str =
             has_missing = True
             flags.append("Student ID number was not found on the document.")
 
-    # 3b) a COR must be for the current school year
     years = school_years_in(text) if readable else []
     current = (current_school_year or "").strip()
     if kind == "registration" and current and years and current not in years:
         has_missing = True
         flags.append(f"This COR is for school year {years[0]}, not the current {current}. Ask for the current COR.")
 
-    # 4) wrong document?
     hits = []
     if kind is not None and readable:
         norm = normalize(text)

@@ -4,11 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-/*
-| A student asks OAS to correct registrar-owned information
-| (name, student ID, course, year level, college). Students cannot edit
-| those fields themselves; staff mark the request resolved after checking.
-*/
 return new class extends Migration
 {
     public function up(): void

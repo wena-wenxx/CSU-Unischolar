@@ -51,8 +51,6 @@ export default function ScholarshipsPage() {
 
   if (loading) return <Loading />;
 
-  // This school year's application, or an older one that is still being processed (an old finished one
-  // does not stop the student from applying again this year).
   const applicationFor = (scholarshipId) =>
     myApplications.find((a) => a.scholarship_id === scholarshipId && (a.this_school_year || !FINISHED.includes(a.status)));
 
@@ -71,7 +69,6 @@ export default function ScholarshipsPage() {
       .join(" "), words);
   };
   const matchingCategory = inCategory.filter(matchesSearch);
-  // Agency-direct programs are listed once, compactly, under the cards.
   const direct = matchingCategory.filter(isAgencyDirect).sort((a, b) => a.name.localeCompare(b.name));
   const shown = matchingCategory
     .filter((s) => !isAgencyDirect(s))

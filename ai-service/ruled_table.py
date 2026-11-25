@@ -1,29 +1,3 @@
-"""
-Ruled-table reader for scanned government forms (ASSISTIVE ONLY).
-
-Why this exists
----------------
-CHED forms such as the TES Continuing "Consolidated Grantees Details" (the TES billing file) reach OAS as
-SCANS. The scanner often adds its own hidden text layer, and that text is full of mistakes ("lES-" for
-"TES-", "131-" for "231-"). One student also takes several lines (the student number, award number and
-program wrap), and a row can continue on the next page. Reading the text line by line therefore mixes the
-rows up.
-
-What this module does instead
------------------------------
-1. Looks at the PAGE PICTURE, not the hidden text.
-2. Finds the printed table lines (OpenCV), straightens a tilted page, and cuts the table into cells.
-   One student = the space between two horizontal lines, so wrapped lines stay in one row.
-3. Reads the words on the page with OCR (PaddleOCR when installed, otherwise Tesseract when installed;
-   with neither, the PDF's own text is used and every cell is marked for checking) and puts every word into
-   the cell it sits in.
-4. Cleans the fields that have a strict format (control number, Student ID, award number, amounts, sex,
-   year level, PWD, phone, e-mail). Every change is recorded. Names are NEVER corrected.
-5. Joins a row that continues at the top of the next page, and checks the whole file: control numbers in
-   order (a gap means a missing page), duplicates, count and sum against the printed total.
-
-Nothing here approves anybody: the result is a preview that OAS staff check and edit before processing.
-"""
 import os
 import re
 import tempfile
@@ -39,32 +13,25 @@ TES_HEADER = (
     "TES Batch", "TES Amount", "PWD", "TOTAL AMOUNT",
 )
 
-# Layouts this reader knows. Add a new CHED form here (columns in order, header labels, strict fields).
 RULED_TEMPLATES = {
     "tes_continuing_form_2_annex_2": {
         "title": "TES Continuing – Consolidated Grantees Details (TES billing)",
         "labels": ("consolidated continuing tes", "tes billing details", "tes continuing", "tes award number"),
         "columns": TES_COLUMNS,
         "header": TES_HEADER,
-        "key": "control_number",          # a new student row starts where this column has a value
-        # Where the 17 vertical lines of the table sit, from the left border (0) to the right border (1).
-        # Measured on the CHED form; a page whose scan hides some lines is fitted to this pattern.
+        "key": "control_number",
         "lines": (0.0, 0.0453, 0.0894, 0.1666, 0.2552, 0.3300, 0.4080, 0.4447, 0.4868, 0.6042, 0.6337,
                   0.7739, 0.8295, 0.8590, 0.9019, 0.9429, 1.0),
     },
 }
 
-LOW = 0.80   # cells below this confidence are highlighted for staff
+LOW = 0.80
 
 DIGIT_FIX = str.maketrans({"O": "0", "o": "0", "Q": "0", "D": "0", "I": "1", "l": "1", "i": "1", "|": "1",
                            "!": "1", "L": "1", "Z": "2", "z": "2", "S": "5", "s": "5", "B": "8", "G": "6",
                            "b": "6", "g": "9", "q": "9", "T": "7", "A": "4", "€": "6"})
 
-
-# ------------------------------------------------------------------ OCR engines
-
 def _paddle_boxes(image_path):
-    """PaddleOCR words as (x0, y0, x1, y1, text, confidence 0-1)."""
     import ocr_engine
 
     ocr = ocr_engine.get_ocr()
@@ -79,7 +46,7 @@ def _paddle_boxes(image_path):
         if page is None:
             continue
         texts = polys = scores = None
-        try:  # PaddleOCR 3.x
+        try:
             texts = list(page["rec_texts"])
             polys = list(page["rec_boxes"])
             scores = list(page["rec_scores"])
@@ -94,7 +61,7 @@ def _paddle_boxes(image_path):
                 b = [float(v) for v in list(box)[:4]]
                 boxes.append((b[0], b[1], b[2], b[3], str(text), float(score)))
             continue
-        if isinstance(page, list):  # PaddleOCR 2.x: [[points, (text, score)], ...]
+        if isinstance(page, list):
             for line in page:
                 try:
                     points, (text, score) = line[0], line[1]
@@ -140,19 +107,15 @@ def ocr_engines_available():
 
 
 def page_words(image_path, engine=None):
-    """OCR words of a page picture. engine: 'paddleocr', 'tesseract' or None (best available)."""
     order = [engine] if engine else ocr_engines_available()
     errors = []
     for name in order:
         try:
             boxes = _paddle_boxes(image_path) if name == "paddleocr" else _tesseract_boxes(image_path)
             return boxes, name
-        except Exception as exc:  # try the next engine
+        except Exception as exc:
             errors.append(f"{name}: {exc}")
     raise RuntimeError("; ".join(errors) or "no OCR engine is installed (PaddleOCR or Tesseract)")
-
-
-# ------------------------------------------------------------------ table lines
 
 def _cluster(values, gap):
     groups = []
@@ -165,11 +128,6 @@ def _cluster(values, gap):
 
 
 def find_grid(gray):
-    """
-    Printed table lines of a page picture (numpy grayscale).
-    Returns (rows, cols, angle): y positions of horizontal lines, x positions of vertical lines, and the tilt
-    that was corrected (degrees). The returned positions are for the straightened picture.
-    """
     import cv2
     import numpy as np
 
@@ -182,13 +140,12 @@ def find_grid(gray):
         vertical = cv2.dilate(cv2.erode(bw, vk), vk)
         return horizontal, vertical
 
-    # 1. tilt: the median angle of long horizontal lines
     horizontal, _ = masks(gray)
     lines = cv2.HoughLinesP(horizontal, 1, np.pi / 1800, threshold=200,
                             minLineLength=gray.shape[1] // 4, maxLineGap=20)
     angle = 0.0
     if lines is not None:
-        segments = np.asarray(lines).reshape(-1, 4)   # OpenCV 4 gives (N,1,4), OpenCV 5 (N,4)
+        segments = np.asarray(lines).reshape(-1, 4)
         angles = [np.degrees(np.arctan2(y2 - y1, x2 - x1)) for x1, y1, x2, y2 in segments]
         angles = [a for a in angles if abs(a) < 5]
         if angles:
@@ -200,13 +157,10 @@ def find_grid(gray):
     else:
         angle = 0.0
 
-    # 2. lines as peaks of the projections
     horizontal, vertical = masks(gray)
     h, w = gray.shape
     rows = _cluster(list(np.where((horizontal > 0).sum(1) > w * 0.30)[0]), 8)
     if len(rows) >= 2 and rows[-1] - rows[0] > 40:
-        # Column lines are measured only between the first and the last row line, so a short table
-        # (e.g. the last page with two students) still shows its columns.
         band = vertical[rows[0]:rows[-1], :]
         cols = _cluster(list(np.where((band > 0).sum(0) > (rows[-1] - rows[0]) * 0.6)[0]), 8)
     else:
@@ -215,11 +169,6 @@ def find_grid(gray):
 
 
 def fit_columns(found, pattern, width):
-    """
-    Fit the form's known column pattern (0-1) to the vertical lines found on a page.
-    A faint or cut scan can hide some lines, and a double border adds one; fitting a scale and an offset
-    to the lines that ARE found gives every column border. -> (spans, lines matched) or (None, 0).
-    """
     tol = max(6.0, width * 0.004)
     best = (0, None)
     found = sorted(found)
@@ -238,7 +187,6 @@ def fit_columns(found, pattern, width):
     hits, lines = best
     if not lines or hits < 4:
         return None, hits
-    # snap each border to the line actually found next to it
     snapped = []
     for x in lines:
         near = [f for f in found if abs(x - f) <= tol]
@@ -246,18 +194,11 @@ def fit_columns(found, pattern, width):
     snapped[0] = max(0.0, snapped[0])
     return list(zip(snapped, snapped[1:])), hits
 
-
-# ------------------------------------------------------------------ field cleaning
-
 def _digits(text):
     return re.sub(r"\D", "", str(text).translate(DIGIT_FIX))
 
 
 def clean_field(field, raw, ocr_conf=1.0):
-    """
-    -> (value, confidence 0-1, note or "")
-    Strict fields are fixed only when the result has the exact expected shape; the note says what changed.
-    """
     raw = re.sub(r"\s+", " ", str(raw or "")).strip()
     conf = ocr_conf
     note = ""
@@ -277,12 +218,12 @@ def clean_field(field, raw, ocr_conf=1.0):
                 note = "" if value == compact else f"read as '{raw}'"
                 return value, conf if not note else min(conf, 0.85), note
         m = re.search(r"(\d{3,4})\s*[-–—~_ ]\s*(\d{5})", raw.translate(DIGIT_FIX))
-        if m:   # extra marks around the number (a pen tick, a stray letter)
+        if m:
             return f"{m.group(1)}-{m.group(2)}", min(conf, 0.7), f"read as '{raw}'"
         return raw, 0.3, "not in the NNN-NNNNN format" if raw else "missing"
     if field == "award_number":
         compact = re.sub(r"\s", "", raw)
-        compact = re.sub(r"^[^0-9]{1,4}?(?=[-\d])", "TES", compact)       # lES- / rEs- / TE5- -> TES
+        compact = re.sub(r"^[^0-9]{1,4}?(?=[-\d])", "TES", compact)
         parts = [p for p in re.split(r"[-–—~_]+", compact) if p]
         if parts and parts[0].upper() != "TES":
             parts = ["TES"] + parts
@@ -309,7 +250,6 @@ def clean_field(field, raw, ocr_conf=1.0):
         letters = re.sub(r"[^A-Z]", "", raw.upper())
         if letters in ("MALE", "FEMALE", "M", "F"):
             value = {"M": "MALE", "F": "FEMALE"}.get(letters, letters)
-            # a stray mark next to the word (e.g. "]FEMALE" read as "MALE") lowers the trust
             return value, conf if re.fullmatch(r"[A-Za-z]+", raw) else min(conf, 0.7), ""
         if "EMALE" in letters or letters.startswith("FE") or letters.startswith("FM"):
             return "FEMALE", min(conf, 0.6), f"read as '{raw}'"
@@ -344,10 +284,9 @@ def clean_field(field, raw, ocr_conf=1.0):
         return raw, 0.4, "e-mail address unreadable" if raw else ""
     if field == "birthdate":
         return raw, conf if raw else 1.0, ""
-    # names and program: never corrected; only flagged when they look wrong
     value = raw.upper().strip(" ,;:|")
     if field == "program":
-        value = value.rstrip(".")       # a dot from the scan after the last word
+        value = value.rstrip(".")
     bad = re.search(r"[0-9@#$%^&*_=+<>{}\[\]\\|~]", value)
     if field in ("last", "first") and not value:
         return value, 0.3, "missing"
@@ -357,11 +296,7 @@ def clean_field(field, raw, ocr_conf=1.0):
         return value, min(conf, 0.5), "contains characters that are not letters"
     return value, conf, ""
 
-
-# ------------------------------------------------------------------ page -> rows
-
 def _assign(words, row_spans, col_spans):
-    """Put each OCR word in the cell its centre falls into. -> {(r, c): [words]}"""
     cells = {}
     for w in words:
         cx, cy = (w[0] + w[2]) / 2, (w[1] + w[3]) / 2
@@ -384,7 +319,6 @@ def _cell_text(words):
         else:
             lines.append([cy, [w]])
     text_lines = [" ".join(x[4] for x in sorted(line, key=lambda w: w[0])) for _, line in lines]
-    # wrapped pieces of one value: "TES-20240808-" + "172600000000-" + "027269" -> no spaces after '-'
     text = ""
     for part in text_lines:
         if text and (text.endswith("-") or part.startswith("-")):
@@ -396,10 +330,6 @@ def _cell_text(words):
 
 
 def read_page(image_path, template_name, engine=None, words=None, fallback_spans=None):
-    """
-    One page picture -> dict(rows=[{field: (value, conf, note)}], head=row continued from the previous
-    page or None, text=all words outside the table, engine, angle, columns_found).
-    """
     import cv2
 
     template = RULED_TEMPLATES[template_name]
@@ -417,7 +347,7 @@ def read_page(image_path, template_name, engine=None, words=None, fallback_spans
             words, engine = page_words(straight_path, engine)
         else:
             engine = "given"
-            if angle:      # the given words belong to the tilted picture: move them like the picture
+            if angle:
                 import numpy as np
                 hh, ww = gray.shape
                 m = cv2.getRotationMatrix2D((ww / 2, hh / 2), angle, 1.0)
@@ -436,7 +366,6 @@ def read_page(image_path, template_name, engine=None, words=None, fallback_spans
     col_spans, matched = fit_columns(cols_x, template["lines"], w)
     borrowed = False
     if not col_spans and fallback_spans and len(rows_y) >= 2:
-        # e.g. the last page holds only the end of one row and the totals: no column lines to measure.
         col_spans, borrowed = fallback_spans, True
     result = {"rows": [], "head": None, "outside": [], "engine": engine, "angle": round(angle, 2),
               "columns_found": matched, "row_lines": len(rows_y), "col_spans": col_spans, "borrowed": borrowed}
@@ -446,7 +375,6 @@ def read_page(image_path, template_name, engine=None, words=None, fallback_spans
 
     row_spans = list(zip(rows_y, rows_y[1:]))
     typical = statistics.median([b - a for a, b in row_spans]) if row_spans else 0
-    # A faint scan can hide a line between two students: split a row that is two or three rows tall.
     fixed = []
     for a, b in row_spans:
         parts = round((b - a) / typical) if typical else 1
@@ -457,13 +385,10 @@ def read_page(image_path, template_name, engine=None, words=None, fallback_spans
             fixed.append((a, b))
     row_spans = [(a, b) for a, b in fixed if b - a > typical * 0.45]
     top_band = (max(0, rows_y[0] - typical), rows_y[0])
-    # the last row can be cut by the bottom edge of the scan (no line under it)
     bottom_band = (rows_y[-1], min(h, rows_y[-1] + typical))
     spans = [top_band] + row_spans + ([bottom_band] if bottom_band[1] - bottom_band[0] > typical * 0.45 else [])
     cells = _assign(words, spans, col_spans)
 
-    # Words above the first line (band 0) also stay in the "outside" text: on the first page that band holds
-    # titles such as "HEI Campus Name", which the file details are read from.
     if borrowed:
         inside = set()
     else:
@@ -476,30 +401,27 @@ def read_page(image_path, template_name, engine=None, words=None, fallback_spans
             continue
         if any(re.search(r"control\s*number|student\s*number|award\s*number|given\s*name", t, re.I)
                for t, _ in raw.values()):
-            continue      # the header row
-        # strict fields that came out empty or in the wrong shape: read that one cell again, enlarged
+            continue
         for c, field in enumerate(columns):
             text, conf = raw[field]
             if result["engine"] not in ("paddleocr", "tesseract"):
-                break        # words were given (tests): nothing to read again
+                break
             if (field in NEEDED and not text) or (field in STRICT and clean_field(field, text, conf)[1] < LOW):
                 again = _ocr_cell(straight, spans[r], col_spans[c], result["engine"], field)
                 if again and (not text or clean_field(field, again[0], again[1])[1] > clean_field(field, text, conf)[1]):
                     raw[field] = again
         key_text = raw[template["key"]][0]
-        has_key = len(re.sub(r"\D", "", key_text)) >= 3      # a real control number has digits, not "HEI"
+        has_key = len(re.sub(r"\D", "", key_text)) >= 3
         if borrowed and r > 0:
-            break      # columns measured on another page: only the continued row is trusted, nothing else
+            break
         if r == 0:
-            # above the first line: the end of a row that started on the previous page
             if not has_key:
                 if borrowed:
                     raw = {f: (t, min(c, 0.6)) for f, (t, c) in raw.items()}
                 result["head"] = raw
                 continue
             if typical and spans[0][1] - spans[0][0] < typical * 0.8:
-                continue   # a cut-off row at the top edge that has its own control number: not reliable
-        # every ruled row is one student, even when its control number cannot be read
+                continue
         result["rows"].append(raw)
     return result
 
@@ -510,12 +432,28 @@ SINGLE = {"year_level": "0123456789", "batch": "0123456789", "control_number": "
           "pwd": "YESNOyesno"}
 
 
+_TESSERACT_READY = None
+
+
+def _cell_engine(engine):
+    global _TESSERACT_READY
+    if engine != "paddleocr" or os.getenv("OCR_CELL_ENGINE", "auto").lower() == "paddle":
+        return engine
+    if _TESSERACT_READY is None:
+        try:
+            from ocr_engine import _pytesseract
+            _pytesseract().get_tesseract_version()
+            _TESSERACT_READY = True
+        except Exception:
+            _TESSERACT_READY = False
+    return "tesseract" if _TESSERACT_READY else engine
+
+
 def _ocr_cell(gray, row_span, col_span, engine, field=""):
-    """Read one table cell again on its own (enlarged). -> (text, confidence) or None."""
     import cv2
 
-    # a small margin, then any printed border line still in the crop is painted white (lines confuse OCR,
-    # and a wide margin would cut off the first letter of text written close to the line)
+    engine = _cell_engine(engine)
+
     my = min(12, max(6, int((row_span[1] - row_span[0]) * 0.06)))
     mx = min(12, max(8, int((col_span[1] - col_span[0]) * 0.06)))
     y0, y1 = int(row_span[0]) + my, int(row_span[1]) - my
@@ -545,7 +483,6 @@ def _ocr_cell(gray, row_span, col_span, engine, field=""):
                 config = f"--psm 7 -c tessedit_char_whitelist={SINGLE[field]}"
             data = pytesseract.image_to_data(Image.open(path), config=config,
                                              output_type=pytesseract.Output.DICT)
-            # Tesseract gives -1 or 0 when it read a single short word without a score: treat as "unsure"
             boxes = [(data["left"][i], data["top"][i], data["left"][i] + data["width"][i],
                       data["top"][i] + data["height"][i], t,
                       float(data["conf"][i]) / 100 if float(data["conf"][i]) > 0 else 0.6)
@@ -556,12 +493,8 @@ def _ocr_cell(gray, row_span, col_span, engine, field=""):
     finally:
         os.remove(path)
 
-
-# ------------------------------------------------------------------ whole document
-
 def _render_pages(path, dpi=300):
-    """Yield (page number, png path, page text layer) for every page of a PDF, or the picture itself."""
-    if isinstance(path, (list, tuple)):          # several page pictures (photos of each page)
+    if isinstance(path, (list, tuple)):
         for number, item in enumerate(path, start=1):
             yield number, item, ""
         return
@@ -593,7 +526,6 @@ def _money(text):
 
 
 def extract_form_details(text):
-    """Title-page details (review only). Missing values stay None."""
     t = re.sub(r"\s+", " ", text or "")
     details = {"program": None, "batch": None, "semester": None, "academic_year": None, "campus": None,
                "printed_total": None}
@@ -628,13 +560,6 @@ def extract_form_details(text):
 
 
 def read_document(path, template_name="tes_continuing_form_2_annex_2", engine=None, dpi=300, page_words_fn=None):
-    """
-    The whole TES billing file -> {
-        "header": [16 column titles], "rows": [[16 values]], "cells": [[{"conf", "note"}]],
-        "warnings": [...], "metadata": {...}, "engine": "paddleocr" | "tesseract", "pages": [...]
-    }
-    page_words_fn(png_path) -> words is only used by tests.
-    """
     template = RULED_TEMPLATES[template_name]
     columns = template["columns"]
     all_rows, pages, outside_text, engine_used, last_spans = [], [], [], None, None
@@ -648,9 +573,6 @@ def read_document(path, template_name="tes_continuing_form_2_annex_2", engine=No
             last_spans = page["col_spans"]
         continued = False
         if page["head"] and all_rows:
-            # Join the end of a row to the last row of the page before ONLY when that row is really
-            # unfinished (e.g. its award number is cut). If a page is missing, the end belongs to a row
-            # we never saw, and joining it would mix two students.
             prev = all_rows[-1]
             unfinished = [f for f, (t, c) in page["head"].items()
                           if t and clean_field(f, prev[f][0], prev[f][1])[1] < LOW]
@@ -672,7 +594,6 @@ def read_document(path, template_name="tes_continuing_form_2_annex_2", engine=No
         pages.append({"page": number, "rows": len(page["rows"]), "columns_found": page["columns_found"],
                       "tilt_corrected": page["angle"], "continued_row": continued})
 
-    # clean every field
     out_rows, out_cells = [], []
     for raw in all_rows:
         values, info = [], []
@@ -708,9 +629,7 @@ def read_document(path, template_name="tes_continuing_form_2_annex_2", engine=No
 
 
 def _use_whole_file(rows, cells, metadata, columns):
-    """Use what the whole file says to settle single cells. Every change keeps a note for staff."""
     idx = {name: i for i, name in enumerate(columns)}
-    # 1. the amount every grantee gets: a cell that shows exactly that amount is fine
     for key in ("amount", "total_amount"):
         i = idx[key]
         valid = [r[i] for r in rows if re.fullmatch(r"[\d,]+\.\d{2}", r[i])]
@@ -720,7 +639,6 @@ def _use_whole_file(rows, cells, metadata, columns):
                 for r, c in zip(rows, cells):
                     if r[i] == common and c[i]["check"]:
                         c[i].update(conf=0.9, check=False)
-    # 2. the batch is printed in the title
     if metadata.get("batch"):
         i = idx["batch"]
         for r, c in zip(rows, cells):
@@ -729,13 +647,10 @@ def _use_whole_file(rows, cells, metadata, columns):
             elif not r[i]:
                 r[i] = metadata["batch"]
                 c[i].update(conf=0.85, check=False, note="empty on the scan; taken from the title (TES Batch)")
-    # 3. numbers that are built the same way in every row (Student Number "NNN-0NNNN", the award number's
-    #    "TES-20240808-172600000000-" part): a digit that differs from what almost every other row has is
-    #    probably misread, so it is highlighted (not changed).
     for key in ("student_id", "award_number"):
         i = idx[key]
         shape = r"\d{3,4}-\d{5}" if key == "student_id" else r"TES-\d{8}-\d{12}-\d{6}"
-        values = [r[i] for r in rows if re.fullmatch(shape, r[i] or "")]   # only well-formed values vote
+        values = [r[i] for r in rows if re.fullmatch(shape, r[i] or "")]
         if len(values) < 10:
             continue
         width = max(len(v) for v in values)
@@ -743,14 +658,13 @@ def _use_whole_file(rows, cells, metadata, columns):
             chars = [v[pos] for v in values if len(v) > pos]
             common = max(set(chars), key=chars.count)
             if chars.count(common) < len(chars) * 0.85:
-                continue          # this position really varies (e.g. the year part of a Student Number)
+                continue
             for r, c in zip(rows, cells):
                 v = r[i]
                 if v and re.fullmatch(shape, v) and len(v) > pos and v[pos] != common:
                     c[i].update(conf=min(c[i]["conf"], 0.6), check=True,
                                 note=(c[i]["note"] + "; " if c[i]["note"] else "") +
                                 f"character {pos + 1} is '{v[pos]}' but almost every other row has '{common}' here")
-    # 4. a control number between two readable ones that differ by 2
     i = idx["control_number"]
     for k in range(1, len(rows) - 1):
         if not re.fullmatch(r"\d{5}", rows[k][i]):
@@ -763,7 +677,6 @@ def _use_whole_file(rows, cells, metadata, columns):
 
 
 def check_rows(rows, metadata, columns=TES_COLUMNS):
-    """Whole-file checks; warnings only (staff decide)."""
     idx = {name: i for i, name in enumerate(columns)}
     warnings = []
     controls = [r[idx["control_number"]] for r in rows if re.fullmatch(r"\d{5}", r[idx["control_number"]])]
@@ -817,16 +730,7 @@ def check_rows(rows, metadata, columns=TES_COLUMNS):
         metadata["expected_count"] = int(round(printed / per))
     return warnings
 
-
-# ------------------------------------------------------------------ any ruled table (no known form)
-
 def read_generic(path, engine=None, dpi=300, min_rows=2, min_cols=2):
-    """
-    Any scanned list printed as a table with lines (most agency lists are): the cells come from the lines,
-    the words from OCR, and a cell that came out empty or unsure is read again on its own.
-    -> {"rows": [[text]], "cells": [[{conf, note, check}]], "engine": str, "pages": n} or None when no table
-    with lines was found (the caller then falls back to reading words by position).
-    """
     import cv2
 
     all_rows, all_cells, used, pages, width = [], [], None, 0, None
@@ -838,7 +742,7 @@ def read_generic(path, engine=None, dpi=300, min_rows=2, min_cols=2):
         h, w = straight.shape
         col_spans = [(a, b) for a, b in zip(cols_x, cols_x[1:]) if b - a >= max(25, w // 80)]
         if len(rows_y) < min_rows + 1 or len(col_spans) < min_cols:
-            skipped.append(number)   # reported to staff: never dropped silently
+            skipped.append(number)
             continue
         straight_path = png
         if angle:
@@ -872,12 +776,10 @@ def read_generic(path, engine=None, dpi=300, min_rows=2, min_cols=2):
                 per_page[number] = per_page.get(number, 0) + 1
     if not all_rows:
         return None
-    # pages with a different number of columns are padded so every row has the same width
     widest = max(len(r) for r in all_rows)
     for r, c in zip(all_rows, all_cells):
         r.extend([""] * (widest - len(r)))
         c.extend([{"conf": 1.0, "note": "", "check": False}] * (widest - len(c)))
-    # a header repeated on every page is kept only once
     header = [t.lower() for t in all_rows[0]]
     keep = [0] + [i for i in range(1, len(all_rows)) if [t.lower() for t in all_rows[i]] != header]
     return {"rows": [all_rows[i] for i in keep], "cells": [all_cells[i] for i in keep], "engine": used, "pages": pages,

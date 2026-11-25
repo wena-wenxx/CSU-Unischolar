@@ -18,45 +18,20 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-/*
-|--------------------------------------------------------------------------
-| Agency approved lists
-|--------------------------------------------------------------------------
-| After OAS forwards applications, the agency (CHED, DOST, LGU, foundation)
-| sends back the list of students it approved. Staff upload that list as a
-| CSV file; the browser reads it and lets staff say which column holds the
-| Student ID. This controller receives the rows and, for each student:
-|
-|   application found, still in process  -> status "approved" (by the agency)
-|   application already approved         -> nothing changes ("already approved")
-|   no application for this program      -> an approved application is created
-|                                           (remark: "Added from agency list")
-|   student ID not in the system         -> "unmatched"
-|   rejected / draft / other active grant-> "error" with the reason; nothing changes
-|
-| It never creates an ACTIVE scholar record directly: the student still goes
-| through enrollment verification and grantee tagging, as in the OAS workflow.
-*/
 class AgencyListController extends Controller
 {
-    /** Applications approved by this upload (they get an e-mail afterwards). */
     private array $approvedApplications = [];
 
     private ?int $uploadId = null;
 
-    /** Every student (id, Student ID, names), loaded once per upload for lists without Student IDs. */
     private ?\Illuminate\Support\Collection $everyone = null;
 
-    /** The processing batch new applications from this list go into. */
     private ?int $batchId = null;
 
-    /** Staff picked the student themselves for an unmatched row (they confirmed a different name). */
     private bool $skipNameCheck = false;
 
-    /** Student ID (normalized) => "file (date)" of the newest EARLIER list of the program that matched the student. */
     private ?array $earlierLists = null;
 
-    /** " Also on the earlier list X (date)." when an earlier list of this program already had the student. */
     private function earlierListNote(int $scholarshipId, string $schoolId): string
     {
         if ($schoolId === '') {
@@ -127,8 +102,6 @@ class AgencyListController extends Controller
             'rows.*.row' => 'required|integer|min:1',
             'rows.*.student_id' => 'nullable|string|max:50',
             'rows.*.approval_date' => 'nullable|string|max:50',
-            // Amounts read from a scan can be unreadable ("10,0O0.0p"): such a value is kept out of the
-            // award details instead of stopping the whole list.
             'rows.*.amount' => 'nullable',
             'rows.*.control_number' => 'nullable|string|max:50',
             'rows.*.award_number' => 'nullable|string|max:255',
@@ -158,8 +131,6 @@ class AgencyListController extends Controller
         $scholarship = Scholarship::findOrFail($data['scholarship_id']);
         $staffId = $request->user()->id;
 
-        // The processing batch: the one chosen by staff (it must be open and of this program),
-        // otherwise the open batch of this program and period (a new one is made when there is none).
         if (!empty($data['processing_batch_id'])) {
             $batch = ProcessingBatch::find($data['processing_batch_id']);
             if ($batch->scholarship_id !== $scholarship->id) {
@@ -170,7 +141,6 @@ class AgencyListController extends Controller
             }
         }
 
-        // The same list processed twice (same program, file and period, or exactly the same file) is almost always a mistake.
         $earlier = AgencyListUpload::where('scholarship_id', $scholarship->id)
             ->where('file_name', $data['file_name'])
             ->where('school_year', $data['school_year'] ?? null)
@@ -202,7 +172,6 @@ class AgencyListController extends Controller
         $upload = null;
 
         DB::transaction(function () use ($data, $scholarship, $staffId, &$counts, &$details, &$seen, &$upload) {
-            // The upload is saved first so every application can point to the list it came from.
             $upload = AgencyListUpload::create([
                 'scholarship_id' => $scholarship->id,
                 'processing_batch_id' => $this->batchId,
@@ -228,8 +197,6 @@ class AgencyListController extends Controller
 
             foreach ($data['rows'] as $row) {
                 $result = $this->processRow($row, $scholarship, $staffId, $data, $seen);
-                // "check" (Student ID found but the name on the list is different) changes nothing,
-                // so it is counted with the rows that need attention.
                 $counts[$result['result'] === 'check' ? 'error' : $result['result']]++;
                 $details[] = $result;
             }
@@ -273,12 +240,10 @@ class AgencyListController extends Controller
                 $line[$field] = $value;
             }
         }
-        // "2026-00001", "2026 00001" and 202600001 (Excel turns the ID into a number) are the same student.
         $schoolId = EnrollmentList::normalizeId($line['student_id']);
 
         $byName = false;
         if ($schoolId === '') {
-            // No Student ID on the list: only an exact, one-of-a-kind name match is accepted.
             $student = $this->studentByName($row);
             if ($student === false) {
                 return $line + ['result' => 'error', 'note' => 'No Student ID and no name in this row.'];
@@ -307,8 +272,6 @@ class AgencyListController extends Controller
 
         $line['student'] = trim("{$student->first_name} {$student->last_name}");
 
-        // The Student ID matched. If the list also has a name, it must be the same person: a misread or
-        // mistyped ID could otherwise approve the wrong student.
         $nameProblem = $this->skipNameCheck ? null : self::nameDiffers($row, $student);
         if ($nameProblem) {
             return $line + ['result' => 'check', 'note' => $nameProblem.' Nothing was changed: check the Student ID on the list.'];
@@ -322,8 +285,6 @@ class AgencyListController extends Controller
 
         $approvalNote = $this->approvalNote($row['approval_date'] ?? null, $data['agency_name'], $data['file_name']);
 
-        // The application of the list's school year; otherwise one still in process from before;
-        // otherwise the student may already be a grantee of this program (a continuing grantee).
         $year = $data['school_year'] ?? \App\Models\ExternalGrantee::currentSchoolYear();
         $application = Application::where('student_id', $student->id)
             ->where('scholarship_id', $scholarship->id)
@@ -368,7 +329,6 @@ class AgencyListController extends Controller
         }
 
         if ($application->status === 'approved') {
-            // The status stays; a newer list (e.g. the next TES billing batch) still updates the award details.
             if ($award) {
                 $application->update($award);
                 $this->copyToScholarRecord($application, $award);
@@ -400,7 +360,6 @@ class AgencyListController extends Controller
         ApplicationStatusLog::record($application, 'approved', $approvalNote, $staffId, $previous);
         $this->approvedApplications[] = $application;
 
-        // The agency's decision is recorded, but OAS should know when it had not finished its own check.
         $early = in_array($previous, ['submitted', 'under_review', 'needs_action'], true)
             ? " Note: OAS had not finished checking this application's documents (it was {$previous}); check them."
             : '';
@@ -409,7 +368,6 @@ class AgencyListController extends Controller
             .(!empty($line['matched_by']) ? ' Matched by name (no Student ID on the list): check that it is the right student.' : '')];
     }
 
-    /** Approval e-mails go out after the database work is saved. Returns how many did not fail. */
     private function sendApprovalEmails(): int
     {
         $emailed = 0;
@@ -423,10 +381,6 @@ class AgencyListController extends Controller
         return $emailed;
     }
 
-    /*
-    | GET /staff/agency-lists/{id}
-    | One processed list with every row and its result, and the rows still to resolve.
-    */
     public function show(Request $request, $id)
     {
         $this->staffOnly($request);
@@ -437,12 +391,6 @@ class AgencyListController extends Controller
         return response()->json($upload);
     }
 
-    /*
-    | POST /staff/agency-lists/{id}/done   Body: done (true | false), note
-    | "Done processing": staff say they finished this list (rows checked, unmatched rows linked or set
-    | aside). It changes no application and deletes nothing; the list stays open to look at, and it can
-    | be marked not done again. Rows still to resolve need a note.
-    */
     public function markDone(Request $request, $id)
     {
         $this->staffOnly($request);
@@ -471,13 +419,6 @@ class AgencyListController extends Controller
         ]);
     }
 
-    /*
-    | POST /staff/agency-lists/{id}/rows/{row}/link
-    | Body: student_id (the id of a student in the Data Bank), confirm_name (when the names differ)
-    | Staff found the student of an unmatched row (e.g. the list had no or a wrong Student ID).
-    | The row is processed again for that student, exactly as during the upload, and the
-    | row keeps a note of what it was before. Nothing else on the list changes.
-    */
     public function linkRow(Request $request, $id, $row)
     {
         $this->staffOnly($request);
@@ -499,7 +440,6 @@ class AgencyListController extends Controller
         $student = Student::findOrFail($data['student_id']);
         $schoolId = EnrollmentList::normalizeId($student->student_id);
 
-        // The same student must not be on the list twice.
         foreach ($upload->details ?? [] as $other) {
             if (($other['row'] ?? null) !== (int) $row && in_array($other['result'] ?? null, ['approved', 'created', 'already'], true)
                 && EnrollmentList::normalizeId($other['student_id'] ?? '') === $schoolId) {
@@ -540,7 +480,7 @@ class AgencyListController extends Controller
         DB::transaction(function () use ($upload, $input, $listData, $index, $line, $request, &$seen, &$result) {
             $result = $this->processRow($input, $upload->scholarship, $request->user()->id, $listData, $seen);
             if (!in_array($result['result'], ['approved', 'created', 'already'], true)) {
-                return;     // not saved: the reason is shown to staff
+                return;
             }
 
             $details = $upload->details;
@@ -576,11 +516,6 @@ class AgencyListController extends Controller
         ]);
     }
 
-    /*
-    | POST /staff/agency-lists/{id}/rows/{row}/set-aside   Body: note (required)
-    | The row stays as it is (e.g. the student is not a CSU student, or the agency will
-    | correct it), with the reason and who decided. It no longer counts as open.
-    */
     public function setAsideRow(Request $request, $id, $row)
     {
         $this->staffOnly($request);
@@ -612,11 +547,6 @@ class AgencyListController extends Controller
         ]);
     }
 
-    /*
-    | POST /staff/agency-lists/{id}/set-aside   Body: rows [row numbers], note
-    | Several open rows with the SAME reason, in one step (each row keeps the note, who and when).
-    | Rows with different reasons are set aside one by one. Nothing is matched or approved.
-    */
     public function setAsideRows(Request $request, $id)
     {
         $this->staffOnly($request);
@@ -649,11 +579,6 @@ class AgencyListController extends Controller
         ]);
     }
 
-    /*
-    | POST /staff/agency-lists/{id}/rows/{row}/resume
-    | Undo "set aside" when the problem was solved (e.g. the student's ID was corrected): the row is open
-    | again so it can be linked. The earlier note is kept in the row's history.
-    */
     public function resumeRow(Request $request, $id, $row)
     {
         $this->staffOnly($request);
@@ -682,7 +607,6 @@ class AgencyListController extends Controller
         return response()->json(['message' => "Row {$row} is not set aside."], 422);
     }
 
-    /** [index in details, the row] of an open row, or [null, null]. */
     private function openRow(AgencyListUpload $upload, int $row): array
     {
         foreach ($upload->details ?? [] as $index => $line) {
@@ -711,7 +635,6 @@ class AgencyListController extends Controller
         return $text." (list: {$file}).";
     }
 
-    /** Control number, award number, amount and batch from the list row (only the ones that are there). */
     private function awardDetails(array $row): array
     {
         $amount = collect([$row['total_amount'] ?? null, $row['amount'] ?? null])->first(fn ($v) => is_numeric($v));
@@ -724,7 +647,6 @@ class AgencyListController extends Controller
         ], fn ($value) => $value !== null && $value !== '') + ($this->uploadId ? ['agency_list_upload_id' => $this->uploadId] : []);
     }
 
-    /** A student who is already a grantee also gets the new details on the scholar record. */
     private function copyToScholarRecord(Application $application, array $award): void
     {
         $values = array_filter([
@@ -735,8 +657,6 @@ class AgencyListController extends Controller
         ], fn ($value) => $value !== null);
 
         if ($values) {
-            // The scholar record of the application's school year; for a continuing grantee whose
-            // record is of another year, the active record of this program.
             $records = ScholarRecord::where('student_id', $application->student_id)
                 ->where('scholarship_id', $application->scholarship_id);
             $record = (clone $records)->where('school_year', $application->school_year)->first()
@@ -745,16 +665,12 @@ class AgencyListController extends Controller
         }
     }
 
-    /**
-     * null when the name on the list fits the student, otherwise a sentence saying what differs.
-     * Accents, capitals, dots and the order of given names do not matter (ÑUÑEZ = Nunez).
-     */
     public static function nameDiffers(array $row, Student $student): ?string
     {
         $listLast = self::plain($row['last_name'] ?? '');
         $listFirst = self::plain($row['first_name'] ?? '');
         if ($listLast === '' && $listFirst === '') {
-            return null;            // the list has no name: only the Student ID can be checked
+            return null;
         }
 
         $last = self::plain($student->last_name);
@@ -773,10 +689,6 @@ class AgencyListController extends Controller
         return "The Student ID belongs to {$student->first_name} {$student->last_name}, but the list says \"{$onList}\".";
     }
 
-    /**
-     * The one student whose last and first name are exactly the ones on the list (accents, capitals and
-     * dots ignored). null = none or more than one; false = the row has no name.
-     */
     private function studentByName(array $row): Student|false|null
     {
         $last = self::plain($row['last_name'] ?? '');
@@ -784,7 +696,6 @@ class AgencyListController extends Controller
         if ($last === '' || $first === '') {
             return ($last === '' && $first === '') ? false : null;
         }
-        // Loaded once per upload; names are compared without accents (ÑUÑEZ = NUNEZ).
         $this->everyone ??= Student::get(['id', 'student_id', 'first_name', 'last_name']);
         $candidates = $this->everyone
             ->filter(fn (Student $s) => self::plain($s->last_name) === $last

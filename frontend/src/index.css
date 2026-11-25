@@ -1,37 +1,13 @@
 @import "tailwindcss";
 
-/* =========================================================
-   CARAGA STATE UNIVERSITY — ScholarGuide theme
-   All system text uses Segoe UI (Windows), with the phone/Mac system font as fallback.
-
-   SYSTEM VARIABLES (change the look of the whole system here):
-     --primary-color  Deep CSU Forest Green   #004d26
-     --accent-color   Academic Gold           #d4af37
-     --bg-surface     Card background         #ffffff
-     --bg-app         Soft gray background    #f4f6f8
-     --text-main      Dark charcoal text      #111827
-     --radius-system  Card corners            12px
-   Every older --csu-* name below points to these, so all pages follow.
-
-   Accessibility (WCAG AA needs 4.5:1 for normal text):
-     - White on primary green: 10.1:1  ✓
-     - Gold on primary green:   4.8:1  ✓ (sidebar, banners)
-     - Gold text on white:      2.1:1  ✗ -> gold-coloured text on white
-       uses --csu-gold-text (6.0:1); gold stays a border/background there.
-     - White on Emerald 3.6:1 -> success badges use a tint + dark text.
-     - White on Orange 2.9:1  -> orange buttons use dark text.
-========================================================= */
-
 :root {
-  /* ---- System variables ---- */
-  --primary-color: #004d26; /* Deep CSU Forest Green */
-  --accent-color: #d4af37; /* Academic Gold */
-  --bg-surface: #ffffff; /* Card background */
-  --bg-app: #f4f6f8; /* Soft gray system background */
-  --text-main: #111827; /* Dark charcoal for readability */
-  --radius-system: 12px; /* Smooth modern card corners */
+  --primary-color: #004d26;
+  --accent-color: #d4af37;
+  --bg-surface: #ffffff;
+  --bg-app: #f4f6f8;
+  --text-main: #111827;
+  --radius-system: 12px;
 
-  /* Same colours as R, G, B numbers, for see-through layers: rgba(var(--primary-rgb), 0.8) */
   --primary-rgb: 0, 77, 38;
   --primary-dark-rgb: 0, 51, 26;
   --white-rgb: 255, 255, 255;
@@ -40,7 +16,6 @@
   --red-rgb: 192, 57, 43;
   --shadow-rgb: 0, 0, 0;
 
-  /* ---- CSU palette (older names, now based on the variables above) ---- */
   --csu-green: var(--primary-color);
   --csu-gold: var(--accent-color);
   --csu-orange: #e67e22;
@@ -50,25 +25,23 @@
   --csu-light-gray: var(--bg-app);
   --csu-white: var(--bg-surface);
 
-  /* Accessible companions (same hues) */
-  --csu-green-dark: #00331a; /* gradients, hover, text on gold (6.7:1) */
+  --csu-green-dark: #00331a;
   --csu-green-hover: #003d1f;
   --csu-green-tint: #e3efe8;
-  --csu-gold-text: #7a6012; /* gold-family text on white (6.0:1) */
+  --csu-gold-text: #7a6012;
   --csu-gold-tint: #faf3dc;
-  --csu-emerald-text: #11683f; /* on emerald tint (6.0:1) */
+  --csu-emerald-text: #11683f;
   --csu-emerald-tint: #e3f4ea;
-  --csu-orange-text: #8a4510; /* on orange tint (6.4:1) */
+  --csu-orange-text: #8a4510;
   --csu-orange-tint: #fdf0e3;
   --csu-orange-hover: #cf6d17;
-  --csu-red-tint: #fbeae8; /* red text on it: 4.7:1 */
+  --csu-red-tint: #fbeae8;
   --csu-red-hover: #a33024;
   --csu-red-wash: #fffafa;
 
-  /* Neutrals */
   --text: var(--csu-gray);
   --text-strong: var(--text-main);
-  --text-muted: #5f5f5f; /* on the app background: 5.9:1 */
+  --text-muted: #5f5f5f;
   --text-on-orange: #1f1f1f;
   --border: #e3e3e3;
   --border-strong: #c9c9c9;
@@ -78,7 +51,6 @@
   --surface-hover: #fafafa;
   --disabled: #9e9e9e;
 
-  /* Printing (black ink on white paper) */
   --print-ink: #333333;
   --print-ink-light: #444444;
   --print-rule: #bbbbbb;
@@ -185,7 +157,6 @@ label {
   color: var(--text-strong);
 }
 
-/* Headings: Segoe UI Historic in CSU Green */
 h1,
 h2,
 h3 {
@@ -238,11 +209,6 @@ hr {
   white-space: nowrap;
 }
 
-/* =========================================================
-   LOGIN PAGE
-   Full-screen campus photo + dark green layer (80%) + centred card.
-   ========================================================= */
-
 .login-page {
   position: relative;
   min-height: 100vh;
@@ -271,7 +237,6 @@ hr {
   gap: 16px;
 }
 
-/* "Creating futures. Empowering communities." in white */
 .login-tagline {
   margin: 0;
   font-family: var(--font-heading);
@@ -312,7 +277,6 @@ hr {
   color: var(--text-muted);
 }
 
-/* Motto in the CSU Gold family (darker shade so it is readable on white) */
 .login-motto {
   margin: 0 0 22px;
   font-style: italic;
@@ -467,10 +431,6 @@ hr {
   }
 }
 
-/* =========================================================
-   APP SHELL: sidebar + top bar
-========================================================= */
-
 .app-shell {
   min-height: 100vh;
   display: flex;
@@ -517,7 +477,7 @@ hr {
 .sidebar-app {
   display: block;
   margin-top: 3px;
-  color: var(--csu-gold); /* gold on CSU Green: 4.9:1 */
+  color: var(--csu-gold);
   font-weight: 700;
   font-size: 15px;
   text-transform: uppercase;
@@ -558,7 +518,6 @@ hr {
   color: var(--csu-white);
 }
 
-/* Active page: CSU Gold with dark green text (7.8:1) */
 .nav-item.active,
 .nav-item.active:hover {
   background: var(--csu-gold);
@@ -663,7 +622,6 @@ hr {
   white-space: nowrap;
 }
 
-/* Role badge: CSU Gold with dark text */
 .role-label {
   background: var(--csu-gold);
   color: var(--csu-green-dark);
@@ -680,15 +638,10 @@ hr {
   max-width: 1500px;
 }
 
-/* Printed-only parts are hidden on screen */
 .print-header,
 .print-footer {
   display: none;
 }
-
-/* =========================================================
-   PAGE PARTS
-========================================================= */
 
 .page-header {
   display: flex;
@@ -769,10 +722,6 @@ hr {
   color: var(--csu-green);
 }
 
-/* =========================================================
-   BUTTONS (also used on links: <Link className="button ...">)
-========================================================= */
-
 .button {
   display: inline-flex;
   align-items: center;
@@ -838,7 +787,6 @@ hr {
   color: var(--csu-white);
 }
 
-/* "Cancel" on something running (upload, file reading, AI check): red outline, not a filled red button. */
 .button-danger-outline {
   background: var(--csu-white, #fff);
   color: var(--csu-red-hover, #a33024);
@@ -890,12 +838,8 @@ hr {
   margin: 0;
 }
 
-/* =========================================================
-   TABLES (wide tables scroll inside their card)
-========================================================= */
-
 .table-wrapper {
-  position: relative; /* keeps hidden screen-reader labels inside the scroll area */
+  position: relative;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   max-width: 100%;
@@ -938,10 +882,6 @@ tbody tr:hover {
   background: var(--surface-hover);
 }
 
-/* =========================================================
-   STATUS BADGES (Segoe UI Historic, uppercase)
-========================================================= */
-
 .status {
   display: inline-flex;
   padding: 4px 9px;
@@ -954,21 +894,18 @@ tbody tr:hover {
   white-space: nowrap;
 }
 
-/* approved, complete, active, validated, ready, processed */
 .status-success {
   background: var(--csu-emerald-tint);
   color: var(--csu-emerald-text);
   box-shadow: inset 0 0 0 1px rgba(var(--emerald-rgb), 0.45);
 }
 
-/* needs_action, flagged, under_review, submitted */
 .status-warning {
   background: var(--csu-orange-tint);
   color: var(--csu-orange-text);
   box-shadow: inset 0 0 0 1px rgba(var(--orange-rgb), 0.5);
 }
 
-/* rejected, inactive, closed */
 .status-danger {
   background: var(--csu-red-tint);
   color: var(--csu-red);
@@ -980,7 +917,6 @@ tbody tr:hover {
   color: var(--csu-gray);
 }
 
-/* Search box above long tables */
 .table-search {
   margin: 0 0 14px;
 }
@@ -989,10 +925,6 @@ tbody tr:hover {
   font-size: 13px;
   white-space: nowrap;
 }
-
-/* =========================================================
-   SCHOLARSHIPS, DOCUMENTS, PROFILE
-========================================================= */
 
 .scholarship-card {
   border-top: 4px solid var(--csu-green);
@@ -1117,10 +1049,6 @@ tbody tr:hover {
   color: var(--text-strong);
 }
 
-/* =========================================================
-   FORMS AND LISTS
-========================================================= */
-
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1161,10 +1089,6 @@ tbody tr:hover {
   padding: 14px 0;
   border-bottom: 1px solid var(--border);
 }
-
-/* =========================================================
-   MODALS, ALERTS, TOASTS
-========================================================= */
 
 .modal-backdrop {
   position: fixed;
@@ -1304,10 +1228,6 @@ tbody tr:hover {
   }
 }
 
-/* =========================================================
-   EMPTY / LOADING
-========================================================= */
-
 .empty-state {
   padding: 35px 20px;
   text-align: center;
@@ -1368,10 +1288,6 @@ tbody tr:hover {
   }
 }
 
-/* =========================================================
-   RESPONSIVE
-========================================================= */
-
 @media (max-width: 1100px) {
   .stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1382,8 +1298,6 @@ tbody tr:hover {
   }
 }
 
-/* Tablets and phones: sidebar becomes a slide-in menu (☰).
-   (Login page responsive rules are in the RESPONSIVE LOGIN section.) */
 @media (max-width: 900px) {
   .sidebar {
     width: 300px;
@@ -1493,13 +1407,6 @@ tbody tr:hover {
   }
 }
 
-/* =========================================================
-   PRINT (Ctrl+P on any staff or student page)
-   Hides the menus and buttons and adds a CSU letterhead:
-   logo + "Caraga State University" + office, page title,
-   print time, and the CSU motto at the bottom of each page.
-========================================================= */
-
 @page {
   size: A4;
   margin: 14mm 12mm 18mm;
@@ -1584,7 +1491,6 @@ tbody tr:hover {
     color: var(--csu-green);
   }
 
-  /* Repeats at the bottom of every printed page */
   .print-footer {
     display: block;
     position: fixed;
@@ -1631,16 +1537,10 @@ tbody tr:hover {
   }
 }
 
-/* =====================================================================
-   ROUND 5: back links, deadlines, checklist, timeline, notifications,
-   announcements, help, agency lists
-   ===================================================================== */
-
 .small {
   font-size: 13px;
 }
 
-/* ---------- Back link above every page title ---------- */
 .page-header-wrap .page-header {
   margin-bottom: 24px;
 }
@@ -1668,7 +1568,6 @@ tbody tr:hover {
   margin-top: 4px;
 }
 
-/* ---------- Program availability and filters ---------- */
 .scholarship-card-top {
   display: flex;
   flex-wrap: wrap;
@@ -1717,7 +1616,6 @@ tbody tr:hover {
   width: auto;
 }
 
-/* ---------- Required-document checklist ---------- */
 .progress {
   height: 10px;
   margin: 4px 0 18px;
@@ -1794,7 +1692,6 @@ tbody tr:hover {
   font-size: 13px;
 }
 
-/* Grey until every required document is uploaded, then CSU green. */
 .submit-area {
   display: flex;
   flex-wrap: wrap;
@@ -1849,7 +1746,6 @@ tbody tr:hover {
   white-space: normal;
 }
 
-/* ---------- Timeline ---------- */
 .timeline {
   list-style: none;
   margin: 0;
@@ -1916,7 +1812,6 @@ tbody tr:hover {
   font-style: italic;
 }
 
-/* ---------- Notification bell (students) ---------- */
 .bell {
   position: relative;
 }
@@ -1988,7 +1883,6 @@ tbody tr:hover {
   background: var(--csu-gold-tint);
 }
 
-/* ---------- Dashboard pieces ---------- */
 .grant-banner {
   display: flex;
   flex-wrap: wrap;
@@ -2065,13 +1959,11 @@ tbody tr:hover {
   display: block;
 }
 
-/* ---------- Profile ---------- */
 .lock-note {
   color: var(--text-muted);
   font-size: 13px;
 }
 
-/* ---------- Staff scholarships ---------- */
 .danger-zone {
   display: flex;
   flex-wrap: wrap;
@@ -2088,7 +1980,6 @@ tbody tr:hover {
   margin: 4px 0 0;
 }
 
-/* ---------- Agency lists ---------- */
 .col-picked {
   background: var(--csu-gold-tint);
 }
@@ -2125,7 +2016,6 @@ tbody tr:hover {
   background: var(--csu-red-tint);
 }
 
-/* ---------- Reports ---------- */
 .report-card {
   display: flex;
   flex-direction: column;
@@ -2136,7 +2026,6 @@ tbody tr:hover {
   overflow-wrap: anywhere;
 }
 
-/* ---------- Help and welcome guide ---------- */
 .help-contents ol {
   margin: 8px 0 0;
   padding-left: 20px;
@@ -2253,23 +2142,12 @@ tbody tr:hover {
   }
 }
 
-/* =====================================================================
-   ROUND 6: CSU variables in use, sidebar profile, search, dashboard
-   hero and shortcuts, clickable cards, My Documents
-   ===================================================================== */
-
-/* ---------- Requested layout rules ---------- */
-
-/* Cards side by side when there is room; one column on phones.
-   (min() keeps a 300px column from overflowing a 320px phone.) */
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
   gap: 24px;
 }
 
-/* Desktop (1024px and wider): 300px sidebar that stays in view while the
-   page scrolls. Below 900px the ☰ slide-in menu is kept (see above). */
 .sidebar {
   overflow-y: auto;
 }
@@ -2290,7 +2168,6 @@ tbody tr:hover {
   }
 }
 
-/* Dashboard number cards: left accent + lift on hover (clickable). */
 .metric-card {
   background: var(--bg-surface);
   border-left: 4px solid var(--primary-color);
@@ -2325,7 +2202,6 @@ tbody tr:hover {
   font-weight: 600;
 }
 
-/* ---------- Dashboard hero (CSU campus photo) ---------- */
 .dashboard-hero {
   position: relative;
   margin-bottom: 22px;
@@ -2382,7 +2258,6 @@ tbody tr:hover {
   text-transform: uppercase;
 }
 
-/* ---------- Quick actions ---------- */
 .quick-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
@@ -2432,7 +2307,6 @@ tbody tr:hover {
   font-size: 20px;
 }
 
-/* ---------- Sidebar profile ---------- */
 .sidebar-profile {
   position: relative;
   margin-bottom: 16px;
@@ -2548,7 +2422,6 @@ tbody tr:hover {
   align-items: center;
 }
 
-/* ---------- Search box (top bar) ---------- */
 .search-box {
   position: relative;
   flex: 0 1 340px;
@@ -2642,7 +2515,6 @@ li.search-empty {
   }
 }
 
-/* ---------- My Documents ---------- */
 .documents-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
@@ -2752,7 +2624,6 @@ li.search-empty {
   cursor: pointer;
 }
 
-/* ---------- Profile ---------- */
 .locked-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
@@ -2803,7 +2674,6 @@ li.search-empty {
   color: var(--csu-orange-text);
 }
 
-/* ---------- Help banner ---------- */
 .help-banner {
   margin: 0 0 20px;
 }
@@ -2849,11 +2719,7 @@ li.search-empty {
     color: var(--print-ink);
   }
 }
-/* =====================================================================
-   ROUND 7: review steps, requirement picker, payroll, ATM, Data Bank
-   ===================================================================== */
 
-/* Dropdowns that sit in a row with a search box (filters above tables) */
 .inline-form select {
   width: auto;
   max-width: 100%;
@@ -2896,7 +2762,6 @@ tbody tr.row-selected:hover {
   color: var(--text-muted);
 }
 
-/* ---------- Review window ---------- */
 .review-next {
   margin-bottom: 16px;
   padding: 10px 14px;
@@ -2922,7 +2787,6 @@ tbody tr.row-selected:hover {
   vertical-align: middle;
 }
 
-/* ---------- Requirement picker ---------- */
 .req-fieldset {
   border: 1px solid var(--border);
   border-radius: var(--radius-system);
@@ -3032,7 +2896,6 @@ tbody tr.row-selected:hover {
   margin-bottom: 10px;
 }
 
-/* ---------- Payroll ---------- */
 .prep-auto {
   margin: 10px 0 16px;
 }
@@ -3082,7 +2945,6 @@ tbody tr.row-selected:hover {
   margin-left: 8px;
 }
 
-/* ---------- Data Bank ---------- */
 .bank-filters {
   margin-bottom: 10px;
 }
@@ -3110,11 +2972,6 @@ tbody tr.row-selected:hover {
   margin-top: 24px;
 }
 
-/* =====================================================================
-   ROUND 8: admin pages, password page, Contact OAS, messages,
-   enrollment, Auto-Review, forwarded list, footer
-   ===================================================================== */
-
 .nowrap {
   white-space: nowrap;
 }
@@ -3131,7 +2988,6 @@ tbody tr.row-selected:hover {
   gap: 4px;
 }
 
-/* ---------- Footer with OAS contact details ---------- */
 .office-footer {
   display: flex;
   flex-wrap: wrap;
@@ -3148,7 +3004,6 @@ tbody tr.row-selected:hover {
   color: var(--primary-color);
 }
 
-/* ---------- Change password ---------- */
 .password-page {
   display: grid;
   place-items: center;
@@ -3212,7 +3067,6 @@ tbody tr.row-selected:hover {
   letter-spacing: 0.06em;
 }
 
-/* ---------- Contact OAS and Student Messages ---------- */
 .contact-list {
   margin: 0 0 12px;
 }
@@ -3295,7 +3149,6 @@ tbody tr.row-selected:hover {
   text-decoration: none;
 }
 
-/* ---------- Auto-Review ---------- */
 .auto-groups {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
@@ -3358,7 +3211,6 @@ tbody tr.row-selected:hover {
   font-size: 14px;
 }
 
-/* ---------- Forwarded to Agency ---------- */
 .program-chips {
   display: flex;
   flex-wrap: wrap;
@@ -3412,11 +3264,6 @@ tbody tr.row-selected:hover {
   }
 }
 
-/* =====================================================================
-   ROUND 9: announcement pictures + small polish
-   ===================================================================== */
-
-/* ---------- Announcement pictures (800 x 450 = 16:9) ---------- */
 .announcement-image {
   display: block;
   width: 100%;
@@ -3550,7 +3397,6 @@ tbody tr.row-selected:hover {
   }
 }
 
-/* ---------- Polish: easier-to-scan tables, calmer buttons ---------- */
 tbody tr:nth-child(even) {
   background: rgba(var(--primary-rgb), 0.018);
 }
@@ -3577,15 +3423,10 @@ tbody tr:nth-child(even) {
   }
 }
 
-/* =====================================================================
-   ROUND 10: program sheet tabs (like Excel), tidy toolbars
-   ===================================================================== */
-
 .sheet-card > h2 {
   margin-bottom: 12px;
 }
 
-/* One tab per program. Scrolls sideways when there are many. */
 .sheet-tabs {
   display: flex;
   gap: 2px;
@@ -3643,7 +3484,6 @@ tbody tr:nth-child(even) {
   color: var(--csu-green-dark);
 }
 
-/* Search, dropdowns and the count on one aligned row. */
 .sheet-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -3693,7 +3533,6 @@ tbody tr:nth-child(even) {
   }
 }
 
-/* Tabs fit more programs; "All programs" stays visible while scrolling. */
 .sheet-tab {
   padding: 7px 11px;
   font-size: 13px;
@@ -3710,7 +3549,6 @@ tbody tr:nth-child(even) {
   background: var(--surface);
 }
 
-/* A checkbox in a filter row keeps its own size. */
 .inline-form .choice {
   flex: 0 0 auto;
 }
@@ -3720,7 +3558,6 @@ tbody tr:nth-child(even) {
   min-width: 0;
 }
 
-/* Agency-direct programs: one compact list instead of many cards. */
 .direct-list ul {
   list-style: none;
   margin: 8px 0 0;
@@ -3745,11 +3582,6 @@ tbody tr:nth-child(even) {
   margin-top: 2px;
 }
 
-/* =====================================================================
-   ROUND 11: AI Recommendations, External Grantees, eligibility rules
-   ===================================================================== */
-
-/* ---------- Sidebar group titles (staff menu) ---------- */
 .nav-heading {
   display: block;
   margin: 12px 14px 2px;
@@ -3760,7 +3592,6 @@ tbody tr:nth-child(even) {
   text-transform: uppercase;
 }
 
-/* ---------- "How it works" box (collapsed by default) ---------- */
 .how-it-works {
   padding: 14px 18px;
 }
@@ -3777,7 +3608,6 @@ tbody tr:nth-child(even) {
   line-height: 1.6;
 }
 
-/* Search box that submits with Enter, inside a sheet toolbar */
 .toolbar-search {
   flex: 1 1 240px;
   min-width: 0;
@@ -3789,7 +3619,6 @@ tbody tr:nth-child(even) {
   margin: 0;
 }
 
-/* Clickable column title (sorting) */
 .th-sort {
   padding: 0;
   border: 0;
@@ -3806,7 +3635,6 @@ tbody tr:nth-child(even) {
   color: var(--primary-color);
 }
 
-/* ---------- Score with a small bar ---------- */
 .score {
   display: flex;
   align-items: center;
@@ -3855,7 +3683,6 @@ tbody tr:nth-child(even) {
   align-items: center;
 }
 
-/* ---------- "Why?" window ---------- */
 .rec-head {
   display: flex;
   flex-wrap: wrap;
@@ -3930,7 +3757,6 @@ tbody tr:nth-child(even) {
   line-height: 1.6;
 }
 
-/* ---------- Eligibility rules on the Scholarships page ---------- */
 .rules-details {
   padding: 12px 16px;
   border: 1px solid var(--border);
@@ -3977,7 +3803,6 @@ tbody tr:nth-child(even) {
   font-size: 14px;
 }
 
-/* ---------- External Grantees review ---------- */
 .review-card {
   border-top: 4px solid var(--accent-color);
 }
@@ -4039,10 +3864,6 @@ tbody tr:nth-child(even) {
   }
 }
 
-/* =====================================================================
-   ROUND 12: General Payroll (General Form No. 6-A)
-   Printed on long bond (8.5 x 13 in), landscape, like the OAS paper form.
-   ===================================================================== */
 @page gp {
   size: 13in 8.5in;
   margin: 0.3in 0.3in;
@@ -4220,13 +4041,11 @@ tbody tr:nth-child(even) {
   text-align: center;
 }
 
-/* Second header row: the two empty columns under "Less: Miscellaneous / CHED Grants" */
 .gp-sheet .gp-table .gp-subhead th {
   height: 12px;
   padding: 0;
 }
 
-/* Signatures (OAS layout): a borderless 5-column table, no stripes */
 .gp-sheet .gp-signs tr,
 .gp-sheet .gp-signs tr:nth-child(even),
 .gp-sheet .gp-signs tr:hover {
@@ -4327,7 +4146,6 @@ tbody tr:nth-child(even) {
   }
 }
 
-/* System Settings: payroll form signatories (label | name | position) */
 .signatory-grid {
   display: grid;
   grid-template-columns: minmax(140px, 0.8fr) 1.2fr 1.2fr;
@@ -4359,7 +4177,6 @@ tbody tr:nth-child(even) {
   }
 }
 
-/* AI Recommendations: data not yet checked by OAS, and the toolbar checkbox */
 .unchecked-tag {
   display: inline-block;
   margin-top: 3px;
@@ -4377,7 +4194,6 @@ tbody tr:nth-child(even) {
   white-space: nowrap;
 }
 
-/* Review window: how to verify a document, staff verification, file cautions */
 .verify-guide {
   margin: 6px 0 2px;
   font-size: 14px;
@@ -4429,12 +4245,6 @@ tbody tr:nth-child(even) {
   padding-left: 18px;
 }
 
-/* =====================================================================
-   ROUND 12: calmer layout for first-time users
-   ===================================================================== */
-
-/* The menu fits a laptop screen: tighter rows, and only the list scrolls,
-   so Sign out stays visible. */
 .sidebar nav {
   flex: 1 1 auto;
   min-height: 120px;
@@ -4454,8 +4264,6 @@ tbody tr:nth-child(even) {
   margin-bottom: 14px;
 }
 
-/* Laptop screens (720 to 920 px high): the whole menu still fits, so a
-   first-time user sees every page without scrolling the menu. */
 @media (max-height: 920px) and (min-width: 901px) {
   .sidebar-motto {
     display: none;
@@ -4508,7 +4316,6 @@ tbody tr:nth-child(even) {
   }
 }
 
-/* Staff dashboard: "Needs your attention" first, other numbers folded */
 .section-title {
   margin: 0 0 12px;
   font-size: 18px;
@@ -4525,9 +4332,6 @@ tbody tr:nth-child(even) {
   margin-bottom: 12px;
 }
 
-/* =====================================================================
-   ROUND 12: "Scholarships that fit you" (student) and "What to do next" (staff)
-   ===================================================================== */
 .matches-card .card-header {
   margin-bottom: 4px;
 }
@@ -4598,7 +4402,6 @@ tbody tr:nth-child(even) {
   }
 }
 
-/* Why? window: next steps + the student's other programs */
 .next-box {
   margin: 12px 0;
   padding: 12px 14px;
@@ -4649,7 +4452,6 @@ tbody tr:nth-child(even) {
   border-bottom: 1px solid var(--border);
 }
 
-/* Export menu: one button, a short list of formats */
 .export-menu {
   position: relative;
   display: inline-block;
@@ -4708,7 +4510,6 @@ tbody tr:nth-child(even) {
   }
 }
 
-/* Profile photo */
 .avatar-photo {
   overflow: hidden;
   padding: 0;
@@ -4747,8 +4548,6 @@ tbody tr:nth-child(even) {
   margin: 0 0 4px;
 }
 
-/* Computer screens: the sidebar profile looks like the CSU MySchool portal
-   (big photo on top, name in capitals, "ID | Course - Year" under it). */
 @media (min-width: 901px) {
   .sidebar-profile .profile-trigger {
     position: relative;
@@ -4798,7 +4597,6 @@ tbody tr:nth-child(even) {
   }
 }
 
-/* The plain person shape shown until a photo is uploaded. */
 .avatar-silhouette {
   overflow: hidden;
   background: #e9ecef;
@@ -4811,7 +4609,6 @@ tbody tr:nth-child(even) {
   fill: #1f2328;
 }
 
-/* Laptop screens (768px tall): a smaller photo so the whole menu still fits. */
 @media (min-width: 901px) and (max-height: 920px) {
   .sidebar-profile {
     margin-bottom: 8px;
@@ -4833,11 +4630,6 @@ tbody tr:nth-child(even) {
   }
 }
 
-/* =====================================================================
-   ROUND 12: calmer dashboards, carousel, gentle motion
-   ===================================================================== */
-
-/* Smaller dashboard header: more of the useful content fits on the first screen. */
 .dashboard-hero {
   padding: 24px 28px;
 }
@@ -4846,7 +4638,6 @@ tbody tr:nth-child(even) {
   font-size: clamp(24px, 3vw, 32px);
 }
 
-/* Staff "Needs your attention": 3 x 2 instead of 4 + 2. */
 .stats-grid.attention-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -4857,7 +4648,6 @@ tbody tr:nth-child(even) {
   }
 }
 
-/* A small grey number next to a card title: "Open Scholarships 12" */
 .count-pill {
   display: inline-block;
   min-width: 26px;
@@ -4873,7 +4663,6 @@ tbody tr:nth-child(even) {
   vertical-align: middle;
 }
 
-/* Line-style bell (instead of the emoji) */
 .bell-icon {
   display: block;
   width: 20px;
@@ -4885,7 +4674,6 @@ tbody tr:nth-child(even) {
   stroke-linejoin: round;
 }
 
-/* ---------- Announcements carousel ---------- */
 .carousel {
   position: relative;
   overflow: hidden;
@@ -5004,15 +4792,10 @@ tbody tr:nth-child(even) {
   }
 }
 
-/* ---------- Gentle motion ---------- */
-/* Each page slides up a little when it opens. */
 .content > div > * {
-  /* "backwards": nothing is left on the element after the animation ends, so
-     menus that open over the next card (Export, profile) still show on top. */
   animation: rise-in 0.35s ease-out backwards;
 }
 
-/* The page title row (with its menus) stays above the cards below it. */
 .page-header-wrap {
   position: relative;
   z-index: 20;
@@ -5037,7 +4820,6 @@ tbody tr:nth-child(even) {
   }
 }
 
-/* Cards that are links lift a little under the mouse. */
 .stat-card,
 .match-row,
 .announcement-card {
@@ -5052,7 +4834,6 @@ a.stat-card:hover,
   box-shadow: 0 8px 18px rgba(var(--primary-rgb), 0.08);
 }
 
-/* Toasts and windows open smoothly. */
 .modal {
   animation: pop-in 0.18s ease-out;
 }
@@ -5064,7 +4845,6 @@ a.stat-card:hover,
   }
 }
 
-/* People who turned on "reduce motion" in their device settings get none of this. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -5080,9 +4860,6 @@ a.stat-card:hover,
   }
 }
 
-/* =====================================================================
-   ROUND 12: AI field fit and the memo reader
-   ===================================================================== */
 .fit-tag {
   display: inline-block;
   margin-top: 4px;
@@ -5141,10 +4918,6 @@ a.stat-card:hover,
   flex-direction: column;
   gap: 6px;
 }
-
-/* =====================================================================
-   PORTAL SIDEBAR: light school-portal treatment for every role
-   ===================================================================== */
 
 @media screen {
   .sidebar {
@@ -5302,11 +5075,8 @@ a.stat-card:hover,
   }
 }
 
-/* =====================================================================
-   ROUND 12: login polish (same layout; no demo accounts box)
-   ===================================================================== */
 .login-page {
-  background-attachment: fixed; /* the photo fills the whole screen, no strip at the bottom */
+  background-attachment: fixed;
 }
 
 .login-wrap {
@@ -5421,7 +5191,6 @@ a.stat-card:hover,
   margin-top: 14px;
 }
 
-/* Program tabs wrap onto a second line instead of scrolling sideways, so every program is visible. */
 .sheet-tabs {
   flex-wrap: wrap;
   row-gap: 4px;
@@ -5446,13 +5215,10 @@ a.stat-card:hover,
   padding-bottom: 8px;
 }
 
-/* Wide screens: the page uses the full width (no empty strip on the right). Long text lines stay
-   readable because cards and tables set their own widths. */
 .content {
   max-width: none;
 }
 
-/* Recent activity and Profile correction requests start at the same height. */
 .dashboard-grid {
   align-items: start;
 }
@@ -5466,7 +5232,6 @@ a.stat-card:hover,
   margin-top: 24px;
 }
 
-/* Applications grouped by student: a line above each student's block, none between their rows. */
 tr.group-start td {
   border-top: 2px solid var(--border-strong, #c9d3cc);
 }
@@ -5475,7 +5240,6 @@ tr.group-cont td {
   border-top: 0;
 }
 
-/* "Why?" window: where the program's rules come from. */
 .rules-source {
   margin: 12px 0;
   padding: 10px 14px;
@@ -5495,7 +5259,6 @@ tr.group-cont td {
   white-space: nowrap;
 }
 
-/* "The documents show different figures?" : two inputs and the button on one row. */
 .correct-figures {
   margin: 6px 0 16px;
 }
@@ -5533,7 +5296,6 @@ tr.group-cont td {
   height: 42px;
 }
 
-/* AI Recommendations: score groups (Ready / Almost there / Needs follow-up). */
 .score-groups {
   display: flex;
   flex-wrap: wrap;
@@ -5561,13 +5323,10 @@ tr.group-cont td {
   margin: -4px 0 10px;
 }
 
-/* The top bar stays above the page while scrolling (the page title layer, z-index 20,
-   used to slide over it). Below the phone menu overlay (30) and the sidebar (40). */
 .topbar {
   z-index: 25;
 }
 
-/* Laptop screens (768 px tall): the staff menu (4 step headings) fits without scrolling. */
 @media (min-width: 901px) and (max-height: 920px) {
   .sidebar .nav-item {
     padding-top: 8px;
@@ -5579,7 +5338,6 @@ tr.group-cont td {
   }
 }
 
-/* Help: video guides with a chapter list beside the video (below it on phones). */
 .tutorial-card .card-header {
   flex-wrap: wrap;
   gap: 8px;
@@ -5656,7 +5414,6 @@ tr.group-cont td {
   }
 }
 
-/* A short warning line inside a list (e.g. one-scholarship rule on Scholar Records). */
 .warning-text {
   margin: 4px 0 0;
   color: var(--csu-orange-text, #9a5b00);
@@ -5671,7 +5428,6 @@ tr.group-cont td {
   border-top: 1px solid #dfe7e2;
 }
 
-/* ---------- Approved list preview (editable, scanned-cell highlights) ---------- */
 .list-preview-bar {
   display: flex;
   flex-wrap: wrap;
@@ -5754,7 +5510,6 @@ tr.group-cont td {
   margin-top: 2px;
 }
 
-/* ---------- Search field (same on every list) ---------- */
 .search-field {
   display: flex;
   align-items: center;
@@ -5789,7 +5544,6 @@ tr.group-cont td {
   flex: none;
 }
 
-/* CSU e-mail under the name and ID in the sidebar (like the student portal). */
 .profile-text .profile-email {
   text-transform: none !important;
   font-size: 12px;
@@ -5798,7 +5552,6 @@ tr.group-cont td {
   max-width: 100%;
 }
 
-/* Demo accounts on the login page (only when DEMO_LOGIN_ACCOUNTS=true). */
 .login-demo {
   margin-top: 14px;
   text-align: left;
@@ -5846,7 +5599,6 @@ tr.group-cont td {
   font-size: 12px;
 }
 
-/* ---------- Round 26: AI check running, long reading progress ---------- */
 .status-info {
   background: var(--csu-green-tint);
   color: var(--primary-color);
@@ -5996,9 +5748,6 @@ tr.group-cont td {
   gap: 10px;
 }
 
-/* ---------- Row numbers (No.) on list tables ----------
-   Sequential numbers of the rows as they are shown now (after search, filter, sort and "Show more"),
-   never database ids. Added by CSS, so no page logic changes. */
 table.numbered {
   counter-reset: row-number;
 }
@@ -6031,7 +5780,6 @@ table.numbered > tbody > tr::before {
   white-space: nowrap;
 }
 
-/* rows that are not records (e.g. an empty-list message) get no number */
 table.numbered > tbody > tr.no-number::before {
   counter-increment: none;
   content: "";
@@ -6049,7 +5797,6 @@ table.numbered > tfoot > tr::before {
   font-size: 13px;
 }
 
-/* A long list shown in full inside its own scroll box (Registrar list preview and rows). */
 .preview-scroll {
   max-height: 420px;
   overflow: auto;
@@ -6061,7 +5808,6 @@ table.numbered > tfoot > tr::before {
   z-index: 1;
 }
 
-/* Student Messages: list of messages (left) and the open conversation (right). */
 .bell-footer {
   margin: 0.6rem 0 0;
   font-size: 0.85rem;
@@ -6146,7 +5892,6 @@ table.numbered > tfoot > tr::before {
   }
 }
 
-/* Drag and drop on file boxes (components/FileDrop.jsx). */
 .file-drop {
   border: 1px dashed var(--border-strong, #c9c9c9);
   border-radius: 8px;

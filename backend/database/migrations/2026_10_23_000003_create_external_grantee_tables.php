@@ -4,26 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-/*
-| External Grantees: students who already hold a scholarship from an OUTSIDE
-| party (LGU, CHED list, private foundation) that is not processed in
-| ScholarGuide.
-|
-| external_grantee_uploads: one row per uploaded file (PDF, Word, Excel, CSV).
-|   status   review     the AI read the file; staff still have to confirm
-|            saved      staff confirmed the matches -> external_grantees rows
-|            discarded  staff threw the upload away
-|   rows     what the AI read from the file, with its match suggestions
-|            (kept so the extracted records can be exported later)
-|
-| external_grantees: one row per line of a SAVED upload.
-|   match_status  matched    linked to a student in the system
-|                 unmatched  no such student (kept for the record)
-|                 error      the line could not be read (no name and no ID)
-|   match_method  student_id | name | manual (picked by staff)
-|   status        active | ended   (an ended holding no longer counts for
-|                                   the one-active-scholarship rule)
-*/
 return new class extends Migration
 {
     public function up(): void
@@ -32,13 +12,13 @@ return new class extends Migration
             $table->id();
             $table->string('program_name');
             $table->string('agency')->nullable();
-            $table->string('category', 20)->nullable();         // lgu, ched, government, private, other
-            $table->string('school_year', 20)->nullable();      // 2026-2027
+            $table->string('category', 20)->nullable();
+            $table->string('school_year', 20)->nullable();
             $table->string('file_name');
-            $table->string('file_path')->nullable();            // private copy of the uploaded file
-            $table->string('file_type', 10)->nullable();        // pdf, docx, xlsx, csv, png, jpg
+            $table->string('file_path')->nullable();
+            $table->string('file_type', 10)->nullable();
             $table->string('status', 20)->default('review')->index();
-            $table->string('read_method', 30)->nullable();      // table, text, ocr
+            $table->string('read_method', 30)->nullable();
             $table->json('warnings')->nullable();
             $table->json('rows')->nullable();
             $table->unsignedInteger('total_rows')->default(0);
@@ -63,10 +43,10 @@ return new class extends Migration
             $table->string('agency')->nullable();
             $table->string('category', 20)->nullable();
             $table->string('school_year', 20)->nullable();
-            $table->string('match_status', 20)->index();        // matched, unmatched, error
-            $table->string('match_method', 20)->nullable();     // student_id, name, manual
+            $table->string('match_status', 20)->index();
+            $table->string('match_method', 20)->nullable();
             $table->unsignedTinyInteger('match_score')->nullable();
-            $table->string('status', 20)->default('active');    // active, ended
+            $table->string('status', 20)->default('active');
             $table->timestamp('ended_at')->nullable();
             $table->text('note')->nullable();
             $table->foreignId('confirmed_by')->nullable()->constrained('users')->nullOnDelete();

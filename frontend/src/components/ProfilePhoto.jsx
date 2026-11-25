@@ -4,7 +4,6 @@ import { useAuth } from "../lib/auth";
 import { useToast } from "../lib/toast";
 import Avatar from "./Avatar";
 
-/* Upload, change or remove your own profile photo (shown in the sidebar). */
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 export default function ProfilePhoto({ name }) {

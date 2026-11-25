@@ -8,32 +8,19 @@ use App\Models\Student;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-/*
-| AI field fit: asks the AI service how well each active
-| scholarship fits each student's field of study, and saves the answer in
-| program_fits. The AI service uses a pretrained sentence-embedding model
-| (or TF-IDF when the model is not installed); see ai-service/fit_matcher.py.
-|
-| It never changes eligibility, scores or decisions: the rules in
-| EligibilityEngine decide who is eligible. When the AI service is off,
-| nothing happens and the old fit values stay.
-*/
 class FitScorer
 {
-    /** What the AI reads about a student: course, college, year and their own "field and goals". */
     public static function studentText(Student $s): string
     {
         return trim(implode('. ', array_filter([$s->course, $s->college, $s->year_level, $s->interests])));
     }
 
-    /** What the AI reads about a program: its name, who runs it, and the description written by OAS. */
     public static function programText(Scholarship $p): string
     {
         return trim(implode('. ', array_filter([$p->name, $p->provider, $p->description,
             $p->colleges ? 'Colleges: '.implode(', ', $p->colleges) : null])));
     }
 
-    /** @return array{ok: bool, method?: string, rows?: int, error?: string} */
     public static function refresh(?array $studentIds = null): array
     {
         $students = Student::query()
@@ -74,13 +61,11 @@ class FitScorer
         foreach (array_chunk($rows, 500) as $chunk) {
             ProgramFit::query()->upsert($chunk, ['student_id', 'scholarship_id'], ['level', 'similarity', 'fields', 'words', 'method', 'computed_at']);
         }
-        // Programs that are no longer active.
         ProgramFit::whereIn('student_id', $students->pluck('id'))->whereNotIn('scholarship_id', $programs->pluck('id'))->delete();
 
         return ['ok' => true, 'method' => $response->json('method'), 'rows' => count($rows)];
     }
 
-    /** Fits keyed "studentId-scholarshipId" for a set of rows (one query). */
     public static function lookup(iterable $pairs): array
     {
         $pairs = collect($pairs);

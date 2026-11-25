@@ -12,55 +12,8 @@ use App\Models\Student;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
-/*
-|--------------------------------------------------------------------------
-| AI Recommendations: the rule-based eligibility engine
-|--------------------------------------------------------------------------
-| For every active scholarship that has at least one rule or required
-| document, and every active student account, it runs a list of CHECKS:
-|
-|   must-have rules (typed in by OAS on the Scholarships page)
-|     GWA            student's GWA <= the scholarship's highest GWA allowed
-|     Family income  student's annual family income <= the ceiling
-|     Year level     student's year level is in the allowed list
-|     College        student's college is in the allowed list
-|     One scholarship  the student holds no other active scholarship
-|                      (ScholarGuide grantee records + external lists)
-|   documents (the scholarship's REQUIRED documents)
-|     met ONLY when the student has the document saved, not expired, and the
-|     AI document check found no problem. A file the AI has not checked yet
-|     (or could not read) does not count, so 100% cannot come from unchecked
-|     files.
-| GWA and family income typed by the student still count, but every row
-| says whether OAS has checked them (data_verified), and staff can show
-| only students whose data OAS checked.
-|
-| Every check is worth 1 point, but a check only earns its full point when
-| it is backed by something checked:
-|     GWA / family income  1 point when OAS verified the figure; ½ point when
-|                          it was only typed by the student
-|     a document           1 point when OAS staff verified it; when the AI
-|                          check passed, the point is how sure the AI was that
-|                          the name on it is the student's (e.g. 0.92)
-|     year level, college   1 point (from the student's account: typed at sign-up;
-|                           later changes need an OAS-approved correction request)
-|     one scholarship       1 point (ScholarGuide grantee records + external lists)
-|     anything not met / not checked         0 points
-|     score = points earned / all checks x 100   (rounded)
-| So 100% means every rule is met with OAS-verified data and every required
-| document was checked with no doubt.
-| A must-have rule that is NOT met makes the verdict "not_eligible", even
-| when the score is high; a must-have rule that cannot be checked (no GWA
-| entered yet) makes it "no_data". Only "eligible" rows are recommended by
-| default. Nothing here approves, rejects or changes an application: staff
-| decide on the AI Recommendations page.
-|
-| Not checked (on purpose): sex, name, or anything the scholarship does not
-| ask for, so two students with the same data always get the same score.
-*/
 class EligibilityEngine
 {
-    // Short names for the table (full names stay in the details).
     public const SHORT = [
         'Certificate of Registration (COR)' => 'COR',
         'Certificate of Grades' => 'Grades',
@@ -73,7 +26,6 @@ class EligibilityEngine
         'Recommendation Letter' => 'Recommendation',
     ];
 
-    /** Scholarships the engine scores: active, with at least one rule or required document. */
     public static function scoredScholarships(): Collection
     {
         return Scholarship::with('requirements')
@@ -90,12 +42,6 @@ class EligibilityEngine
             || !empty($s->year_levels) || !empty($s->colleges);
     }
 
-    /*
-    | Recalculate the recommendations. $studentIds = null -> every student.
-    | Staff decisions (invited, dismissed, ...) are kept; only the numbers change.
-    | Returns ['students' => n, 'scholarships' => n, 'rows' => n, 'eligible' => n].
-    */
-    /** When every student was last scored (Cache, kept forever). */
     public const FULL_RUN_KEY = 'ai_recommendations_full_run_at';
 
     public static function recalculate(?array $studentIds = null, bool $withFit = true): array
@@ -118,10 +64,8 @@ class EligibilityEngine
                 $key = $student->id.'-'.$scholarship->id;
                 $application = $context['applications'][$key] ?? null;
 
-                // Already a grantee of this program, or already approved: nothing to recommend.
                 $isGrantee = ($context['records'][$student->id] ?? collect())
                     ->contains(fn ($r) => $r->scholarship_id === $scholarship->id);
-                // An approval from an earlier school year does not stop a new recommendation.
                 if ($isGrantee || ($application?->status === 'approved' && $application->this_school_year)) {
                     continue;
                 }
@@ -157,8 +101,6 @@ class EligibilityEngine
                 );
             }
 
-            // Rows that no longer apply (student became a grantee, program closed, ...):
-            // remove the untouched ones; keep the ones staff already acted on.
             AiRecommendation::query()
                 ->where('staff_status', 'new')
                 ->when($studentIds !== null, fn ($q) => $q->whereIn('student_id', $ids))
@@ -167,13 +109,10 @@ class EligibilityEngine
                 ->each(fn ($r) => $r->delete());
         });
 
-        // A full run (every student) is remembered, so the staff page knows the whole list was scored.
-        // Re-scoring ONE student (profile change, upload) does not count as a full run.
         if ($studentIds === null) {
             \Illuminate\Support\Facades\Cache::forever(self::FULL_RUN_KEY, now()->toIso8601String());
         }
 
-        // AI field fit (ranks and explains only; skipped quietly when the AI service is off).
         $fit = $withFit ? FitScorer::refresh($studentIds) : ['ok' => true, 'skipped' => 'recent'];
 
         return [
@@ -185,7 +124,6 @@ class EligibilityEngine
         ];
     }
 
-    /** Everything the checks need, loaded once (no query per student). */
     private static function context(array $studentIds): array
     {
         $records = ScholarRecord::with('scholarship:id,name')
@@ -200,14 +138,12 @@ class EligibilityEngine
             ->get()
             ->groupBy('student_id');
 
-        // One application per program per school year: the newest one counts (keyBy keeps the last).
         $applications = Application::query()
             ->whereIn('student_id', $studentIds)
             ->orderBy('id')
             ->get(['id', 'student_id', 'scholarship_id', 'status', 'school_year'])
             ->keyBy(fn ($a) => $a->student_id.'-'.$a->scholarship_id);
 
-        // Newest copy of each document type per student (My Documents + applications).
         $documents = [];
         Document::with(['requirement:id,name', 'validationResult:id,document_id,flags,confidence_score'])
             ->whereIn('student_id', $studentIds)
@@ -227,7 +163,6 @@ class EligibilityEngine
             && ($student->eligibility_updated_at === null || $student->eligibility_verified_at->gte($student->eligibility_updated_at));
     }
 
-    /** All checks for one student and one scholarship. */
     public static function evaluate(Student $student, Scholarship $scholarship, array $context): array
     {
         $checks = [];
@@ -316,7 +251,6 @@ class EligibilityEngine
         ];
     }
 
-    /** One check. points: what it adds to the score (0 when not met; less than 1 when not fully checked). */
     private static function check(string $key, string $label, bool $must, string $rule, string $value, string $result, float $points = 1.0): array
     {
         $points = $result === 'met' ? round(max(0.0, min(1.0, $points)), 2) : 0.0;
@@ -331,7 +265,6 @@ class EligibilityEngine
         return collect($list)->contains(fn ($item) => mb_strtolower(trim((string) $item)) === $needle);
     }
 
-    /** [what the staff member sees, met / not_met, points] for the student's newest copy of a document. */
     private static function documentState(?Document $document): array
     {
         if (!$document) {
@@ -344,12 +277,10 @@ class EligibilityEngine
             return [$saved.', expired on '.$document->expiresAt()?->format('M j, Y'), 'not_met', 0.0];
         }
 
-        // A person's check (e.g. PhilSys Check, Registrar, barangay) counts even when the AI could not read it.
         if ($document->staff_verified_at) {
             return [$saved.' · verified by OAS staff', 'met', 1.0];
         }
 
-        // AI check passed: the point is how sure the AI was that the name on it is the student's.
         $sure = $document->validationResult?->confidence_score;
         $sure = $sure === null ? 100.0 : (float) $sure;
 
@@ -357,7 +288,6 @@ class EligibilityEngine
             'flagged' => [$saved.' · AI flagged: '.self::firstFlag($document), 'not_met', 0.0],
             'needs_review' => [$saved.' · the AI could not read it (check by hand)', 'not_met', 0.0],
             'validated' => [$saved.' · AI check found no issue'.($sure < 100 ? ' (name match '.round($sure).'%)' : ''), 'met', $sure / 100],
-            // Not checked yet: it may be fine, but it is not counted until the AI checks it.
             default => [$saved.' · not AI-checked yet (run the AI check to count it)', 'not_met', 0.0],
         };
     }

@@ -22,8 +22,6 @@ const RESULT_LABELS = {
   error: ["Error", "danger"],
 };
 
-// SHA-256 of the file, so exactly the same file uploaded again is noticed (null when the browser
-// cannot do it, e.g. on a plain http:// address that is not localhost).
 async function fileFingerprint(file) {
   try {
     if (!window.crypto?.subtle) return null;
@@ -34,7 +32,6 @@ async function fileFingerprint(file) {
   }
 }
 
-// How the pages of a PDF were read, e.g. "2 pages from the PDF text, 6 pages with OCR".
 function pageMethodsText(metadata) {
   const pages = metadata?.page_methods;
   if (!Array.isArray(pages) || pages.length === 0) return "";
@@ -50,7 +47,6 @@ function pageMethodsText(metadata) {
 
 const openRow = (line) => ["unmatched", "error", "check"].includes(line.result) && !line.resolved_at;
 
-// "TES", "CMSP"... read from the file, compared with the program chosen.
 function programMismatch(detected, program) {
   if (!detected || !program) return false;
   const want = String(detected).toUpperCase();
@@ -58,18 +54,11 @@ function programMismatch(detected, program) {
   return !have.includes(want);
 }
 
-// Guess which column holds what, from the header names.
 function guessColumn(headers, patterns) {
   const index = headers.findIndex((h) => patterns.some((p) => p.test(h.toLowerCase())));
   return index >= 0 ? String(index) : "";
 }
 
-/*
-  Upload the approved list an agency sends back (CHED, DOST, LGU, foundation).
-  1. Choose the program and the list file (CSV, Excel, Word, PDF or a photo).
-  2. Say which column holds the Student ID (and, optionally, the approval date).
-  3. Process: each row is matched to a student; see the summary and details.
-*/
 export default function AgencyListsPage() {
   const toast = useToast();
   const confirm = useConfirm();
@@ -91,7 +80,7 @@ export default function AgencyListsPage() {
   const [processing, setProcessing] = useState(false);
   const [reading, setReading] = useState(false);
   const [readingName, setReadingName] = useState("");
-  const readControl = useRef(null); // "Cancel" while a file is being read
+  const readControl = useRef(null);
   const [pendingFile, setPendingFile] = useState(null);
   const [result, setResult] = useState(null);
   const [metadata, setMetadata] = useState({});
@@ -112,8 +101,6 @@ export default function AgencyListsPage() {
   const [batchId, setBatchId] = useState("");
   const [fileSha, setFileSha] = useState(null);
 
-  // Written with .then() (not await) so React's lint rule can see that the
-  // state is set later, when the server answers, not during the effect.
   const load = useCallback(
     () =>
       Promise.all([
@@ -159,8 +146,6 @@ export default function AgencyListsPage() {
     setAgency(program?.provider || "");
   }
 
-  // CSV is read here; Excel and Word by Laravel; PDF and pictures by the AI service.
-  // Choosing a file only remembers it; staff press "Read file" when ready (nothing is read or saved before).
   function chooseFile(event) {
     setPendingFile(event.target.files?.[0] || null);
   }
@@ -197,7 +182,6 @@ export default function AgencyListsPage() {
         campus: detected?.campus || old.campus || "",
         reference_number: detected?.reference_number || "",
         list_date: detected?.date || "",
-        // what the FILE says (printed total ÷ amount), not how many rows were read
         expected_count: detected?.expected_count ? String(detected.expected_count) : "",
         expected_total: detected?.printed_total != null ? String(detected.printed_total) : "",
       }));
@@ -218,7 +202,6 @@ export default function AgencyListsPage() {
     }
   }
 
-  // A cell corrected by staff in the preview.
   function editCell(r, c, value) {
     const line = r + (hasHeader ? 1 : 0);
     setRows((old) => old.map((row, i) => (i === line ? row.map((cell, j) => (j === c ? value : cell)) : row)));
@@ -269,12 +252,10 @@ export default function AgencyListsPage() {
         return index >= 0 ? index : null;
       };
       const valueAt = (row, index) => index === null ? null : (row[index] || "").trim() || null;
-      // "10,000.00" -> 10000; anything that is not a number (an unreadable scan) -> null
       const money = (text) => {
         const plain = String(text ?? "").replaceAll(",", "").trim();
         return /^\d+(\.\d+)?$/.test(plain) ? plain : null;
       };
-      // One "Name" column ("DELA CRUZ, JUAN M." or "Juan M. Dela Cruz") -> last and first name.
       const splitName = (text) => {
         const value = String(text || "").trim();
         if (!value) return [null, null];
@@ -351,9 +332,7 @@ export default function AgencyListsPage() {
 
   if (!scholarships) return <Loading />;
 
-  // A Student ID column is best; a list with names only can still be matched (exact, one-of-a-kind names).
   const hasNames = nameColumn !== "" || headers.some((h) => /^(last\s*name|surname)$/i.test(h.trim()));
-  // A "+ New batch" that was not created yet must be created (or cancelled) before processing.
   const ready = scholarshipId && agency.trim() && fileName && (idColumn !== "" || hasNames) && dataRows.length > 0 && batchId !== "new";
   const amountColumn = guessColumn(headers, [/tes.?amount/, /^amount$/, /total.?amount/]);
   const countMismatch = details.expected_count !== "" && Number(details.expected_count) !== dataRows.length;
@@ -691,8 +670,8 @@ function Summary({ upload }) {
 function Details({ upload, onChanged }) {
   const toast = useToast();
   const [linking, setLinking] = useState(null);
-  const [settingAside, setSettingAside] = useState(null); // array of rows
-  const [chosen, setChosen] = useState([]); // open row numbers picked for "Set aside selected"
+  const [settingAside, setSettingAside] = useState(null);
+  const [chosen, setChosen] = useState([]);
 
   async function resume(line) {
     try {
@@ -704,7 +683,6 @@ function Details({ upload, onChanged }) {
     }
   }
 
-  // Problems first, so staff see what needs attention.
   const order = { error: 0, check: 1, unmatched: 2, created: 3, approved: 4, already: 5 };
   const sorted = [...(upload.details || [])].sort(
     (a, b) => Number(openRow(b)) - Number(openRow(a)) || order[a.result] - order[b.result] || a.row - b.row
@@ -821,10 +799,6 @@ function Details({ upload, onChanged }) {
   );
 }
 
-/*
-  An unmatched row (no or a wrong Student ID on the list): staff find the student in the Data Bank
-  and link the row. The row is then processed for that student, as during the upload.
-*/
 function LinkRowModal({ upload, line, onClose, onDone }) {
   const toast = useToast();
   const confirm = useConfirm();
@@ -944,7 +918,6 @@ function LinkRowModal({ upload, line, onClose, onDone }) {
   );
 }
 
-// Common reasons, so staff do not type the same note again and again (they can still edit it).
 const ASIDE_REASONS = [
   "Not a CSU student: the Student ID is not in the system.",
   "The Student ID on the list looks wrong; asked the agency for a correction.",
@@ -954,7 +927,6 @@ const ASIDE_REASONS = [
   "Waiting for the agency's corrected list.",
 ];
 
-// The reason that fits what the system found on this row (only a suggestion).
 function suggestReason(line) {
   const text = `${line?.note || ""} ${line?.message || ""}`.toLowerCase();
   if (/twice|duplicate|more than once/.test(text)) return ASIDE_REASONS[2];
@@ -1045,7 +1017,6 @@ function UploadResult({ upload, onChanged }) {
   );
 }
 
-// "Done processing": staff say this list is finished. It changes no application and can be undone.
 function DoneControl({ upload, onChanged }) {
   const toast = useToast();
   const [note, setNote] = useState("");
@@ -1189,12 +1160,6 @@ function HistoryTable({ history, onChanged }) {
   );
 }
 
-
-/*
-  Shown while a list is being read. It says honestly what is happening and how long it has taken
-  (the server does not report a percentage, so none is shown): typed files take seconds; scanned PDFs and
-  photos are read page by page with OCR and can take about a minute per page.
-*/
 function ReadingProgress({ fileName }) {
   const [seconds, setSeconds] = useState(0);
   useEffect(() => {
@@ -1221,12 +1186,6 @@ function ReadingProgress({ fileName }) {
   );
 }
 
-
-/*
-  A new processing batch, made here without leaving the page. The name says what it is:
-  program · semester · academic year (AY 2026-2027) · the agency's batch number (Batch 2), so a batch
-  number is never mistaken for a year. The server refuses a name the program already has.
-*/
 function NewBatchForm({ program, schoolYear, semester, agencyBatch, onCancel, onCreated }) {
   const toast = useToast();
   const [year, setYear] = useState(schoolYear);

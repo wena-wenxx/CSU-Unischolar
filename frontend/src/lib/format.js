@@ -1,7 +1,5 @@
 import { FILES_URL } from "../services/api";
 
-/* Small helpers shared by every page. */
-
 export function formatDate(date) {
   if (!date) return "—";
 
@@ -13,7 +11,6 @@ export function formatDate(date) {
 }
 
 export function formatMoney(value) {
-  // Amounts can be empty until OAS enters the official figure.
   if (value === null || value === undefined || value === "") {
     return "Amount not set";
   }
@@ -23,12 +20,10 @@ export function formatMoney(value) {
   })}`;
 }
 
-// "needs_action" -> "needs action"
 export function statusLabel(status) {
   return String(status || "—").replaceAll("_", " ");
 }
 
-// Which colour family a status badge uses.
 export function statusTone(status) {
   const value = String(status || "").toLowerCase();
 
@@ -63,33 +58,25 @@ export function fullName(student) {
     .join(" ");
 }
 
-// A student document: a signed link from the API that works for 30 minutes
-// (the files are private). If the page was open longer, reload it.
 export function fileUrl(document) {
   return document.file_url || `${FILES_URL}/${document.file_path}`;
 }
 
-// Announcement picture: "/announcements/x.jpg" is a sample shipped with the
-// frontend; "announcements/abc.jpg" was uploaded by staff. null = no picture.
 export function announcementImage(item) {
   if (!item?.image_path) return null;
   return item.image_path.startsWith("/") ? item.image_path : `${FILES_URL}/${item.image_path}`;
 }
 
-// Number of documents the AI flagged in an application (list or full record).
 export function flaggedCount(application) {
   if (typeof application.flagged_count === "number") return application.flagged_count;
   return (application.documents || []).filter((document) => document.status === "flagged").length;
 }
 
-// First words of a long text, for previews.
 export function preview(text, length = 140) {
   const clean = String(text || "").replace(/\s+/g, " ").trim();
   return clean.length > length ? `${clean.slice(0, length).replace(/\s+\S*$/, "").replace(/[.,;:]+$/, "")}…` : clean;
 }
 
-// Required requirements that have no uploaded document yet.
-// (The staff list sends missing_requirements as names, to stay small.)
 export function missingRequirements(application) {
   if (Array.isArray(application.missing_requirements)) {
     return application.missing_requirements.map((name) => ({ name }));
@@ -109,7 +96,6 @@ export function missingRequirements(application) {
 export function enrollmentText(application) {
   if (application.status !== "approved") return "—";
 
-  // How it was checked: against the Registrar's uploaded list, or by OAS staff (not a link to CSU's systems).
   const how =
     application.enrollment_method === "registrar_list"
       ? " (Registrar's list)"
@@ -122,9 +108,6 @@ export function enrollmentText(application) {
     : "Not yet verified";
 }
 
-// Builds a CSV file in the browser and downloads it.
-// A "\uFEFF" mark at the start makes Excel read it as UTF-8 (keeps ñ and Ñ intact).
-// Returns false when there is nothing to export.
 export function downloadCSV(filename, rows) {
   if (!rows.length) return false;
 
@@ -136,8 +119,6 @@ export function downloadCSV(filename, rows) {
       headers
         .map((header) => {
           const value = String(row[header] ?? "");
-          // Excel drops leading zeros (control no. 00001, phone 0917...) and turns long numbers into
-          // 1.72E+11. Writing ="00001" keeps them exactly as text.
           if (/^0\d+$/.test(value) || /^\d{12,}$/.test(value)) return `"=""${value}"""`;
           return `"${value.replaceAll('"', '""')}"`;
         })
@@ -161,9 +142,6 @@ export function downloadCSV(filename, rows) {
   return true;
 }
 
-/* ---------- Time ---------- */
-
-// "just now", "5 minutes ago", "2 hours ago", "3 days ago", or a date.
 export function timeAgo(date) {
   if (!date) return "—";
 
@@ -195,9 +173,6 @@ export function formatDateTime(date) {
   });
 }
 
-/* ---------- Scholarship programs ---------- */
-
-// Grouped like the OAS list of scholarship programs.
 export const CATEGORY_LABELS = {
   ched: "CHED-funded",
   government: "Other Government",
@@ -209,10 +184,8 @@ export function categoryLabel(category) {
   return CATEGORY_LABELS[category] || (category === "lgu" ? "LGU" : "Other");
 }
 
-// Agency-direct: students apply directly at the agency, not in ScholarGuide.
 export const isAgencyDirect = (scholarship) => scholarship?.application_mode === "agency_direct";
 
-// Whole days from today (Manila) until a YYYY-MM-DD date. Negative = past.
 function daysUntil(day) {
   if (!day) return null;
 
@@ -222,7 +195,6 @@ function daysUntil(day) {
   return Math.round(ms / 86400000);
 }
 
-// Label + colour for a program's availability (computed by the backend).
 export function availabilityInfo(scholarship) {
   if (isAgencyDirect(scholarship)) return { label: "Apply at the agency", tone: "neutral" };
 
@@ -252,9 +224,6 @@ export function deadlineText(scholarship) {
   return `Deadline: ${formatDate(scholarship.application_end)}`;
 }
 
-/* ---------- What students see ---------- */
-
-// Plain-language meaning of each application status (shown to students).
 export const STATUS_HELP = {
   draft: {
     title: "Draft",
@@ -286,10 +255,6 @@ export const STATUS_HELP = {
   },
 };
 
-// Students see a simple document state, not the raw AI flags:
-// the AI only helps OAS staff, and staff decide what to ask the student.
-// What the student sees for one document. The AI check, the application status and the OAS review are
-// three different things, so the label says which one it is about.
 export function studentDocumentState(document) {
   if (!document) return { label: "Not uploaded", tone: "neutral" };
   if (document.staff_verified_at) return { label: "Verified by OAS", tone: "success" };
@@ -301,7 +266,6 @@ export function studentDocumentState(document) {
   return { label: "Uploaded", tone: "neutral" };
 }
 
-// Wording for one step of an application's history.
 export function stepLabel(toStatus) {
   const labels = {
     draft: "Application started",
@@ -319,7 +283,6 @@ export function stepLabel(toStatus) {
   return labels[toStatus] || statusLabel(toStatus);
 }
 
-// "Liza Demo Mendoza" -> "LM" (sidebar avatar)
 export function initials(name) {
   return String(name || "?")
     .split(/\s+/)
@@ -329,12 +292,10 @@ export function initials(name) {
     .join("");
 }
 
-// Profile photo address, or null when the user has none (initials are shown).
 export function photoUrl(user) {
   return user?.photo_path ? `${FILES_URL}/${user.photo_path}` : null;
 }
 
-// "BS Information Technology" -> "BSIT", "Bachelor of Science in Nursing" -> "BSN" (sidebar).
 export function courseShort(course) {
   const text = String(course || "").trim();
   if (!text) return "";

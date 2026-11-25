@@ -9,18 +9,6 @@ use App\Models\Document;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-/*
-|--------------------------------------------------------------------------
-| Sending forwarded applications to an agency
-|--------------------------------------------------------------------------
-| Marking an application "Complete" means OAS finished its review. The list is sent to the agency
-| later, usually for many students at once. "Record as sent" saves that one sending (date, how,
-| note) and gives every application in it the SAME forwarded date, so the list shows when the
-| agency actually received it instead of the day each review was finished.
-|
-| The supporting-documents ZIP is made only on request and only with the document types staff
-| tick (an agency rarely needs every file). Downloads are written to the activity log.
-*/
 class AgencySubmissionController extends Controller
 {
     private function staffOnly(Request $request): void
@@ -30,7 +18,6 @@ class AgencySubmissionController extends Controller
         }
     }
 
-    // GET /staff/agency-submissions   ?scholarship_id=
     public function index(Request $request)
     {
         $this->staffOnly($request);
@@ -40,11 +27,6 @@ class AgencySubmissionController extends Controller
             ->latest('sent_on')->latest('id')->limit(200)->get());
     }
 
-    /*
-    | POST /staff/agency-submissions
-    | Body: ids [application ids], sent_on (date), sent_by_way (optional), note (optional),
-    |       confirm_resend (true to move applications that were already recorded as sent)
-    */
     public function store(Request $request)
     {
         $this->staffOnly($request);
@@ -79,7 +61,6 @@ class AgencySubmissionController extends Controller
 
         $scholarship = $apps->first()->scholarship;
         $batchIds = $apps->pluck('processing_batch_id')->filter()->unique();
-        // The date staff chose, at the time of recording (so the order of the day is kept).
         $sentAt = \Illuminate\Support\Carbon::parse($data['sent_on'], 'Asia/Manila')
             ->setTimeFrom(now('Asia/Manila'))->utc();
 
@@ -114,11 +95,6 @@ class AgencySubmissionController extends Controller
         ], 201);
     }
 
-    /*
-    | POST /staff/forwarded/documents-zip   Body: ids [application ids], types [requirement names]
-    | One folder per student (LASTNAME_Firstname_StudentID) with only the ticked document types,
-    | plus a list of what is inside and what was missing.
-    */
     public function documentsZip(Request $request)
     {
         $this->staffOnly($request);

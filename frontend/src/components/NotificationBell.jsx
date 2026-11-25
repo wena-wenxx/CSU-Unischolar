@@ -5,14 +5,8 @@ import { stepLabel, timeAgo } from "../lib/format";
 import { useAuth } from "../lib/auth";
 import { useToast } from "../lib/toast";
 
-// Staff: how often the bell asks for new student actions ("what to do next"). Small request.
 const ALERT_SECONDS = 10;
 
-/*
-  Students see application updates and OAS replies. Staff see open messages
-  from students. The staff inbox is shared, so an open message is the
-  notification until it is answered or closed.
-*/
 export default function NotificationBell() {
   const { user } = useAuth();
   const location = useLocation();
@@ -30,10 +24,8 @@ export default function NotificationBell() {
   const boxRef = useRef(null);
   const toast = useToast();
   const [alerts, setAlerts] = useState({ alerts: [], unseen: 0 });
-  const known = useRef(null); // alert keys already shown, so only new ones pop up
+  const known = useRef(null);
 
-  // Staff: a student did something that needs the OAS -> it appears here within seconds,
-  // with the next step and a button to the right page (and a short pop-up the first time).
   const loadAlerts = useCallback(() => {
     if (!isStaff || document.visibilityState !== "visible") return;
     api
@@ -79,7 +71,6 @@ export default function NotificationBell() {
     return () => window.clearInterval(refresh);
   }, [isStaff, load, location.pathname]);
 
-  // Close when clicking anywhere else.
   useEffect(() => {
     if (!open) return undefined;
 
@@ -157,7 +148,6 @@ export default function NotificationBell() {
                 </ul>
               )}
 
-              {/* One list only: student messages are part of "What to do next" above (newest first). */}
               <p className="bell-footer">
                 <Link to="/staff/messages" onClick={() => setOpen(false)}>
                   All student messages

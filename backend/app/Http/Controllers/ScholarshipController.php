@@ -12,23 +12,19 @@ use Illuminate\Support\Facades\DB;
 
 class ScholarshipController extends Controller
 {
-    // Staff and the admin may manage scholarship programs.
     private function notStaff(Request $request): bool
     {
         return !$request->user()->isOffice();
     }
 
-    // List scholarships. Staff see all. Students see active programs that
-    // are open or opening soon; programs past their deadline are hidden.
-    // (A student can still open any program from their own applications.)
     public function index(Request $request)
     {
         $query = Scholarship::with('requirements');
 
         if ($request->user()->role === 'student') {
             $query->visibleToStudents()
-                ->orderByRaw('application_end is null')   // dated deadlines first
-                ->orderBy('application_end')               // closing soonest first
+                ->orderByRaw('application_end is null')
+                ->orderBy('application_end')
                 ->orderBy('name');
         } else {
             $query->orderBy('id', 'desc');
@@ -57,7 +53,6 @@ class ScholarshipController extends Controller
             'application_end' => 'nullable|date|after_or_equal:application_start',
             'amount' => 'nullable|numeric|min:0',
             'status' => 'nullable|in:active,inactive,closed',
-            // Eligibility rules for AI Recommendations (empty = no rule)
             'max_gwa' => 'nullable|numeric|min:1|max:5',
             'max_family_income' => 'nullable|numeric|min:0|max:100000000',
             'year_levels' => 'nullable|array|max:10',
@@ -88,7 +83,6 @@ class ScholarshipController extends Controller
         };
     }
 
-    /** Empty lists are stored as null ("any year level", "any college"). */
     private function cleanRules(array $data): array
     {
         foreach (['year_levels', 'colleges'] as $key) {
@@ -104,11 +98,6 @@ class ScholarshipController extends Controller
         return $data;
     }
 
-    /*
-    | GET /eligibility-options   (staff)
-    | Year levels and colleges found in the student records, for the
-    | eligibility rule checkboxes on the Scholarships page.
-    */
     public function eligibilityOptions(Request $request)
     {
         if ($this->notStaff($request)) {
@@ -121,12 +110,6 @@ class ScholarshipController extends Controller
         ]);
     }
 
-    /*
-    | GET /requirement-types
-    | The standard document types students keep in My Documents. Requirements
-    | picked from this list can be reused across applications and have an
-    | expiry period; a custom (typed) requirement cannot.
-    */
     public function requirementTypes()
     {
         return response()->json(collect(StudentDocumentController::STANDARD_TYPES)->map(fn ($name) => [
@@ -135,11 +118,6 @@ class ScholarshipController extends Controller
         ])->values());
     }
 
-    /*
-    | POST /scholarships
-    | The program and its requirements are saved together.
-    | requirements: [{ name, is_required, description }]
-    */
     public function store(Request $request)
     {
         if ($this->notStaff($request)) {
@@ -196,7 +174,6 @@ class ScholarshipController extends Controller
         $scholarship->fill($data);
         $changed = array_keys($scholarship->getDirty());
 
-        // Rule changes keep who and when, and the log shows old -> new values.
         $ruleChanges = array_values(array_intersect($changed, self::RULE_FIELDS));
         if ($ruleChanges) {
             $scholarship->rules_updated_by = $request->user()->id;
@@ -229,8 +206,6 @@ class ScholarshipController extends Controller
 
         $scholarship = Scholarship::withCount('applications')->findOrFail($id);
 
-        // Deleting would also delete every application, scholar record and
-        // payroll entry under it (database cascade). Keep the history instead.
         if ($scholarship->applications_count > 0) {
             return response()->json([
                 'message' => "This scholarship has {$scholarship->applications_count} application(s), so it cannot be deleted. Set its status to Closed instead; students will no longer be able to apply, and the records stay."
@@ -279,7 +254,6 @@ class ScholarshipController extends Controller
         return response()->json($requirement, 201);
     }
 
-    // PATCH /requirements/{id}: switch Required / Optional, or change the note.
     public function updateRequirement(Request $request, $id)
     {
         if ($this->notStaff($request)) {
@@ -307,7 +281,7 @@ class ScholarshipController extends Controller
 
         $requirement = ScholarshipRequirement::with('scholarship:id,name')->findOrFail($id);
         $requirement->delete();
-        $requirement->scholarship?->touch();   // AI Recommendations re-score on the next visit
+        $requirement->scholarship?->touch();
         ActivityLog::record($request->user(), 'scholarship.requirement_removed', "Removed requirement \"{$requirement->name}\" from {$requirement->scholarship?->name}.");
 
         return response()->json(['message' => 'Requirement deleted successfully.']);

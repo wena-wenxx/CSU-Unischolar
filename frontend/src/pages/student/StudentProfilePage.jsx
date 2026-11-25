@@ -11,7 +11,6 @@ import ProfileItem from "../../components/ProfileItem";
 import StatusBadge from "../../components/StatusBadge";
 import Loading from "../../components/Loading";
 
-// Registrar-owned fields a student may ask OAS to correct.
 const CORRECTABLE = {
   first_name: "First name",
   middle_name: "Middle name",
@@ -23,15 +22,6 @@ const CORRECTABLE = {
   college: "College",
 };
 
-/*
-  My Profile
-  - Registrar information (name, Student ID, course, year level, college):
-    read-only. A wrong value is fixed through "Request a correction".
-  - E-mail: read-only (it is the university login account).
-  - Contact number: the student can change it.
-  - GWA and family income: typed by the student for scholarship matching
-    (AI Recommendations); OAS checks them against the Grades and the ITR.
-*/
 export default function StudentProfilePage() {
   const toast = useToast();
 
@@ -46,8 +36,6 @@ export default function StudentProfilePage() {
   const [savingMatching, setSavingMatching] = useState(false);
   const correctionRef = useRef(null);
 
-  // Written with .then() (not await) so React's lint rule can see that the
-  // state is set later, when the server answers, not during the effect.
   const load = useCallback(
     () =>
       Promise.all([api.get("/profile"), api.get("/student/change-requests"), loadMyDocuments().catch(() => null)])
@@ -133,7 +121,6 @@ export default function StudentProfilePage() {
 
   const current = (field) => student[field] || "—";
 
-  // "Request a change" next to a locked field: pick it in the form below.
   function requestChange(field) {
     setCorrection({ field, requested_value: "", reason: "" });
     correctionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -424,11 +411,6 @@ export default function StudentProfilePage() {
   );
 }
 
-// Read-only: OAS keeps the ATM status up to date. No banking is done here.
-/*
-  "My field and goals" (optional): helps the AI field fit find
-  scholarships for the student's field. It never affects eligibility.
-*/
 function FieldGoals({ initial }) {
   const toast = useToast();
   const [text, setText] = useState(initial);

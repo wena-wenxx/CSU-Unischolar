@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Schema;
 
 class ScholarRecord extends Model
 {
-    // Suggested notes when a grantee has no ATM yet (staff may type another).
     public const ATM_NOTES = [
         'For ATM application',
         'Pending bank processing',
@@ -21,7 +20,6 @@ class ScholarRecord extends Model
     protected $fillable = [
         'student_id', 'scholarship_id', 'school_year', 'semester', 'processing_batch_id', 'status', 'currently_enrolled', 'enrollment_period', 'has_atm', 'atm_funds', 'atm_note',
         'grantee_tagged_at', 'remarks',
-        // from the agency's approved list (e.g. the CHED TES billing file)
         'control_number', 'award_number', 'award_amount', 'award_batch',
     ];
     protected $casts = [
@@ -31,7 +29,6 @@ class ScholarRecord extends Model
 
     protected $appends = ['atm_label'];
 
-    /** A record made without a school year belongs to the current one (one record per program per year). */
     protected static function booted(): void
     {
         static::creating(function (ScholarRecord $record) {
@@ -46,11 +43,6 @@ class ScholarRecord extends Model
     public function payrollRecords() { return $this->hasMany(PayrollRecord::class); }
     public function processingBatch() { return $this->belongsTo(ProcessingBatch::class); }
 
-    /*
-    | Records inserted directly (the bulk demo seeder) get the school year of the
-    | approved application that made them, or of the day they were tagged, and
-    | that application's batch.
-    */
     public static function fillMissingSchoolYears(): int
     {
         $count = 0;
@@ -74,7 +66,6 @@ class ScholarRecord extends Model
         return $count;
     }
 
-    /** "ATM · funded", "ATM · funds pending", "No ATM · For ATM application" ... */
     public function getAtmLabelAttribute(): string
     {
         if ($this->has_atm) {
@@ -89,11 +80,6 @@ class ScholarRecord extends Model
         return 'No ATM'.($this->atm_note ? ' · '.$this->atm_note : '');
     }
 
-    /*
-    | Starting ATM status for grantees that have none yet (migration and seeders):
-    | ATM + already paid before -> funded; ATM, never paid -> pending;
-    | no ATM -> "For ATM application".
-    */
     public static function backfillAtmStatus(): int
     {
         $paid = DB::table('payroll_records')->where('status', 'processed')->pluck('scholar_record_id')->unique()->all();
@@ -108,7 +94,6 @@ class ScholarRecord extends Model
         foreach ($records->get() as $record) {
             $record->timestamps = false;
 
-            // Agency-direct programs pay the grantee themselves.
             if ($record->scholarship?->application_mode === 'agency_direct') {
                 $record->forceFill(['atm_note' => 'Paid directly by the agency'])->save();
                 $count++;

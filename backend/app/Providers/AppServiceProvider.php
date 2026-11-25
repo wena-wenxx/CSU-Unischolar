@@ -10,39 +10,25 @@ use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
-        //
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
-        // Safety net for the demo: if MAIL_ALWAYS_TO is set, EVERY e-mail goes
-        // to that one inbox instead of the (fictional) student addresses.
-        // (Read through config so "php artisan config:cache" keeps working.)
         if ($to = config('mail.always_to')) {
             Mail::alwaysTo($to);
         }
 
-        // The AI worker window (php artisan queue:work database --queue=ai) says "I am here" on every loop,
-        // so AI checks are sent to it only while it is really running.
         \Illuminate\Support\Facades\Queue::looping(function ($event) {
             if (($event->connectionName ?? null) === 'database') {
                 try {
                     \App\Support\DocumentChecker::markWorkerAlive();
                 } catch (\Throwable $e) {
-                    // database down: the worker cannot take checks now anyway
                 }
             }
         });
 
-        // Login: 10 tries a minute for one e-mail on one computer (stops password guessing).
         RateLimiter::for('login', function (Request $request) {
             return Limit::perMinute(10)
                 ->by(mb_strtolower((string) $request->input('email')).'|'.$request->ip())

@@ -6,21 +6,6 @@ use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
-/**
- * FICTIONAL DEMO DATA.
- *
- * Builds the step-by-step history (application_status_logs) for every
- * seeded application from the dates the other seeders already stored:
- * started -> submitted -> under review -> ... -> approved / rejected,
- * plus "enrollment verified" and "tagged as grantee".
- *
- * The times between steps are spread out evenly (and deterministically)
- * between the real dates, so timelines and "last updated" look natural.
- * For the 10 named demo students the newest step is left unread, so the
- * notification bell shows something on their first login.
- *
- * Safe to run again: it does nothing if any log already exists.
- */
 class StatusLogSeeder extends Seeder
 {
     private const NAMED_PREFIX = '2026-000';
@@ -61,7 +46,6 @@ class StatusLogSeeder extends Seeder
                     'to_status' => $to,
                     'remarks' => $remarks,
                     'changed_by' => $byStaff ? $staffId : $app->user_id,
-                    // Named demo students: newest step unread (shows in the bell).
                     'read_at' => ($named && $isLast && $to !== 'draft') ? null : $at,
                     'created_at' => $at,
                     'updated_at' => $at,
@@ -76,7 +60,6 @@ class StatusLogSeeder extends Seeder
                 DB::table('application_status_logs')->insert($chunk);
             }
 
-            // "Last updated" on each application = its newest step.
             foreach ($lastTimes as $id => $at) {
                 DB::table('applications')->where('id', $id)->update(['updated_at' => $at]);
             }
@@ -85,7 +68,6 @@ class StatusLogSeeder extends Seeder
         $this->command?->info('Status history: '.count($rows).' steps for '.count($lastTimes).' applications.');
     }
 
-    // The status an application had before step $i (milestones keep "approved").
     private function statusBefore(array $steps, int $i): string
     {
         for ($j = $i - 1; $j >= 0; $j--) {
@@ -97,7 +79,6 @@ class StatusLogSeeder extends Seeder
         return 'draft';
     }
 
-    /** @return array<int, array{0:string,1:Carbon,2:?string,3:bool}> [to_status, time, remarks, done by staff] */
     private function steps(object $app, ?object $record, Carbon $now): array
     {
         $created = Carbon::parse($app->created_at);
@@ -113,7 +94,6 @@ class StatusLogSeeder extends Seeder
 
         $steps[] = ['submitted', $submitted, null, false];
 
-        // Which staff steps happened, in order.
         $path = match ($app->status) {
             'under_review' => ['under_review'],
             'needs_action' => ['under_review', 'needs_action'],
@@ -127,7 +107,6 @@ class StatusLogSeeder extends Seeder
             return $steps;
         }
 
-        // The staff steps fit between submission and the end of the process.
         $latest = $now->copy()->subHours(1 + $app->id % 20);
         $end = $verified
             ? $verified->copy()->subHours(6)

@@ -47,29 +47,6 @@ const ManageAccountsPage = lazy(() => import("./pages/admin/ManageAccountsPage")
 const ActivityLogPage = lazy(() => import("./pages/admin/ActivityLogPage"));
 const SettingsPage = lazy(() => import("./pages/admin/SettingsPage"));
 
-/*
-  Every page has its own address, so the browser Back button and
-  page refresh work:
-
-    /login                    /account/password (change password, any role)
-    /student/dashboard        /staff/dashboard          /admin/dashboard
-    /student/scholarships     /staff/applications       /admin/staff
-    /student/scholarships/:id /staff/auto-review        /admin/students
-    /student/applications     /staff/agency-lists       /admin/activity
-                              /staff/batches
-    /student/applications/:id /staff/forwarded          /admin/settings
-    /student/documents        /staff/scholars           /admin/scholarships
-    /student/history          /staff/enrollment         /admin/reports
-    /student/profile          /staff/payroll            /admin/help
-    /student/contact          /staff/scholarships       /admin/profile
-    /student/help             /staff/announcements
-                              /staff/messages
-                              /staff/data-bank
-                              /staff/reports
-                              /staff/help
-                              /staff/profile
-*/
-
 function HomeRedirect() {
   const { user } = useAuth();
   return <Navigate to={homePathFor(user)} replace />;
@@ -80,7 +57,6 @@ export default function App() {
     <AuthProvider>
       <ToastProvider>
         <ConfirmProvider>
-          {/* Staff and admin pages load when first opened, so students download less. */}
           <Suspense fallback={<Loading />}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
@@ -123,7 +99,6 @@ export default function App() {
                 <Route path="/staff/messages" element={<MessagesPage />} />
                 <Route path="/staff/announcements/:id" element={<AnnouncementDetailPage />} />
               </Route>
-              {/* The General Payroll form opens without the menu, so it prints like the paper form. */}
               <Route path="/staff/payroll/form" element={<GeneralPayrollPage />} />
             </Route>
 
@@ -141,12 +116,10 @@ export default function App() {
               </Route>
             </Route>
 
-            {/* Any role: forced after a temporary password, and from My Profile. */}
             <Route element={<ProtectedRoute />}>
               <Route path="/account/password" element={<ChangePasswordPage />} />
             </Route>
 
-            {/* "/", "/student", "/staff" or an unknown address -> your dashboard (or login) */}
             <Route path="*" element={<HomeRedirect />} />
           </Routes>
           </Suspense>

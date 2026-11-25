@@ -11,18 +11,6 @@ use Illuminate\Http\Request;
 
 class EnrollmentController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | STAFF - VERIFY ENROLLMENT OF AN APPROVED APPLICANT
-    |--------------------------------------------------------------------------
-    | OAS workflow: the agency approves -> OAS verifies enrollment ->
-    | OAS tags the grantee. This step ONLY records the verification on the
-    | application. Tagging the grantee is a separate step
-    | (POST /applications/{id}/scholar-record).
-    |
-    | Body: currently_enrolled (boolean, required), remarks (optional)
-    */
-
     public function verify(Request $request, $applicationId)
     {
         if ($request->user()->role !== 'staff') {
@@ -64,17 +52,11 @@ class EnrollmentController extends Controller
         ]);
     }
 
-    /*
-    | Saves one enrollment check (also used by "Verify All Enrollments"):
-    | the application, its step history, the activity log, and the scholar
-    | record's enrollment flag (payroll checks it).
-    */
     public static function record(Application $application, bool $enrolled, ?string $remarks, User $by, string $method = 'manual', ?string $period = null): void
     {
         $application->update([
             'enrollment_verified' => $enrolled,
             'enrollment_verified_at' => $enrolled ? now() : null,
-            // How it was checked: against the Registrar's uploaded list, or by staff (not a link to CSU's systems).
             'enrollment_method' => $method,
             'remarks' => $remarks ?? $application->remarks,
         ]);
@@ -98,7 +80,6 @@ class EnrollmentController extends Controller
             ->where('school_year', $application->school_year)
             ->update([
                 'currently_enrolled' => $enrolled,
-                // the term that was checked: the Registrar list's period, else the application's term
                 'enrollment_period' => $period ?? ($application->semester ? "{$application->semester} AY {$application->school_year}" : null),
             ]);
     }

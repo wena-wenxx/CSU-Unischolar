@@ -1,36 +1,14 @@
-/* =====================================================================
-   CSU UniScholar / ScholarGuide: DESIGN SYSTEM (UI refresh, round 28)
-   ---------------------------------------------------------------------
-   Loaded AFTER index.css (see main.jsx), so these rules give every page
-   the same finish without rewriting the page-specific rules in index.css.
-   Change the look of the whole system here.
 
-   Brand: Caraga State University colours are green and gold (university
-   infobox; the shades come from the CSU logo already used in the app).
-   Green carries the identity (navigation, primary actions); gold is an
-   accent (active marker, highlights); everything else is neutral, so the
-   pages stay calm. Status colours (green / amber / red) are only used for
-   statuses.
-
-   Sections: 1 tokens · 2 base type · 3 shell (sidebar, top bar) · 4 page
-   header · 5 cards · 6 buttons · 7 forms · 8 tables · 9 badges · 10 stat
-   cards and dashboard · 11 overlays (modal, toast, dropdowns) · 12 loading
-   · 13 carousel · 14 motion · 15 responsive · 16 reduced motion
-   ===================================================================== */
-
-/* ---------- 1. Tokens ---------- */
 :root {
-  /* neutrals (slightly green-tinted greys, easy on the eyes) */
   --ds-bg: #f4f6f5;
   --ds-surface: #ffffff;
-  --ds-surface-2: #f8faf9; /* table heads, quiet panels */
-  --ds-line: #e4e8e6; /* borders */
+  --ds-surface-2: #f8faf9;
+  --ds-line: #e4e8e6;
   --ds-line-strong: #cfd6d2;
-  --ds-ink: #14201a; /* headings */
-  --ds-text: #33413a; /* body text: 10.9:1 on white */
-  --ds-muted: #5d6b64; /* secondary text: 5.6:1 on white */
+  --ds-ink: #14201a;
+  --ds-text: #33413a;
+  --ds-muted: #5d6b64;
 
-  /* brand */
   --ds-green: var(--primary-color, #004d26);
   --ds-green-600: #0b6235;
   --ds-green-700: #003d1f;
@@ -39,25 +17,21 @@
   --ds-gold: var(--accent-color, #d4af37);
   --ds-gold-50: #fbf6e4;
 
-  /* shape */
   --ds-r-sm: 8px;
-  --ds-r: 10px; /* buttons, inputs */
-  --ds-r-lg: 14px; /* cards */
-  --ds-r-xl: 18px; /* hero, modal */
+  --ds-r: 10px;
+  --ds-r-lg: 14px;
+  --ds-r-xl: 18px;
 
-  /* elevation: soft and neutral */
   --ds-shadow-xs: 0 1px 2px rgba(16, 24, 20, 0.05);
   --ds-shadow-sm: 0 1px 3px rgba(16, 24, 20, 0.06), 0 1px 2px rgba(16, 24, 20, 0.04);
   --ds-shadow-md: 0 6px 16px -4px rgba(16, 24, 20, 0.1), 0 2px 6px -2px rgba(16, 24, 20, 0.06);
   --ds-shadow-lg: 0 20px 40px -12px rgba(16, 24, 20, 0.22);
   --ds-ring: 0 0 0 3px rgba(11, 98, 53, 0.22);
 
-  /* motion */
   --ds-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --ds-fast: 120ms;
   --ds-mid: 200ms;
 
-  /* the older names follow the new values, so old rules match */
   --border: var(--ds-line);
   --border-strong: var(--ds-line-strong);
   --text-muted: var(--ds-muted);
@@ -66,7 +40,6 @@
   --surface-hover: #f6f8f7;
 }
 
-/* ---------- 2. Base typography ---------- */
 body {
   background: var(--ds-bg);
   color: var(--ds-text);
@@ -99,8 +72,6 @@ h3 {
   font-weight: 650;
 }
 
-/* long student and programme names wrap instead of pushing the layout
-   (break-word only breaks a word that cannot fit, so Student IDs stay whole) */
 td {
   overflow-wrap: break-word;
 }
@@ -116,7 +87,6 @@ td {
   color: var(--ds-muted);
 }
 
-/* numbers line up in tables and totals */
 td,
 .stat-card strong,
 .numeric {
@@ -137,7 +107,6 @@ a {
   background: var(--ds-green-100);
 }
 
-/* ---------- 3. App shell ---------- */
 .content {
   padding: 28px 32px 40px;
   max-width: 1440px;
@@ -151,7 +120,6 @@ a {
   padding: 18px 12px 14px;
 }
 
-/* a thin gold line at the very top of the menu: the CSU accent */
 .sidebar::before {
   content: "";
   position: absolute;
@@ -213,7 +181,6 @@ a {
   color: var(--ds-green);
 }
 
-/* gold marker on the active page */
 .nav-item.active::before {
   content: "";
   position: absolute;
@@ -287,7 +254,6 @@ a {
   color: var(--ds-muted);
 }
 
-/* ---------- 4. Page header ---------- */
 .page-header {
   margin-bottom: 22px;
   align-items: flex-end;
@@ -309,7 +275,6 @@ a {
   color: var(--ds-ink);
 }
 
-/* ---------- 5. Cards ---------- */
 .card {
   background: var(--ds-surface);
   border: 1px solid var(--ds-line);
@@ -328,7 +293,6 @@ a {
   font-size: 1.0625rem;
 }
 
-/* a card inside a card is a quiet panel, not another box */
 .card .card {
   box-shadow: none;
   background: var(--ds-surface-2);
@@ -370,7 +334,6 @@ a {
   color: var(--ds-muted);
 }
 
-/* ---------- 6. Buttons ---------- */
 .button,
 .link-button.button {
   position: relative;
@@ -410,7 +373,6 @@ a {
   box-shadow: var(--ds-ring);
 }
 
-/* primary: CSU green */
 .button-primary {
   background: var(--ds-green);
   color: #fff;
@@ -423,7 +385,6 @@ a {
   box-shadow: 0 4px 12px -2px rgba(0, 77, 38, 0.35);
 }
 
-/* secondary: white with a line */
 .button-secondary {
   background: var(--ds-surface);
   color: var(--ds-green-700);
@@ -437,7 +398,6 @@ a {
   color: var(--ds-green-700);
 }
 
-/* approve / success */
 .button-success {
   background: #11683f;
   color: #fff;
@@ -448,7 +408,6 @@ a {
   box-shadow: 0 4px 12px -2px rgba(17, 104, 63, 0.35);
 }
 
-/* needs action: amber with dark text */
 .button-warning {
   background: #f0a23b;
   color: #2b1a04;
@@ -458,7 +417,6 @@ a {
   background: #e08f22;
 }
 
-/* reject / delete */
 .button-danger {
   background: #b42318;
   color: #fff;
@@ -469,7 +427,6 @@ a {
   box-shadow: 0 4px 12px -2px rgba(180, 35, 24, 0.35);
 }
 
-/* cancel something running */
 .button-danger-outline {
   background: var(--ds-surface);
   color: #a3261b;
@@ -481,7 +438,6 @@ a {
   border-color: #b42318;
 }
 
-/* disabled: clearly off, no lift */
 .button:disabled,
 button:disabled {
   opacity: 0.5;
@@ -490,7 +446,6 @@ button:disabled {
   box-shadow: none;
 }
 
-/* loading: <button aria-busy="true"> shows a small spinner before the label */
 .button[aria-busy="true"] {
   cursor: progress;
 }
@@ -505,7 +460,6 @@ button:disabled {
   animation: ds-spin 0.7s linear infinite;
 }
 
-/* text links that look like buttons */
 .link-button {
   color: var(--ds-green-600);
   font-weight: 600;
@@ -518,7 +472,6 @@ button:disabled {
   text-decoration: underline;
 }
 
-/* round icon buttons (×, bell, arrows) */
 .close-button,
 .bell-button,
 .carousel-arrow,
@@ -538,12 +491,10 @@ button:disabled {
   background: var(--ds-green-50);
 }
 
-/* filter chips (tabs made of small buttons) */
 .filter-row .button-small {
   border-radius: 999px;
 }
 
-/* ---------- 7. Forms ---------- */
 input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
 select,
 textarea {
@@ -572,7 +523,6 @@ textarea:focus {
   box-shadow: var(--ds-ring);
 }
 
-/* an answer the browser marks as wrong (after the user typed in it) */
 input:user-invalid,
 select:user-invalid,
 textarea:user-invalid {
@@ -598,7 +548,6 @@ label {
   font-size: 13.5px;
 }
 
-/* required fields: <label className="required-label"> or a label next to a required input */
 .required-label::after,
 label:has(+ input:required)::after,
 label:has(+ select:required)::after,
@@ -613,7 +562,6 @@ input[type="radio"] {
   accent-color: var(--ds-green);
 }
 
-/* "Choose File": the button inside the file box looks like our buttons */
 input[type="file"] {
   max-width: 100%;
   color: var(--ds-muted);
@@ -639,7 +587,6 @@ input[type="file"]::file-selector-button:hover {
   border-color: var(--ds-green-600);
 }
 
-/* drag-and-drop areas */
 .file-drop {
   border: 1.5px dashed var(--ds-line-strong);
   border-radius: var(--ds-r);
@@ -668,7 +615,6 @@ input[type="file"]::file-selector-button:hover {
   color: var(--ds-muted);
 }
 
-/* ---------- 8. Tables ---------- */
 .table-wrapper {
   border-radius: var(--ds-r);
 }
@@ -718,7 +664,6 @@ tr.row-selected:hover {
   background: var(--ds-green-50);
 }
 
-/* ---------- 9. Status badges ---------- */
 .status {
   align-items: center;
   gap: 6px;
@@ -730,7 +675,6 @@ tr.row-selected:hover {
   box-shadow: none !important;
 }
 
-/* a small dot in the badge colour */
 .status::before {
   content: "";
   width: 6px;
@@ -765,7 +709,6 @@ tr.row-selected:hover {
   border-radius: 999px;
 }
 
-/* ---------- 10. Stat cards and dashboard ---------- */
 .stats-grid {
   gap: 16px;
 }
@@ -791,7 +734,7 @@ tr.row-selected:hover {
 
 .stat-card span {
   margin: 0 0 6px;
-  padding-right: 44px; /* room for the icon */
+  padding-right: 44px;
   color: var(--ds-muted);
   font-size: 13px;
   font-weight: 600;
@@ -812,7 +755,6 @@ tr.row-selected:hover {
   font-size: 12.5px;
 }
 
-/* the icon tile in the corner */
 .stat-icon {
   position: absolute;
   top: 14px;
@@ -831,7 +773,6 @@ tr.row-selected:hover {
   height: 18px;
 }
 
-/* a number that needs attention gets a gold tile */
 .stat-card.has-value .stat-icon {
   background: var(--ds-gold-50);
   color: #7a6012;
@@ -849,14 +790,12 @@ a.stat-card:hover,
   gap: 20px;
 }
 
-/* dashboard hero: calmer, rounder */
 .dashboard-hero {
   border-radius: var(--ds-r-xl);
   box-shadow: var(--ds-shadow-sm);
   overflow: hidden;
 }
 
-/* quick actions: clickable tiles */
 .quick-action,
 .quick-actions a,
 .quick-actions .quick-action {
@@ -873,7 +812,6 @@ a.stat-card:hover,
   border-color: var(--ds-line-strong);
 }
 
-/* ---------- 11. Overlays ---------- */
 .modal-backdrop {
   background: rgba(12, 22, 17, 0.45);
   backdrop-filter: blur(3px);
@@ -892,7 +830,6 @@ a.stat-card:hover,
   border-top: 1px solid var(--ds-line);
 }
 
-/* toasts slide in from the right; a coloured line shows the kind */
 .toast {
   position: relative;
   border: 1px solid var(--ds-line);
@@ -939,7 +876,6 @@ a.stat-card:hover,
   color: #a8861b;
 }
 
-/* dropdowns: bell, profile menu, export menu */
 .bell-panel,
 .profile-menu,
 .export-menu-list,
@@ -951,7 +887,6 @@ a.stat-card:hover,
   transform-origin: top right;
 }
 
-/* ---------- 12. Loading ---------- */
 .loading.skeleton {
   display: grid;
   align-items: stretch;
@@ -1012,7 +947,6 @@ a.stat-card:hover,
   font-size: 13px;
 }
 
-/* ---------- 13. Carousel ---------- */
 .carousel {
   border-radius: var(--ds-r-lg);
   overflow: hidden;
@@ -1049,8 +983,6 @@ a.stat-card:hover,
   background: var(--ds-green);
 }
 
-/* ---------- 14. Motion ---------- */
-/* each page appears with a short rise (index.css staggers the sections) */
 .content > div > * {
   animation-duration: 260ms;
   animation-timing-function: var(--ds-ease);
@@ -1124,7 +1056,6 @@ details[open] > :not(summary) {
   }
 }
 
-/* ---------- 15. Responsive ---------- */
 @media (max-width: 1100px) {
   .content {
     padding: 24px;
@@ -1181,7 +1112,6 @@ details[open] > :not(summary) {
     padding-right: 34px;
   }
 
-  /* forms and selects never push the page sideways */
   select,
   input:not([type="checkbox"]):not([type="radio"]),
   textarea {
@@ -1189,7 +1119,7 @@ details[open] > :not(summary) {
   }
 
   .button {
-    min-height: 42px; /* easier to tap */
+    min-height: 42px;
   }
 
   .button-small {
@@ -1201,7 +1131,6 @@ details[open] > :not(summary) {
   }
 }
 
-/* ---------- 16. Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
   .button:not(:disabled):hover,
   a.stat-card:hover,
@@ -1230,7 +1159,6 @@ details[open] > :not(summary) {
   }
 }
 
-/* ---------- small additions used by the components ---------- */
 .toast > span {
   flex: 1;
 }
@@ -1244,8 +1172,6 @@ details[open] > :not(summary) {
   vertical-align: -2px;
 }
 
-/* No sideways scrolling on phones: grid and flex children may shrink, and a dropdown with a long
-   option never grows wider than its box (it was pushing Reports 450 px wide). */
 .form-grid > *,
 .profile-grid > *,
 .detail-grid > *,
@@ -1260,7 +1186,6 @@ select {
   text-overflow: ellipsis;
 }
 
-/* Dashboard shortcut tiles: line icon in a green tile, like the number cards */
 .quick-tile {
   border-radius: var(--ds-r-lg);
   box-shadow: var(--ds-shadow-xs);
@@ -1296,7 +1221,6 @@ select {
   color: #fff;
 }
 
-/* Buttons inside the bell keep their own colours (the panel's link colour made them unreadable) */
 .bell-panel a.button-primary,
 .bell-panel a.button-primary:hover {
   color: #fff;
@@ -1306,7 +1230,6 @@ select {
   color: var(--ds-green-700);
 }
 
-/* The file box inside a drop area is not a second box */
 .file-drop input[type="file"] {
   border: 0;
   background: transparent;
@@ -1315,8 +1238,6 @@ select {
   min-height: 0;
 }
 
-/* Buttons inside a bell item keep the button look (the item's link rules gave them the gold item
-   background and dark text, so "Open review" was hard to see on new items). */
 .bell-panel li a.button {
   display: inline-flex;
   flex-direction: row;
@@ -1335,7 +1256,6 @@ select {
   background: var(--ds-green-600);
 }
 
-/* Auto-Review: the "Why" list keeps a readable width next to the remark box */
 .reason-list {
   min-width: 240px;
 }

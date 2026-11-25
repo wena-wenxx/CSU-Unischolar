@@ -2,20 +2,6 @@
 
 namespace App\Support;
 
-/*
-|--------------------------------------------------------------------------
-| How e-mail is handled right now, in words staff can trust
-|--------------------------------------------------------------------------
-| Sending official e-mail to real CSU (carsu.edu.ph) accounts needs the
-| university's authorization, so during the study e-mail is OFF: messages are
-| written to the log (MAIL_MAILER=log) or all go to one test inbox
-| (MAIL_ALWAYS_TO). Screens must never say "sent" in those cases; students
-| are informed by the in-system notifications either way.
-|
-|   off     MAIL_MAILER=log / array: nothing leaves the computer
-|   test    MAIL_ALWAYS_TO is set: every e-mail goes to that one test inbox
-|   live    real sending to the students' own addresses
-*/
 class MailMode
 {
     public static function mode(): string
@@ -28,7 +14,6 @@ class MailMode
         return config('mail.always_to') ? 'test' : 'live';
     }
 
-    /** One sentence for the result message after approvals, e.g. "3 approval e-mails were sent." */
     public static function approvalSentence(int $count): string
     {
         if ($count === 0) {
@@ -43,7 +28,6 @@ class MailMode
         };
     }
 
-    /** e.g. "Invitation e-mail sent to Ana Cruz." / "... written to the e-mail log only (e-mail is off)." */
     public static function oneSentence(string $what, string $toName): string
     {
         return match (self::mode()) {
@@ -53,7 +37,6 @@ class MailMode
         };
     }
 
-    /** For the screens: what happens to e-mail now. */
     public static function describe(): array
     {
         return [

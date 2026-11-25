@@ -10,20 +10,6 @@ use App\Models\ScholarRecord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-/*
-|--------------------------------------------------------------------------
-| Enrollment: Registrar list + "Verify All Enrollments"
-|--------------------------------------------------------------------------
-| 1. OAS uploads the Registrar's list of enrolled students (CSV, read in
-|    the browser; only Student ID, last name, first name, course are sent).
-| 2. "Verify All" checks every approved applicant waiting for verification
-|    and/or every active grantee against the latest list, by Student ID:
-|      enrolled      Student ID found and the last name matches
-|      not_enrolled  Student ID not on the Registrar's list
-|      manual        Student ID found but the name is different, or no list
-| 3. Nothing is saved until staff press "Record": the system suggests,
-|    staff confirm.
-*/
 class EnrollmentListController extends Controller
 {
     private function staffOnly(Request $request): void
@@ -33,7 +19,6 @@ class EnrollmentListController extends Controller
         }
     }
 
-    // GET /staff/enrollment-lists
     public function index(Request $request)
     {
         $this->staffOnly($request);
@@ -42,9 +27,7 @@ class EnrollmentListController extends Controller
             'lists' => EnrollmentList::with('uploader:id,name')->latest()->latest('id')->limit(20)->get(),
             'waiting' => Application::where('status', 'approved')->where('enrollment_verified', false)->inOpenWork()->count(),
             'grantees' => ScholarRecord::where('status', 'active')->count(),
-            // Why the list can be empty (shown on the page instead of a silent "0"):
             'why_empty' => [
-                // approved, not verified, but their processing batch was already marked completed
                 'in_completed_batches' => Application::where('status', 'approved')->where('enrollment_verified', false)
                     ->whereHas('processingBatch', fn ($b) => $b->where('status', 'completed'))->count(),
                 'already_verified' => Application::where('status', 'approved')->where('enrollment_verified', true)->count(),
@@ -53,7 +36,6 @@ class EnrollmentListController extends Controller
         ]);
     }
 
-    // POST /staff/enrollment-lists   Body: period, file_name, rows [{student_id, last_name, first_name, course}]
     public function store(Request $request)
     {
         $this->staffOnly($request);
@@ -68,7 +50,6 @@ class EnrollmentListController extends Controller
             'rows.*.course' => 'nullable|string|max:255',
         ]);
 
-        // Keep one row per Student ID; skip empty IDs.
         $rows = collect($data['rows'])
             ->filter(fn ($row) => EnrollmentList::normalizeId($row['student_id'] ?? '') !== '')
             ->unique(fn ($row) => EnrollmentList::normalizeId($row['student_id']))
@@ -110,17 +91,6 @@ class EnrollmentListController extends Controller
         ], 201);
     }
 
-    /*
-    | GET /staff/enrollment-lists/{id}/rows
-    | Every row of a saved Registrar list with what the system found for it. Read-only: it shows staff that
-    | the whole list was read (e.g. 55 rows) and which rows matter. Nothing is recorded as enrolled here.
-    |   waiting        approved applicant waiting for enrollment verification  -> Verify All, then Record
-    |   grantee        active grantee (start-of-semester check)                 -> Verify All "Active grantees"
-    |   verified       approved applicant already verified                      -> nothing to do
-    |   no_grant       student in the system, no approved application or grant -> nothing to do
-    |   name_differs   Student ID found, but the surname is different           -> check who this is
-    |   not_in_system  no student with this Student ID (other enrolled students) -> nothing to do
-    */
     public function rows(Request $request, int $id)
     {
         $this->staffOnly($request);
@@ -145,7 +115,7 @@ class EnrollmentListController extends Controller
                 return $row + ['result' => 'not_in_system', 'note' => 'No student with this Student ID in the system. Nothing to do.'];
             }
             $row['student'] = trim($student->last_name.', '.$student->first_name);
-            $row['student_id'] = $student->student_id;   // as written in the system (with its dash)
+            $row['student_id'] = $student->student_id;
             if ($e->last_name && EnrollmentList::normalizeName($e->last_name) !== EnrollmentList::normalizeName($student->last_name)) {
                 return array_merge($row, ['result' => 'name_differs', 'note' => "In the system this Student ID is {$student->last_name}, {$student->first_name}. Check who this is."]);
             }
@@ -173,10 +143,6 @@ class EnrollmentListController extends Controller
         ]);
     }
 
-    /*
-    | POST /staff/enrollment/check   Body: scope approved|grantees|both, enrollment_list_id (optional: latest)
-    | Returns the suggested result for everyone; saves nothing.
-    */
     public function check(Request $request)
     {
         $this->staffOnly($request);
@@ -253,10 +219,6 @@ class EnrollmentListController extends Controller
         ]);
     }
 
-    /*
-    | POST /staff/enrollment/record
-    | Body: enrollment_list_id, items [{kind: application|grantee, id, enrolled: true|false}]
-    */
     public function record(Request $request)
     {
         $this->staffOnly($request);

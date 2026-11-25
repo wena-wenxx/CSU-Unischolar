@@ -5,16 +5,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-/*
-| Round 12: AI field fit.
-|   students.interests   optional "My field and goals" (typed by the student)
-|   program_fits         how well each active scholarship fits each student's
-|                        field (from the AI service: embeddings or TF-IDF).
-|                        It only ranks and explains; eligibility stays with the rules.
-| Also: the demo agency-direct programs get a "who it is for" sentence taken
-| from the agencies' own pages (only where the description is still the
-| generic demo note), so the AI has something to match.
-*/
 return new class extends Migration
 {
     private const NOTE = 'Apply directly to the scholarship-giving agency; requirements and allowances are handled by its office. The OAS posts announcements and updates when the agency requests it.';
@@ -29,11 +19,11 @@ return new class extends Migration
             $table->id();
             $table->foreignId('student_id')->constrained()->cascadeOnDelete();
             $table->foreignId('scholarship_id')->constrained()->cascadeOnDelete();
-            $table->string('level', 10);                 // high | medium | low | any
+            $table->string('level', 10);
             $table->decimal('similarity', 5, 3)->default(0);
-            $table->json('fields')->nullable();          // shared fields, e.g. ["Agriculture"]
-            $table->json('words')->nullable();           // shared words, for the explanation
-            $table->string('method', 20);                // embeddings | tfidf
+            $table->json('fields')->nullable();
+            $table->json('words')->nullable();
+            $table->string('method', 20);
             $table->timestamp('computed_at')->nullable();
             $table->unique(['student_id', 'scholarship_id']);
         });

@@ -17,7 +17,6 @@ const FILTERS = [
 ];
 
 export default function MyApplicationsPage() {
-  // /student/applications?status=approved opens the list already filtered.
   const location = useLocation();
   const [filter, setFilter] = useState(() => {
     const wanted = new URLSearchParams(location.search).get("status");

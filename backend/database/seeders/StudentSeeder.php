@@ -7,25 +7,8 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
-/**
- * Test student (REAL, used with her permission): Gleslimie B. Binag.
- *   Her e-mail, Student ID, course and photo come from .env (config/demo.php), so her real details
- *   never go to GitHub. Without them in .env, clearly fake placeholders are used.
- *   Use this account for e-mail tests, login demos and screenshots.
- *   She starts with NO applications so the full flow can be shown live.
- *
- *   Her GWA and family income are left EMPTY: she types them on My Profile
- *   during testing (AI Recommendations then shows "Not enough data" until then).
- *
- * Plus ten FICTIONAL demo students (no real CSU student data). Their GWA
- * (1.47) and family income (PHP 96,000) are the values printed on their
- * sample Grades and ITR files, already verified by the demo OAS staff.
- * Every account uses the password Student@12345.
- * "Demo" as the middle name makes it obvious these are not real people.
- */
 class StudentSeeder extends Seeder
 {
-    // Middle names, the same as on their sample documents (database/seeders/demo-files).
     public const MIDDLE = [
         '2026-00001' => 'Lopez', '2026-00002' => 'Cruz', '2026-00003' => 'Torres', '2026-00004' => 'Aquino',
         '2026-00005' => 'Morales', '2026-00006' => 'Bautista', '2026-00007' => 'Castillo', '2026-00008' => 'Domingo',
@@ -33,7 +16,6 @@ class StudentSeeder extends Seeder
     ];
 
     public const STUDENTS = [
-        // email number, student ID, first, last, course, year level, college
         [1, '2026-00001', 'Juan', 'Navarro', 'Bachelor of Science in Information Technology', '4th Year', 'College of Computing and Information Sciences'],
         [2, '2026-00002', 'Maria', 'Santos', 'Bachelor of Science in Information Technology', '3rd Year', 'College of Computing and Information Sciences'],
         [3, '2026-00003', 'Ana', 'Ramirez', 'Bachelor of Science in Computer Science', '2nd Year', 'College of Computing and Information Sciences'],
@@ -76,7 +58,6 @@ class StudentSeeder extends Seeder
             ]
         );
 
-        // Her photo for the sidebar, copied from this computer (public storage, not in GitHub).
         if ($real['photo'] && is_file($real['photo'])) {
             $path = 'avatars/test-student.'.strtolower(pathinfo($real['photo'], PATHINFO_EXTENSION) ?: 'jpg');
             \Illuminate\Support\Facades\Storage::disk('public')->put($path, file_get_contents($real['photo']));
@@ -106,7 +87,6 @@ class StudentSeeder extends Seeder
                     'year_level' => $yearLevel,
                     'college' => $college,
                     'contact_number' => sprintf('090000000%02d', $number),
-                    // Same values as their sample Certificate of Grades and Parents' ITR.
                     'gwa' => 1.47,
                     'family_income' => 96000,
                     'eligibility_updated_at' => now()->subDays(30),

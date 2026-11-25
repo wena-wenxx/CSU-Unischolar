@@ -19,10 +19,6 @@ class ActivityLog extends Model
         return $this->belongsTo(User::class);
     }
 
-    /*
-    | ActivityLog::record($user, 'application.approved', 'Approved by agency: Juan Navarro (TES)', $application)
-    | Never stops the action it describes: if logging fails, the error is ignored.
-    */
     public static function record(?User $user, string $action, string $description, ?Model $subject = null): ?self
     {
         try {
@@ -43,10 +39,6 @@ class ActivityLog extends Model
         }
     }
 
-    /*
-    | Demo data only: one activity entry for each staff step already in the
-    | application history (seeders), so Activity Logs is not empty at first.
-    */
     public static function backfillFromStatusLogs(): int
     {
         if (self::query()->exists()) {

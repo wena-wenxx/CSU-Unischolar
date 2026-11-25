@@ -29,13 +29,6 @@ function validateDocumentUpload(file) {
   return "";
 }
 
-/*
-  One application:
-  1. a checklist with one row per required document (upload each one),
-  2. a progress bar and a Submit button that is grey until every required
-     document is uploaded, then turns green,
-  3. the step-by-step timeline and "what happens next".
-*/
 export default function ApplicationDetailPage() {
   const { id } = useParams();
   const location = useLocation();
@@ -44,17 +37,15 @@ export default function ApplicationDetailPage() {
 
   const [application, setApplication] = useState(null);
   const [error, setError] = useState("");
-  const [files, setFiles] = useState({}); // requirement id -> chosen File
-  const [inputKeys, setInputKeys] = useState({}); // to clear a file input after upload
+  const [files, setFiles] = useState({});
+  const [inputKeys, setInputKeys] = useState({});
   const [uploadingId, setUploadingId] = useState(null);
-  const uploadControl = useRef(null); // AbortController of the upload in progress ("Cancel upload")
-  const stopUploads = useRef(false); // "Cancel upload" also stops the rest of "Upload all chosen files"
+  const uploadControl = useRef(null);
+  const stopUploads = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
-  const [saved, setSaved] = useState([]); // My Documents, grouped by type
+  const [saved, setSaved] = useState([]);
 
-  // Written with .then() (not await) so React's lint rule can see that the
-  // state is set later, when the server answers, not during the effect.
   const load = useCallback(
     () =>
       Promise.all([api.get(`/applications/${id}`), loadMyDocuments().catch(() => null)])
@@ -70,14 +61,12 @@ export default function ApplicationDetailPage() {
     load();
   }, [load]);
 
-  // One "Checking..." state per document; checks running in the AI worker are followed until they finish.
   const ai = useAiChecks({ toast, onChange: load, confirm });
   const { resume } = ai;
   useEffect(() => {
     resume(application?.documents);
   }, [application, resume]);
 
-  // Sends one chosen file. quiet = part of "Upload all": no reload / message per file.
   async function sendFile(requirement, file, quiet = false) {
     const fileError = validateDocumentUpload(file);
     if (fileError) {
@@ -107,7 +96,7 @@ export default function ApplicationDetailPage() {
     } catch (err) {
       if (isCancel(err)) {
         toast.info(`Upload of ${requirement.name} cancelled. The file is still chosen; press Upload to try again.`);
-        load(); // if the file had already fully arrived, the server may have kept it: show the real state
+        load();
         return false;
       }
       toast.error(`${requirement.name}: ${errMsg(err, "Document upload failed.")}`);
@@ -118,19 +107,16 @@ export default function ApplicationDetailPage() {
     }
   }
 
-  // "Cancel upload": stops the file being sent now (and the rest of "Upload all chosen files").
   function cancelUpload() {
     stopUploads.current = true;
     uploadControl.current?.abort();
   }
 
-  // "Remove": un-choose a file that was not uploaded yet.
   function clearChosen(requirement) {
     setFiles((current) => ({ ...current, [requirement.id]: null }));
     setInputKeys((current) => ({ ...current, [requirement.id]: (current[requirement.id] || 0) + 1 }));
   }
 
-  // "Delete": remove an uploaded file from this application (only while it can still be changed).
   async function deleteDocument(requirement, document) {
     const ok = await confirm({
       title: `Delete ${document.original_filename}?`,
@@ -158,8 +144,6 @@ export default function ApplicationDetailPage() {
     await sendFile(requirement, file);
   }
 
-  // "Upload all documents" when files were already chosen on the rows: uploads every chosen file in
-  // one press (no need to press Upload on each row).
   async function uploadChosen() {
     const todo = (application?.scholarship?.requirements || []).filter((r) => files[r.id]);
     let done = 0;
@@ -174,7 +158,6 @@ export default function ApplicationDetailPage() {
     else toast.error(`${done} of ${todo.length} uploaded. The others are still chosen on their rows; fix them and press Upload all again.`);
   }
 
-  // Attach a file from My Documents instead of uploading it again.
   async function attachSaved(requirement, file, quiet = false) {
     setUploadingId(requirement.id);
 
@@ -259,14 +242,11 @@ export default function ApplicationDetailPage() {
     (application.documents || []).find((d) => d.scholarship_requirement_id === requirement.id);
   const otherFiles = (application.documents || []).filter((d) => !d.scholarship_requirement_id);
 
-  // Saved files (My Documents) that could fill a requirement, if different from what is attached now.
   const savedFor = (requirement) => {
     const file = latestUsable(saved, requirement.name);
     const attached = documentFor(requirement);
     return file && file.file_path !== attached?.file_path ? file : null;
   };
-  // "Use my saved documents" fills empty rows, but skips files the AI flagged:
-  // those stay as a separate "Use saved file" choice with a warning.
   const fillable = editable
     ? requirements
         .filter((r) => !documentFor(r) && savedFor(r) && savedFor(r).status !== "flagged")
@@ -563,8 +543,6 @@ export default function ApplicationDetailPage() {
   );
 }
 
-
-// What the AI check found, in the student's words. The AI only points things out; OAS decides.
 function AiFindings({ document }) {
   const result = document.validation_result;
   if (document.status === "processing") {
@@ -596,8 +574,6 @@ function AiFindings({ document }) {
   );
 }
 
-
-// Guess which requirement a file is for from its name ("birth certificate.pdf" -> Birth Certificate).
 const NAME_HINTS = [
   [/birth|psa|nso/i, /birth/i],
   [/indigen/i, /indigen/i],
@@ -619,17 +595,12 @@ function guessRequirement(fileName, requirements, taken) {
   return "";
 }
 
-/*
-  "Upload all documents": choose several files at once; each is matched to a document by its file name
-  (the student checks or changes every match), then all are uploaded one after another with their own
-  status. The upload and Replace buttons on each row still work as before.
-*/
 function UploadAll({ applicationId, requirements, documentFor, onDone, onClose }) {
   const toast = useToast();
-  const [items, setItems] = useState([]); // {key, file, requirementId, state, message}
+  const [items, setItems] = useState([]);
   const [running, setRunning] = useState(false);
-  const control = useRef(null); // the upload in progress
-  const stopped = useRef(false); // "Cancel" pressed: the rest is not sent
+  const control = useRef(null);
+  const stopped = useRef(false);
 
   function choose(event) {
     const files = Array.from(event.target.files || []);

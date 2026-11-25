@@ -10,13 +10,6 @@ use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-/*
-| "You may be eligible for ..." e-mail, sent when OAS staff press
-| "Send invitation" (mode invite) or "Add to scholarship" (mode added:
-| OAS started a draft application for the student) on AI Recommendations.
-| It is an invitation only: the student still applies and is reviewed.
-| The view is resources/views/emails/scholarship-invitation.blade.php.
-*/
 class ScholarshipInvitationMail extends Mailable
 {
     use Queueable, SerializesModels;

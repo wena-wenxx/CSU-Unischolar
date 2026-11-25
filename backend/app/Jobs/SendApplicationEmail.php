@@ -11,13 +11,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Mail;
 
-/*
-| Sends one e-mail and records the result in email_logs.
-| QUEUE_CONNECTION=sync  -> sent right away (simplest for the demo).
-| QUEUE_CONNECTION=database -> sent by "php artisan queue:work" in the
-|                              background, so staff never wait for SMTP.
-| A failure is recorded, never shown as an error to the staff member.
-*/
 class SendApplicationEmail implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable;

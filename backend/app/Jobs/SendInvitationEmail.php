@@ -12,11 +12,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Mail;
 
-/*
-| Sends one AI Recommendations invitation e-mail and records the result in
-| email_logs (same rules as SendApplicationEmail: a failure is recorded,
-| never shown to the staff member as an error).
-*/
 class SendInvitationEmail implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable;

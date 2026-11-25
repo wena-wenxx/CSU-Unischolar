@@ -14,25 +14,6 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
-/*
-| php artisan demo:applicants            (12 applicants for TES)
-| php artisan demo:applicants 15 --program=TDP-TES
-|
-| Gives DEMO students (fictional, is_demo) a SUBMITTED application with every required document, so the
-| staff side has real work to process next to the test student: AI check all, Auto-Review, review,
-| needs action, forward, approved list, enrollment, grantee, payroll.
-|
-| The sample PDFs have readable text (the real AI service reads them). Most are correct; a few are made
-| wrong on purpose so the AI has something to flag:
-|   every 4th applicant: one document is the wrong kind (e.g. a Barangay Clearance uploaded as the COR)
-|   every 5th applicant: one surname has a typing mistake (name mismatch)
-|   every 7th applicant: one file is a blank scan (cannot be read, manual review)
-| Documents start "uploaded, not AI-checked": staff press AI check all, like in real work.
-|
-| Only demo students without an active grant and without an application to that program are used. Real
-| students are never touched. Demo computer only (APP_ENV=local and DEMO_RESET_ALLOWED=true).
-| Undo: php artisan demo:clean (everything) or demo:reset-student <Student ID> (one student).
-*/
 class DemoApplicants extends Command
 {
     protected $signature = 'demo:applicants
@@ -105,7 +86,7 @@ class DemoApplicants extends Command
                 $application->forceFill(['created_at' => $submitted->copy()->subHour(), 'updated_at' => $submitted])->save();
 
                 $person = $this->person($student);
-                $target = $requirements[$n % $requirements->count()]->name;   // the document that has the problem
+                $target = $requirements[$n % $requirements->count()]->name;
                 foreach ($requirements as $requirement) {
                     $this->document($application, $student, $requirement, $person, $requirement->name === $target ? $problem : null, $submitted);
                 }
@@ -124,7 +105,6 @@ class DemoApplicants extends Command
         return self::SUCCESS;
     }
 
-    /** The values the sample documents print, taken from the student's own record. */
     private function person(Student $s): array
     {
         $seed = crc32($s->student_id);

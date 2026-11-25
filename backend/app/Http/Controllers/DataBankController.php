@@ -7,7 +7,6 @@ use App\Models\Student;
 use App\Support\EligibilityEngine;
 use Illuminate\Http\Request;
 
-/** The centralized scholarship data bank: search a student, see full history. */
 class DataBankController extends Controller
 {
     private function staffOnly(Request $request)
@@ -19,22 +18,6 @@ class DataBankController extends Controller
         return null;
     }
 
-    /*
-    | GET /staff/data-bank
-    | q            words that must all match the student ID, a name or the course
-    | college, year_level, sex
-    | standing     active (holds a scholarship now) | former (held one before)
-    |              | applied (applied, never a grantee) | none (never applied)
-    |              | external (holds a scholarship from an outside party)
-    | external_program  holds this outside scholarship (External Grantees)
-    | scholarship_id  applied to, or held, this program
-    | school_year, semester   has an application or a scholar record in that period
-    | processing_batch_id     has an application or a scholar record in that batch
-    | application_status      has an application with that status (e.g. rejected, needs_action)
-    | scholar_status          has a scholar record with that status (active, inactive, completed)
-    | page, per_page  "Show more" paging (25 per page, alphabetical by last name)
-    | export=1     every match at once (for the CSV export, up to 5000)
-    */
     public function search(Request $request)
     {
         if ($denied = $this->staffOnly($request)) {
@@ -59,8 +42,6 @@ class DataBankController extends Controller
             'export' => 'nullable|boolean',
         ]);
 
-        // Every word typed must match the student ID, a name or the course.
-        // "juan student" finds Juan ... Student. Works on MySQL and SQLite.
         $words = array_filter(preg_split('/\s+/', trim((string) ($filters['q'] ?? ''))));
 
         $query = Student::query()
@@ -133,7 +114,6 @@ class DataBankController extends Controller
             'has_more' => !$export && $page * $perPage < $total,
         ];
 
-        // Choices for the filter dropdowns (first page only).
         if ($page === 1) {
             $response['options'] = [
                 'colleges' => Student::query()->whereNotNull('college')->distinct()->orderBy('college')->pluck('college'),
@@ -160,7 +140,6 @@ class DataBankController extends Controller
         $student = Student::with([
             'user', 'applications.scholarship', 'applications.documents.validationResult',
             'applications.processingBatch:id,name,status',
-            // processing history: every status change, enrollment check and tagging, with who did it
             'applications.statusLogs.changer:id,name',
             'scholarRecords.scholarship', 'scholarRecords.payrollRecords', 'scholarRecords.processingBatch:id,name,status',
             'externalGrantees' => fn ($e) => $e->where('match_status', 'matched')->latest(),

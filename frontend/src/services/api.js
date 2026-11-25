@@ -1,12 +1,9 @@
 import axios from "axios";
 import * as session from "../lib/session";
 
-// Backend address. Override in frontend/.env with VITE_API_URL if needed.
 export const API_URL =
   import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api";
 
-// Uploaded files are served from Laravel's public storage
-// (run "php artisan storage:link" once in backend/).
 export const FILES_URL =
   import.meta.env.VITE_FILES_URL ||
   API_URL.replace(/\/api\/?$/, "") + "/storage";
@@ -34,7 +31,6 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Token expired or was revoked: log out and go back to the login page.
     if (error.response?.status === 401 && session.getItem("token")) {
       session.removeItem("token");
       session.removeItem("user");
@@ -45,12 +41,10 @@ api.interceptors.response.use(
   }
 );
 
-// True when the request was stopped with a Cancel button (AbortController), not a real error.
 export function isCancel(err) {
   return err?.code === "ERR_CANCELED" || err?.name === "CanceledError" || err?.name === "AbortError";
 }
 
-// Turns any API error into one readable sentence for the user.
 export function errMsg(err, fallback = "Something went wrong. Please try again.") {
   if (isCancel(err)) return "Cancelled.";
   const data = err?.response?.data;

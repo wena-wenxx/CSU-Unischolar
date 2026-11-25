@@ -5,13 +5,6 @@ namespace App\Console\Commands;
 use App\Support\EligibilityEngine;
 use Illuminate\Console\Command;
 
-/*
-| php artisan recommendations:run
-|
-| Recalculates AI Recommendations for every student and every scored
-| scholarship (same as the "Recalculate" button on the staff page).
-| Staff decisions (invited, dismissed, ...) are kept.
-*/
 class RunRecommendations extends Command
 {
     protected $signature = 'recommendations:run';

@@ -3,10 +3,6 @@ import { homePathFor, useAuth } from "../lib/auth";
 import { APP_NAME, LOGO, UNIVERSITY } from "../lib/brand";
 import ChangePasswordForm from "../components/ChangePasswordForm";
 
-/*
-  Shown right after logging in with a temporary password (set by the admin),
-  before any other page. Also reachable from My Profile.
-*/
 export default function ChangePasswordPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();

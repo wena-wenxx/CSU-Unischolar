@@ -1,10 +1,5 @@
 import { formatDateTime, stepLabel } from "../lib/format";
 
-/*
-  Step-by-step history of one application, using its status logs.
-  Steps already done are filled; the next expected steps are shown faded,
-  so the student can see where they are and what comes next.
-*/
 const MAIN_PATH = ["draft", "submitted", "under_review", "complete", "approved", "enrollment_verified", "grantee_tagged"];
 
 export default function StatusTimeline({ application }) {
@@ -12,7 +7,6 @@ export default function StatusTimeline({ application }) {
   const done = logs.map((log) => log.to_status);
   const finished = ["rejected"].includes(application.status) || done.includes("grantee_tagged");
 
-  // Next steps that have not happened yet (not shown after a final "rejected").
   const upcoming = finished
     ? []
     : MAIN_PATH.filter((step) => !done.includes(step) && MAIN_PATH.indexOf(step) > MAIN_PATH.indexOf(lastMainStep(done)));

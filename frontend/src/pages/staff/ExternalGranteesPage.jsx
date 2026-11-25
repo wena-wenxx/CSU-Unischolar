@@ -12,16 +12,6 @@ import SearchField from "../../components/SearchField";
 import SheetTabs from "../../components/SheetTabs";
 import FileDrop from "../../components/FileDrop";
 
-/*
-  External Grantees (staff): students who already hold a scholarship from an
-  outside party (LGU, CHED list, private foundation).
-    1. Upload the party's list (PDF, Word, Excel, CSV or a photo).
-    2. The AI reads names and Student IDs and suggests the matching student
-       (Student ID first, then a fuzzy name match of at least 80%).
-    3. Staff confirm or correct every line, then Save.
-  A saved, matched student "holds an external scholarship": it shows on their
-  profile and in the Data Bank, and counts for the one-scholarship rule.
-*/
 const EMPTY_FORM = { program_name: "", agency: "", category: "lgu", school_year: "" };
 const stamp = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
@@ -30,7 +20,6 @@ function Badge({ value }) {
   return <span className={`status status-${tone}`}>{label}</span>;
 }
 
-// The list filters as API parameters.
 function query(f, extra = {}) {
   const out = { match: f.match, status: f.status, ...extra };
   if (f.q.trim()) out.q = f.q.trim();
@@ -38,14 +27,13 @@ function query(f, extra = {}) {
   return out;
 }
 
-// Each line's starting decision, taken from the AI's suggestion.
 function startDecisions(rows) {
   const out = {};
   (rows || []).forEach((row) => {
     out[row.row] = {
       student_id: row.result === "matched" ? row.student?.id ?? null : null,
       include: row.result !== "error",
-      manual: null, // a student found by typing a Student ID
+      manual: null,
     };
   });
   return out;
@@ -73,7 +61,7 @@ export default function ExternalGranteesPage() {
   const [file, setFile] = useState(null);
   const [fileKey, setFileKey] = useState(0);
   const [uploading, setUploading] = useState(false);
-  const uploadControl = useRef(null); // "Cancel" while the list is sent and read
+  const uploadControl = useRef(null);
   const [showUpload, setShowUpload] = useState(false);
 
   const [review, setReview] = useState(null);
@@ -84,7 +72,6 @@ export default function ExternalGranteesPage() {
   const [filters, setFilters] = useState({ q: "", program: "all", match: "matched", status: "all" });
   const [history, setHistory] = useState([]);
 
-  // .then() (not await) so React's lint rule sees the state is set later.
   const loadList = useCallback(
     (f, page = 1) =>
       api
@@ -125,7 +112,6 @@ export default function ExternalGranteesPage() {
 
   useEffect(() => {
     loadList({ q: "", program: "all", match: "matched", status: "all" });
-    // An upload still waiting for review opens automatically.
     loadHistory().then((uploads) => {
       const waiting = (uploads || []).find((u) => u.status === "review");
       if (waiting) openReview(waiting.id);
@@ -687,7 +673,6 @@ export default function ExternalGranteesPage() {
   );
 }
 
-/* Step 2: staff confirm or correct each line before saving. */
 function ReviewCard({ review, decisions, decide, findStudent, saving, onSave, onDiscard, onExport }) {
   const [typing, setTyping] = useState({});
   const rows = review.rows || [];

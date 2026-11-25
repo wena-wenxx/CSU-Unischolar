@@ -16,12 +16,6 @@ use Illuminate\Support\Facades\DB;
 
 class ApplicationController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | STUDENT
-    |--------------------------------------------------------------------------
-    */
-
     public function store(Request $request)
     {
         if ($request->user()->role !== 'student') {
@@ -49,15 +43,12 @@ class ApplicationController extends Controller
             $request->scholarship_id
         );
 
-        // Closed, inactive, not yet open, past its deadline, or applied for at the agency.
         if ($scholarship->isAgencyDirect() || !$scholarship->is_open) {
             return response()->json([
                 'message' => $scholarship->closedReason()
             ], 422);
         }
 
-        // One active scholarship per student: ScholarGuide grantee records and
-        // scholarships from outside parties (External Grantees).
         $holding = $student->otherActiveScholarship();
 
         if ($holding) {
@@ -81,7 +72,6 @@ class ApplicationController extends Controller
             ], 422);
         }
 
-        // An application from an earlier school year that is still being processed comes first.
         $stillOpen = Application::where('student_id', $student->id)
             ->where('scholarship_id', $scholarship->id)
             ->whereNotIn('status', ['approved', 'rejected'])
@@ -107,13 +97,6 @@ class ApplicationController extends Controller
             201
         );
     }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | STUDENT - SUBMIT APPLICATION
-    |--------------------------------------------------------------------------
-    */
 
     public function submit(Request $request, $id)
     {
@@ -145,8 +128,6 @@ class ApplicationController extends Controller
             ], 422);
         }
 
-        // A first submission must be made before the deadline. A resubmission
-        // that OAS asked for (needs_action) is still accepted afterwards.
         if ($application->status === 'draft' && !$application->scholarship->is_open) {
             return response()->json([
                 'message' => $application->scholarship->closedReason()
@@ -195,13 +176,6 @@ class ApplicationController extends Controller
         ]);
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | STUDENT - MY APPLICATIONS
-    |--------------------------------------------------------------------------
-    */
-
     public function myApplications(Request $request)
     {
         $student = Student::where(
@@ -227,13 +201,6 @@ class ApplicationController extends Controller
         return response()->json($applications);
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | STAFF - ALL APPLICATIONS
-    |--------------------------------------------------------------------------
-    */
-
     public function index(Request $request)
     {
         if ($request->user()->role !== 'staff' && !$request->user()->isAdmin()) {
@@ -242,11 +209,6 @@ class ApplicationController extends Controller
             ], 403);
         }
 
-        // The list only sends what the tables, filters and CSV reports show
-        // (about 10x smaller than whole records, so pages open faster).
-        // Full documents and AI results are loaded per application in show().
-        // ?status=approved (or a comma list) returns only those statuses.
-        // Newest activity first: whatever changed most recently is on top.
         $statuses = array_filter(explode(',', (string) $request->query('status', '')));
 
         $applications = Application::query()
@@ -273,7 +235,6 @@ class ApplicationController extends Controller
                     ->where('is_required', true)
                     ->reject(fn ($r) => in_array($r->id, $covered))
                     ->pluck('name')->values() ?? []);
-                // A flag a staff member already checked and verified is not counted as open.
                 $application->setAttribute('flagged_count', $application->documents->where('status', 'flagged')->whereNull('staff_verified_at')->count());
                 $application->setAttribute('documents_count', $application->documents->count());
                 $application->setRelation('documents', collect());
@@ -285,13 +246,6 @@ class ApplicationController extends Controller
         return response()->json($applications);
     }
 
-
-    /*
-    | GET /staff/applications/version
-    | A tiny fingerprint of all applications and their documents. The
-    | Applications page asks for it every few seconds and reloads the list
-    | only when it changed (someone else worked on it, or Auto-Review ran).
-    */
     public function version(Request $request)
     {
         if (!$request->user()->isOffice()) {
@@ -303,13 +257,6 @@ class ApplicationController extends Controller
 
         return response()->json(['version' => "{$apps->c}|{$apps->u}|{$docs->c}|{$docs->u}"]);
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | STAFF / STUDENT (OWNER) - VIEW ONE APPLICATION
-    |--------------------------------------------------------------------------
-    | Staff can open any application. A student can open only their own.
-    */
 
     public function show(Request $request, $id)
     {
@@ -338,7 +285,6 @@ class ApplicationController extends Controller
             return response()->json($application);
         }
 
-        // Staff only: what the review window needs at a glance.
         $application->setAttribute('next_statuses', $application->staffNextStatuses());
         $application->setAttribute('missing_requirements', $application->missingRequirementNames());
 
@@ -373,13 +319,6 @@ class ApplicationController extends Controller
         return response()->json($application);
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | STUDENT / STAFF - UPLOAD DOCUMENT
-    |--------------------------------------------------------------------------
-    */
-
     public function uploadDocument(Request $request, $id)
     {
         $request->validate([
@@ -390,7 +329,6 @@ class ApplicationController extends Controller
 
         $application = Application::findOrFail($id);
 
-        // Separation of duties: the system administrator manages accounts, not applications.
         if ($request->user()->role === 'admin') {
             return response()->json(['message' => 'Only the student or OAS staff can add documents to an application.'], 403);
         }
@@ -425,20 +363,18 @@ class ApplicationController extends Controller
 
         $file = $request->file('file');
 
-        // Uploading again for the same requirement replaces the old file,
-        // so each requirement has one current document.
         if ($request->scholarship_requirement_id) {
             $previous = Document::where('application_id', $application->id)
                 ->where('scholarship_requirement_id', $request->scholarship_requirement_id)
                 ->get();
 
             foreach ($previous as $old) {
-                $old->delete(); // its AI result is removed with it
+                $old->delete();
                 Document::deleteFileIfUnused($old->file_path);
             }
         }
 
-        $path = $file->store('documents', Document::DISK);   // private: opened through a signed link
+        $path = $file->store('documents', Document::DISK);
 
         $requirementName = $request->scholarship_requirement_id
             ? ScholarshipRequirement::whereKey($request->scholarship_requirement_id)->value('name')
@@ -452,7 +388,6 @@ class ApplicationController extends Controller
             'original_filename' =>
                 $file->getClientOriginalName(),
             'file_path' => $path,
-            // The type name lets the student reuse this file in My Documents.
             'document_type' =>
                 $request->document_type ?: $requirementName,
             'status' => 'uploaded',
@@ -463,17 +398,6 @@ class ApplicationController extends Controller
             'document' => $document
         ], 201);
     }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | STUDENT - REUSE A SAVED DOCUMENT (My Documents)
-    |--------------------------------------------------------------------------
-    | Attaches a file the student already uploaded (for another application
-    | or in My Documents) to this application, instead of uploading it again.
-    | A new document row is made that points to the same stored file, so each
-    | application keeps its own status and AI check.
-    */
 
     public function reuseDocument(Request $request, $id)
     {
@@ -529,7 +453,7 @@ class ApplicationController extends Controller
             'original_filename' => $source->original_filename,
             'file_path' => $source->file_path,
             'document_type' => $requirement->name,
-            'status' => 'uploaded', // OAS checks it again for this application
+            'status' => 'uploaded',
         ]);
 
         return response()->json([
@@ -537,13 +461,6 @@ class ApplicationController extends Controller
             'document' => $document,
         ], 201);
     }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | STAFF - APPLICATION REVIEW
-    |--------------------------------------------------------------------------
-    */
 
     public function review(Request $request, $id)
     {
@@ -564,7 +481,6 @@ class ApplicationController extends Controller
         $application = Application::findOrFail($id);
         $previousStatus = $application->status;
 
-        // Keep the steps in order (see Application::STAFF_NEXT).
         if ($error = $application->staffChangeError($data['status'])) {
             return response()->json(['message' => $error], 422);
         }
@@ -580,13 +496,10 @@ class ApplicationController extends Controller
             'remarks' => $data['remarks'] ?? null,
         ];
 
-        // Forwarded to the agency now (or again): remember when.
         if ($data['status'] === 'complete' && !in_array($previousStatus, ['complete', 'approved', 'rejected'], true)) {
             $changes['forwarded_at'] = now();
         }
 
-        // Enrollment verification only makes sense for approved
-        // applications. If staff move it away from "approved", clear it.
         if ($data['status'] !== 'approved') {
             $changes['enrollment_verified'] = false;
             $changes['enrollment_verified_at'] = null;
@@ -594,7 +507,6 @@ class ApplicationController extends Controller
 
         $application->update($changes);
 
-        // E-mail the student when the agency's approval is recorded.
         $emailLog = null;
         if ($data['status'] === 'approved' && $previousStatus !== 'approved') {
             $emailLog = ApplicationNotifier::approved($application, 'review');

@@ -14,11 +14,6 @@ import {
   UNIVERSITY,
 } from "../lib/brand";
 
-/*
-  Login: full-screen CSU Main Campus photo under a dark green layer,
-  with a centred white sign-in card. "Forgot password?" shows how to get
-  a new password from the OAS (with its contact details).
-*/
 export default function LoginPage() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
@@ -31,7 +26,6 @@ export default function LoginPage() {
   const [forgot, setForgot] = useState(false);
   const [contact, setContact] = useState(null);
 
-  // OAS contact details for "Forgot your password?" (public, no login needed).
   useEffect(() => {
     api
       .get("/office-contact")
@@ -39,7 +33,6 @@ export default function LoginPage() {
       .catch(() => setContact(null));
   }, []);
 
-  // Already logged in? Go straight to the dashboard.
   if (user) {
     return <Navigate to={homePathFor(user)} replace />;
   }

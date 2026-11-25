@@ -4,12 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-/*
-| The Registrar's list of enrolled students for a term, uploaded by OAS as a
-| CSV file. "Verify All Enrollments" matches approved applicants and active
-| grantees against it by Student ID. (No live connection to the Registrar.)
-| forwarded_at: when OAS forwarded the application to the agency.
-*/
 return new class extends Migration
 {
     public function up(): void

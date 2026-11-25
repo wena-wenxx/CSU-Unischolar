@@ -1,9 +1,3 @@
-/*
-  Video guides on the Help page. Recorded from the real system with fictional demo data:
-  a gold arrow and a caption show each step. Files: frontend/public/tutorials/*.mp4 (no sound; captions are in the video).
-  Chapters: seconds from the start -> title (clicking one jumps there).
-  To re-record after the screens change, see documentation/TUTORIAL_VIDEOS.md.
-*/
 export const TUTORIALS = {
   student: {
     title: "Student guide",
@@ -43,7 +37,6 @@ export const TUTORIALS = {
   },
 };
 
-// Which videos each role sees (staff also see the student guide, to help students).
 export const TUTORIALS_FOR = {
   student: ["student"],
   staff: ["staff", "student"],

@@ -1,9 +1,3 @@
-{{--
-  General Payroll (General Form No. 6-A) as a PDF, made with dompdf.
-  dompdf understands tables and simple CSS (no flex or grid), so the layout
-  is built from tables. Same content as the printable page and the Word file.
-  Paper: long bond 8.5 x 13 in, landscape (set in GeneralPayrollForm::pdf).
---}}
 @php
     $peso = fn ($v) => $v === null ? '' : number_format((float) $v, 2);
     $s = $form['signatories'];
@@ -86,7 +80,6 @@
                     // Column widths (%): dompdf reads them from the first header row.
                     $sem = fn ($label) => e($label).'<small>'.$peso($form['rate']).'</small>';
                 @endphp
-                {{-- Two header rows, like the OAS form: "Less: Miscellaneous / CHED Grants" over two empty sub-columns. --}}
                 <tr>
                     <th rowspan="2" style="width: 2.8%;">No.</th>
                     <th rowspan="2" style="width: 6.4%;">ID NO.</th>
@@ -153,7 +146,6 @@
             </tbody>
         </table>
 
-        {{-- Signatures in the OAS layout: 5 across, a line, then 3 + the witness lines. --}}
         <table class="signs">
             <tr class="cert-row">
                 <td colspan="2">(1.) I certify on my oath above Payroll is correct and that the services have been duly rendered as stated.</td>

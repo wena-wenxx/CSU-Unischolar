@@ -56,8 +56,6 @@ class User extends Authenticatable
         return $this->role === 'staff';
     }
 
-    // OAS staff or the admin: may READ office-wide data (lists, reports).
-    // Processing applications, grantees and payroll stays with staff.
     public function isOffice(): bool
     {
         return in_array($this->role, ['staff', 'admin'], true);

@@ -1,23 +1,3 @@
-"""
-CSU UniScholar AI service (ASSISTIVE ONLY).
-
-It reads an uploaded document and returns FLAGS for OAS staff to review.
-It never approves or rejects anyone.
-
-    ocr_engine.py  -> gets the text out of the file (PDF text or PaddleOCR)
-    validation.py  -> turns that text into flags (name, student ID, document kind)
-    list_reader.py -> reads an outside party's list of grantees (PDF, Word,
-                      Excel, CSV, picture) and suggests which ScholarGuide
-                      student each line is (staff confirm every match)
-    fit_matcher.py -> how well each scholarship fits a student's field
-                      (pretrained sentence embeddings, or TF-IDF without them)
-    rule_reader.py -> reads a scholarship memo and suggests its eligibility
-                      rules (local LLM through Ollama, or simple patterns);
-                      staff confirm every value
-
-Run (inside ai-service/, with the virtual environment active):
-    uvicorn main:app --reload --port 8001
-"""
 import hashlib
 import json
 import logging
@@ -55,14 +35,12 @@ ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
 
 log = logging.getLogger("uvicorn.error")
 
-# Same file + same student + same document kind -> same answer: a repeated check is answered at once.
 _RESULTS = OrderedDict()
 _RESULTS_MAX = 64
 
 
 @app.on_event("startup")
 def _load_ocr_early():
-    """Loads PaddleOCR in the background when the service starts, so the first AI check is not slow."""
     ocr_engine.warm_up()
 
 
@@ -90,11 +68,6 @@ def read_root():
 
 @app.get("/health")
 def health():
-    """
-    One check of every AI part, for the setup guide:
-      OCR (PaddleOCR or Tesseract), text matching (BGE model or TF-IDF), memo reader (Ollama or patterns).
-    Typed PDFs, Excel and Word files work even when no OCR program is installed.
-    """
     import ocr_engine
     import rule_reader
 
@@ -115,7 +88,6 @@ def health():
 
 @app.get("/ocr-status")
 def get_ocr_status():
-    """Is PaddleOCR installed and loaded? (Typed PDFs work even without it.)"""
     return ocr_status()
 
 
@@ -126,9 +98,7 @@ async def validate_document(
     expected_student_id: str = Form(""),
     expected_last_name: str = Form(""),
     document_label: str = Form(""),
-    # Older name for document_label, still accepted.
     document_type: str = Form(""),
-    # e.g. "2026-2027": a COR for another school year is flagged.
     current_school_year: str = Form(""),
 ):
     if not file.filename:
@@ -155,7 +125,6 @@ async def validate_document(
         log.info("validate-document %s: same file checked before, answered from memory", file.filename)
         return cached
 
-    # The reading runs in a worker thread, so the service keeps answering other requests meanwhile.
     result = await run_in_threadpool(
         _check_file, file_bytes, suffix, file.filename, label, expected_name, expected_student_id,
         expected_last_name, current_school_year,
@@ -176,7 +145,6 @@ def _check_file(file_bytes, suffix, filename, label, expected_name, expected_stu
 
     try:
         extraction = extract_text(temp_path, filename)
-        # "Possible edit" cautions from the file's hidden details (never a verdict).
         cautions = file_notes(temp_path, filename, file_bytes)
     finally:
         try:
@@ -185,7 +153,6 @@ def _check_file(file_bytes, suffix, filename, label, expected_name, expected_stu
             pass
 
     if extraction["ocr_status"] != "ok":
-        # Could not read the file at all: send it to a human, do not guess.
         return {
             "success": True,
             "ocr_status": "failed",
@@ -238,16 +205,9 @@ def _check_file(file_bytes, suffix, filename, label, expected_name, expected_stu
 @app.post("/extract-grantee-list")
 async def extract_grantee_list(
     file: UploadFile = File(...),
-    # JSON list of the students in ScholarGuide:
-    # [{"id": 5, "student_id": "2024-10123", "first_name": "...", "middle_name": "...", "last_name": "..."}]
     students: str = Form("[]"),
     threshold: int = Form(80),
 ):
-    """
-    Reads a list of grantees (PDF, Word .docx, Excel .xlsx, CSV, PNG/JPG) and
-    suggests a ScholarGuide student for each line. It only SUGGESTS: OAS staff
-    confirm or correct every line before anything is saved.
-    """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file supplied.")
 
@@ -276,7 +236,7 @@ async def extract_grantee_list(
 
     try:
         result = await run_in_threadpool(extract_and_match, temp_path, file.filename, student_list, threshold)
-    except Exception as e:  # unreadable or damaged file: tell staff plainly
+    except Exception as e:
         raise HTTPException(status_code=422, detail=f"The file could not be read ({type(e).__name__}: {e}).")
     finally:
         try:
@@ -289,11 +249,6 @@ async def extract_grantee_list(
 
 @app.post("/read-table")
 async def read_table_endpoint(file: UploadFile = File(...)):
-    """
-    Reads any list file (PDF, Word .docx, Excel .xlsx, CSV, PNG/JPG) into rows
-    of cells. Used by Approved Lists and Enrollment, where staff then choose
-    which column is the Student ID.
-    """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file supplied.")
     suffix = Path(file.filename).suffix.lower()
@@ -304,12 +259,22 @@ async def read_table_endpoint(file: UploadFile = File(...)):
     file_bytes = await file.read()
     if not file_bytes:
         raise HTTPException(status_code=422, detail="Uploaded file is empty.")
+    started = time.monotonic()
+    key = "table|" + hashlib.sha256(file_bytes).hexdigest() + "|" + suffix
+    cached = _cached(key)
+    if cached is not None:
+        cached["elapsed_seconds"] = round(time.monotonic() - started, 2)
+        cached["cached"] = True
+        return {"success": True, **cached}
     with NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
         temp_file.write(file_bytes)
         temp_path = temp_file.name
     try:
-        started = time.monotonic()
         result = await run_in_threadpool(table_rows, temp_path, file.filename)
+        try:
+            _remember(key, result)
+        except (TypeError, ValueError):
+            pass
         result["elapsed_seconds"] = round(time.monotonic() - started, 2)
     except Exception as e:
         text = str(e)
@@ -331,17 +296,11 @@ async def read_table_endpoint(file: UploadFile = File(...)):
 
 @app.get("/fit-status")
 def fit_status():
-    """Which text-matching method is used: the embedding model, or TF-IDF when it is not installed."""
     return fit_matcher.status()
 
 
 @app.post("/fit-scores")
 def fit_scores(payload: dict = Body(...)):
-    """
-    Field fit of every student to every scholarship (AI Recommendations).
-    Body: {"students": [{"id", "text"}], "programs": [{"id", "text"}]}
-    It only ranks and explains; the eligibility rules stay in Laravel.
-    """
     students = payload.get("students") or []
     programs = payload.get("programs") or []
     if not students or not programs:
@@ -358,11 +317,6 @@ async def suggest_rules(
     options: str = Form("{}"),
     use_llm: bool = Form(True),
 ):
-    """
-    Reads a scholarship memo (pasted text, or a PDF / Word / TXT / picture file)
-    and suggests its eligibility rules, each with the sentence it came from.
-    Staff check and apply them; nothing is saved here.
-    """
     try:
         choices = json.loads(options or "{}")
     except json.JSONDecodeError:

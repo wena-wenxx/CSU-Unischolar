@@ -5,8 +5,6 @@ import { useToast } from "../../lib/toast";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 
-/* Sent invitations and scholarship notices: whom the OAS invited, for which program, when, and where
-   each one stands now. Read-only: invitations are sent from AI Recommendations. */
 const TABS = [
   ["all", "All"],
   ["sent", "Sent, not opened"],

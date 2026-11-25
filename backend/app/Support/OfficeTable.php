@@ -4,26 +4,10 @@ namespace App\Support;
 
 use ZipArchive;
 
-/*
-|--------------------------------------------------------------------------
-| OfficeTable: reads a Word (.docx) or Excel (.xlsx) list into rows of cells
-|--------------------------------------------------------------------------
-| Both files are a zip folder with XML inside, so PHP can read them with
-| ZipArchive alone (no extra package, and the AI service does not need to be
-| running). Used by Approved Lists and Enrollment (POST /staff/read-table).
-|
-|   .xlsx  every sheet, every row; shared text, inline text, numbers, dates
-|   .docx  every table row; when the file has no table, one row per
-|          paragraph, split on tabs or 2+ spaces
-|
-| Old .doc / .xls files are a different (binary) format and are not read:
-| open them and "Save As" .docx / .xlsx.
-*/
 class OfficeTable
 {
     public const MAX_ROWS = 5000;
 
-    /** @return array{rows: array<int, array<int, string>>, method: string, warnings: array<int, string>} */
     public static function read(string $path, string $extension): array
     {
         $zip = new ZipArchive();
@@ -50,8 +34,6 @@ class OfficeTable
 
         return ['rows' => $rows, 'method' => $method, 'warnings' => $warnings];
     }
-
-    // ------------------------------------------------------------------ Excel
 
     private static function xlsx(ZipArchive $zip): array
     {
@@ -98,7 +80,6 @@ class OfficeTable
         return [$rows, 'excel'];
     }
 
-    /** Sheet files in workbook order (falls back to every sheet file found). */
     private static function sheetPaths(ZipArchive $zip): array
     {
         $paths = [];
@@ -132,7 +113,6 @@ class OfficeTable
         return array_values($paths);
     }
 
-    /** Style numbers whose number format is a date. */
     private static function dateStyles(ZipArchive $zip): array
     {
         $styles = self::xml($zip, 'xl/styles.xml');
@@ -167,16 +147,13 @@ class OfficeTable
             return $raw;
         }
         if ($isDate) {
-            // Excel counts days from 1899-12-30.
             return date('Y-m-d', (int) round(((float) $raw - 25569) * 86400));
         }
         $number = (float) $raw;
 
-        // 202600001.0 -> "202600001" (student numbers typed as numbers)
         return floor($number) === $number && abs($number) < 1e15 ? (string) (int) $number : (string) $number;
     }
 
-    /** "C12" -> 2 */
     private static function columnIndex(string $ref): ?int
     {
         if (!preg_match('/^([A-Z]+)/', strtoupper($ref), $m)) {
@@ -189,8 +166,6 @@ class OfficeTable
 
         return $n - 1;
     }
-
-    // ------------------------------------------------------------------- Word
 
     private static function docx(ZipArchive $zip): array
     {
@@ -213,8 +188,6 @@ class OfficeTable
                     $parts[] = self::paragraphText($xpath, $p);
                 }
                 $cells[] = self::clean(implode(' ', $parts));
-                // A cell merged across columns keeps the columns lined up (empty cells after it);
-                // a cell merged down (vMerge "continue") is left empty.
                 $span = (int) ($xpath->query('w:tcPr/w:gridSpan/@w:val', $tc)->item(0)?->nodeValue ?? 1);
                 for ($i = 1; $i < $span; $i++) {
                     $cells[] = '';
@@ -247,8 +220,6 @@ class OfficeTable
         return $text;
     }
 
-    // ---------------------------------------------------------------- helpers
-
     private static function xml(ZipArchive $zip, string $name): ?\SimpleXMLElement
     {
         $raw = $zip->getFromName($name);
@@ -260,7 +231,6 @@ class OfficeTable
         return $xml === false ? null : $xml;
     }
 
-    /** All <t> text inside a shared-string or inline-string item (rich text has several). */
     private static function text(?\SimpleXMLElement $node): string
     {
         if (!$node) {

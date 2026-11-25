@@ -4,10 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-/*
-| A file of outside-scholarship grantees uploaded by OAS staff
-| (status: review -> saved, or discarded). See ExternalGranteeController.
-*/
 class ExternalGranteeUpload extends Model
 {
     public const CATEGORIES = [

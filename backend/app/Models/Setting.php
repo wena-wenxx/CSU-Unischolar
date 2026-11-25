@@ -5,10 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 
-/*
-| Key/value system settings, changed by the admin in System Settings.
-| When a key has never been saved, the default below is used.
-*/
 class Setting extends Model
 {
     protected $primaryKey = 'key';
@@ -19,11 +15,9 @@ class Setting extends Model
 
     public const SEMESTERS = ['1st Semester', '2nd Semester', 'Summer'];
 
-    // Office details as published by the OAS (CSU website). Office hours were
-    // not published there; confirm them with the OAS.
     public const DEFAULTS = [
-        'current_school_year' => null,        // e.g. 2026-2027 (null = worked out from today's date)
-        'current_semester' => null,           // 1st Semester / 2nd Semester / Summer
+        'current_school_year' => null,
+        'current_semester' => null,
         'oas_office_hours' => 'Monday to Friday, 8:00 AM to 5:00 PM',
         'oas_location' => 'Caraga State University, Ampayon, Butuan City, Philippines',
         'oas_email' => 'oas@carsu.edu.ph',
@@ -32,10 +26,6 @@ class Setting extends Model
         'oas_facebook' => 'https://www.facebook.com/carsuoas',
         'oas_about' => 'The Office of Admission and Scholarship is responsible for the development and implementation of programs and initiatives that are aimed at attracting, admitting, and supporting a diverse and talented student body while facilitating access to scholarship opportunities and financial aid resources to promote affordability and student success.',
 
-        // Signatories printed on the General Payroll (General Form No. 6-A), as on the OAS form the OAS gave
-        // us (photos of a filled-in TES Batch 1 sheet). These are the officials' names in their official
-        // positions. The admin changes them in System Settings when an official changes; a saved value
-        // always wins over these defaults.
         'payroll_coordinator_name' => 'AIRISH PELEMENIANO - JUMONONG, MSc',
         'payroll_coordinator_title' => 'Scholarship Coordinator',
         'payroll_director_name' => 'SHEILA RAE E. PERMANES, PhD',
@@ -52,7 +42,6 @@ class Setting extends Model
         'payroll_cashier_title' => 'University Cashier',
     ];
 
-    // The signatory slots on Form 6-A, in the order the form prints them.
     public const PAYROLL_SIGNATORIES = [
         'coordinator' => 'Noted by (1)',
         'director' => 'Noted by (2)',
@@ -85,7 +74,6 @@ class Setting extends Model
         'payroll_cashier_name' => 'Payroll form: cashier name', 'payroll_cashier_title' => 'Payroll form: cashier title',
     ];
 
-    /** [slot => ['name' => ..., 'title' => ...]] for the payroll form. */
     public static function payrollSignatories(): array
     {
         $values = self::allValues();

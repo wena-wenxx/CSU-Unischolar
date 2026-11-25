@@ -8,7 +8,6 @@ import { useToast } from "../../lib/toast";
 import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 
-/* Who did what and when. Newest first, 50 at a time, with filters and CSV export. */
 const stamp = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
 const TONE = {
@@ -57,7 +56,7 @@ export default function ActivityLogPage() {
   async function change(key, value) {
     const next = { ...filters, [key]: value };
     setFilters(next);
-    if (key === "q") return; // text: wait for Search / Enter
+    if (key === "q") return;
     setLoading(true);
     await fetchPage(1, next);
     setLoading(false);

@@ -6,15 +6,8 @@ use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
-/*
-| Profile photo: every user (student, staff, admin) can upload a
-| photo of themselves; it is shown in the sidebar. Optional: without one the
-| initials are shown. Saved in storage/app/public/avatars with a random file
-| name (needs "php artisan storage:link" once, like announcement pictures).
-*/
 class ProfilePhotoController extends Controller
 {
-    // POST /profile/photo   form-data: photo (JPG, PNG or WebP, up to 2 MB)
     public function store(Request $request)
     {
         $request->validate([
@@ -37,7 +30,6 @@ class ProfilePhotoController extends Controller
         return response()->json(['message' => 'Profile photo saved.', 'user' => $user->fresh()->load('student')]);
     }
 
-    // DELETE /profile/photo
     public function destroy(Request $request)
     {
         $user = $request->user();

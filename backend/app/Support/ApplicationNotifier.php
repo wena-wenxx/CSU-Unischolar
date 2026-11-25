@@ -11,11 +11,6 @@ use App\Models\EmailLog;
 use App\Models\Scholarship;
 use App\Models\Student;
 
-/*
-| One place that decides which e-mails go out.
-| Called when an application becomes "approved" (staff review or agency list),
-| and from AI Recommendations ("Send invitation" / "Add to scholarship").
-*/
 class ApplicationNotifier
 {
     public static function approved(Application $application, string $trigger): ?EmailLog
@@ -46,10 +41,6 @@ class ApplicationNotifier
         return $log->fresh();
     }
 
-    /*
-    | AI Recommendations: "you may be eligible" (mode invite) or "OAS started
-    | your application" (mode added, $application = the new draft).
-    */
     public static function invitation(Student $student, Scholarship $scholarship, string $mode, ?Application $application = null, ?string $note = null): ?EmailLog
     {
         $student->loadMissing('user');

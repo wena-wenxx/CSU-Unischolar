@@ -8,16 +8,6 @@ use App\Models\Scholarship;
 use App\Support\DemoListFiles;
 use Illuminate\Http\Request;
 
-/*
-| POST /staff/billing-statement
-| Body: scholarship_id, school_year (e.g. 2026-2027), semester (optional), format xlsx|pdf
-|
-| Makes the billing list of one program and school year from the scholar records, in the column
-| order of the CHED TES billing list (Form 2, Annex 2) that the Approved Lists page reads back.
-| It is prepared by the OAS for checking before it is encoded or submitted; it is NOT the official
-| CHED form and nothing is sent to CHED or UniFAST. Values the system does not keep (birthdate,
-| PWD) stay blank, and a missing award number or amount is marked so staff fill it in.
-*/
 class BillingStatementController extends Controller
 {
     public const COLUMNS = ['Control Number', 'Student Number', 'TES Award Number', 'Last Name', 'Given Name',
@@ -39,8 +29,6 @@ class BillingStatementController extends Controller
 
         $scholarship = Scholarship::findOrFail($data['scholarship_id']);
 
-        // Grantees of this program and school year who are still grantees (active) or finished the
-        // year (completed); inactive (dropped) grantees are not billed.
         $records = ScholarRecord::with(['student.user:id,email'])
             ->where('scholarship_id', $scholarship->id)
             ->where('school_year', $data['school_year'])

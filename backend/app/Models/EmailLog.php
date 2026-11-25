@@ -14,10 +14,6 @@ class EmailLog extends Model
         'sent_at' => 'datetime',
     ];
 
-    /**
-     * The sending error in plain words, with what to change in backend/.env
-     * (then run "php artisan config:clear" and restart "php artisan serve").
-     */
     public static function plainError(?string $error): string
     {
         $e = (string) $error;

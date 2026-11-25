@@ -4,16 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-/*
-|--------------------------------------------------------------------------
-| Enrollment verification lives on the APPLICATION, not the student.
-|--------------------------------------------------------------------------
-| OAS workflow: the agency approves -> OAS verifies the student is currently
-| enrolled -> OAS tags the student as a grantee (scholar_records).
-| Verification is recorded per approved application, so a student's
-| history shows when each scholarship's enrollment check happened.
-*/
-
 return new class extends Migration
 {
     public function up(): void

@@ -2,12 +2,6 @@ import { Link } from "react-router-dom";
 import Icon from "./Icon";
 import { iconFor } from "../lib/icons";
 
-/*
-  Dashboard number. With `to`, the whole card is a link to the matching list,
-  e.g. <StatCard title="Needs Action" value={49} to="/staff/applications?filter=needs_action" />
-  The corner icon follows the page it opens (or pass icon="wallet"); `attention` marks a number staff
-  should act on (gold icon tile) when it is above zero.
-*/
 export default function StatCard({ title, value, to, hint, icon, attention = false }) {
   const name = icon || iconFor(to || title.toLowerCase());
   const busy = attention && Number(value) > 0;

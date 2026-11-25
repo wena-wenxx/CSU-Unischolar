@@ -10,15 +10,9 @@ use App\Models\Student;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
-/**
- * One SAVED external grantee list, so External Grantees, the Data Bank filter
- * and the "holds an external scholarship" note are not empty at first.
- * Fictional program and people (bulk demo students who hold no scholarship).
- * Upload more lists yourself: php artisan demo:external-lists
- */
 class ExternalGranteeSeeder extends Seeder
 {
-    public const PROGRAM = 'Municipal Educational Assistance Program';   // fictional
+    public const PROGRAM = 'Municipal Educational Assistance Program';
 
     public function run(): void
     {
@@ -31,11 +25,10 @@ class ExternalGranteeSeeder extends Seeder
             ->merge(Application::where('status', 'approved')->pluck('student_id'))
             ->unique()->all();
 
-        // From the END of the list, so demo:external-lists (which takes from the start) does not overlap.
         $students = Student::query()
             ->whereNotIn('id', $taken)
-            ->where('student_id', 'like', '20__-_____')       // bulk demo students (2024-12345)
-            ->where('student_id', 'not like', '20__-000%')    // not the named demo students
+            ->where('student_id', 'like', '20__-_____')
+            ->where('student_id', 'not like', '20__-000%')
             ->orderByDesc('student_id')
             ->limit(3)
             ->get();
@@ -67,7 +60,7 @@ class ExternalGranteeSeeder extends Seeder
             'category' => 'lgu',
             'school_year' => '2026-2027',
             'file_name' => 'municipal-scholars-2026.xlsx',
-            'file_path' => null,   // demo record: no original file kept
+            'file_path' => null,
             'file_type' => 'xlsx',
             'status' => 'saved',
             'read_method' => 'excel',

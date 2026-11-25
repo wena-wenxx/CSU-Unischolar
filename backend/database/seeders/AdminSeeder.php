@@ -6,11 +6,6 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
-/**
- * Demo system administrator (manages accounts and settings).
- *   admin@carsu.edu.ph / Admin@12345
- * Change this password before any real use.
- */
 class AdminSeeder extends Seeder
 {
     public function run(): void

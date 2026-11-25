@@ -7,38 +7,17 @@ use App\Models\ValidationResult;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
-/*
-|--------------------------------------------------------------------------
-| AI document check (shared by the web request and the background worker)
-|--------------------------------------------------------------------------
-| Sends one uploaded document to the Python AI service and saves the result.
-| The AI only FLAGS possible problems; OAS staff always decide.
-|
-| Why there are two ways to run it
-| ---------------------------------
-| "php artisan serve" on Windows answers ONE request at a time. A check that
-| takes 1-3 minutes therefore froze every other page. When the AI worker runs
-|     php artisan queue:work database --queue=ai --timeout=300 --tries=1
-| the check is done in that separate window and the web request returns at
-| once (the page asks for the result every few seconds). Without the worker,
-| the check runs inside the request, but with a time limit below PHP's own
-| limit, so the document can never stay on "processing" forever.
-*/
 class DocumentChecker
 {
-    /** A check still "processing" after this many minutes did not finish (worker closed, PHP stopped). */
     public const STALE_MINUTES = 6;
 
-    /** Seconds the background worker waits for the AI service. */
     public const WORKER_TIMEOUT = 240;
 
     public const WORKER_KEY = 'ai_worker_seen_at';
 
-    /** True when "php artisan queue:work database --queue=ai" was seen in the last 30 seconds. */
     public static function workerRunning(): bool
     {
         $seen = (int) Cache::get(self::WORKER_KEY, 0);
-        // While the worker is busy with a long check it does not loop, so "busy until" counts too.
         $busyUntil = (int) Cache::get(self::WORKER_KEY.'_busy_until', 0);
 
         return ($seen > 0 && $seen >= now()->subSeconds(30)->timestamp) || $busyUntil >= now()->timestamp;
@@ -59,10 +38,9 @@ class DocumentChecker
         }
     }
 
-    /** Seconds the in-request check may wait: below PHP's max_execution_time, so PHP never kills it midway. */
     public static function inlineTimeout(): int
     {
-        $limit = (int) ini_get('max_execution_time');   // 0 = no limit (command line)
+        $limit = (int) ini_get('max_execution_time');
         if ($limit <= 0) {
             return 170;
         }
@@ -77,10 +55,6 @@ class DocumentChecker
             && $document->updated_at->gt(now()->subMinutes(self::STALE_MINUTES));
     }
 
-    /**
-     * A document left on "processing" by a check that never finished goes back to the status it had
-     * before, with a message, so the button can be pressed again.
-     */
     public static function expireIfStale(Document $document): Document
     {
         if ($document->status === 'processing' && !self::isRunning($document)) {
@@ -90,18 +64,12 @@ class DocumentChecker
         return $document;
     }
 
-    /** Ends a check that cannot finish: the document gets its old status back and the page shows the message. */
     public static function abandon(Document $document, string $message): void
     {
         $document->update(['status' => self::statusBefore($document)]);
         self::rememberError($document->id, $message);
     }
 
-    /**
-     * "Cancel" on a running AI check. The document goes back to the status it had before, at once.
-     * A check waiting in the AI worker is skipped; one the AI service is already reading finishes there,
-     * but its result is thrown away (nothing is saved). Returns false when no check was running.
-     */
     public static function cancel(Document $document): bool
     {
         if ($document->status !== 'processing') {
@@ -147,10 +115,6 @@ class DocumentChecker
         return $document->validationResult ? 'needs_review' : 'uploaded';
     }
 
-    /**
-     * Runs the check. Returns ['ok' => bool, 'status' => document status, 'message' => text, 'http' => code].
-     * $timeout = seconds to wait for the AI service.
-     */
     public static function run(Document $document, int $timeout): array
     {
         $document->loadMissing(['application.student', 'student', 'requirement', 'validationResult']);
@@ -169,9 +133,7 @@ class DocumentChecker
             return self::failed($document, 'This document is not linked to a student.', 422);
         }
 
-        // First + last name only: validation.py already accepts a middle name printed on the document.
         $expectedName = trim($student->first_name.' '.$student->last_name);
-        // The requirement name ("Certificate of Registration (COR)") tells the AI which kind of document to expect.
         $documentLabel = $document->requirement?->name ?? $document->document_type ?? '';
 
         $started = microtime(true);
@@ -182,10 +144,8 @@ class DocumentChecker
                 ->post(rtrim(config('services.ai.url'), '/').'/validate-document', [
                     'expected_name' => $expectedName,
                     'expected_student_id' => $student->student_id,
-                    // Parents' documents (e.g. ITR) only show the surname.
                     'expected_last_name' => $student->last_name,
                     'document_label' => $documentLabel,
-                    // A COR from another school year is flagged.
                     'current_school_year' => \App\Models\ExternalGrantee::currentSchoolYear(),
                 ]);
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
@@ -209,7 +169,6 @@ class DocumentChecker
                 (string) $response->body());
         }
 
-        // Cancelled by the user while the AI was reading: the result is not saved.
         if (self::wasCancelled($document->id)) {
             return ['ok' => false, 'status' => $document->fresh()->status, 'http' => 200, 'cancelled' => true,
                 'message' => 'The AI check was cancelled. Nothing was saved.'];
@@ -217,7 +176,6 @@ class DocumentChecker
 
         $result = (array) $response->json();
 
-        // An old certificate (e.g. an indigency issued two years ago) is flagged for staff.
         $outdated = DocumentAge::outdatedFlag(
             $document->typeName(),
             (array) ($result['extracted_data']['dates'] ?? [])
@@ -240,8 +198,6 @@ class DocumentChecker
             ]
         );
 
-        // Almost nothing could be read (blank or very poor scan): a person must look at it, the same as
-        // an unreadable file, instead of treating it as an ordinary flag.
         $tooLittleText = collect((array) ($result['flags'] ?? []))
             ->contains(fn ($flag) => str_starts_with((string) $flag, 'Very little text could be read'));
 
@@ -278,7 +234,7 @@ class DocumentChecker
 
     private static function failed(Document $document, string $message, int $http, ?string $detail = null): array
     {
-        if (self::wasCancelled($document->id)) {   // cancelled by the user: no error to show
+        if (self::wasCancelled($document->id)) {
             return ['ok' => false, 'status' => $document->status, 'http' => 200, 'cancelled' => true, 'message' => 'The AI check was cancelled. Nothing was saved.'];
         }
         self::rememberError($document->id, $message);

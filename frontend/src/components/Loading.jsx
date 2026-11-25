@@ -1,10 +1,5 @@
 import { MOTTO } from "../lib/brand";
 
-/*
-  Shown while a page gets its data: a grey outline of the page (title, number cards, a panel) that
-  shimmers, so the page does not jump when the content arrives. compact = only the small label
-  (inside a card or a window).
-*/
 export default function Loading({ message = "Loading...", compact = false }) {
   if (compact) {
     return (

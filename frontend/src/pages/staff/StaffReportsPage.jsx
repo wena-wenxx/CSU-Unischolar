@@ -10,7 +10,6 @@ import { SEMESTERS } from "../../lib/terms";
 
 const STATUSES = ["submitted", "under_review", "needs_action", "complete", "approved", "rejected", "draft"];
 
-// "CHED Merit Scholarship Program (CMSP)" -> "CMSP"; otherwise a short slug of the name.
 function programCode(name) {
   if (!name) return "all-programs";
   const inBrackets = name.match(/\(([^)]+)\)/);
@@ -24,9 +23,8 @@ function programCode(name) {
     .slice(0, 40);
 }
 
-const stamp = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" }); // 2026-10-06
+const stamp = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
-/* CSV exports that open in Excel (OAS's current workflow uses Excel). */
 export default function StaffReportsPage() {
   const toast = useToast();
 
@@ -36,7 +34,7 @@ export default function StaffReportsPage() {
   const { user } = useAuth();
   const [billYear, setBillYear] = useState(() => {
     const now = new Date();
-    const start = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1; // school year starts in August
+    const start = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
     return `${start}-${start + 1}`;
   });
   const [billSemester, setBillSemester] = useState("");
@@ -83,12 +81,10 @@ export default function StaffReportsPage() {
   const scholars = data.scholars.filter((r) => inProgram(r.scholarship_id));
   const payroll = data.payroll.filter((p) => inProgram(p.scholar_record?.scholarship_id));
 
-  // Applications already forwarded to the agency (or decided by it), for the agency list.
   const forAgency = data.applications.filter(
     (a) => inProgram(a.scholarship_id) && ["complete", "approved"].includes(a.status)
   );
 
-  // Billing list of one program and school year (CHED TES Form 2 column order), made by the server.
   async function exportBilling(format) {
     setBillBusy(format);
     try {

@@ -10,12 +10,10 @@ import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 import { actionLabel } from "../../lib/activity";
 
-/* System Admin: accounts at a glance, the current term and the latest activity. */
 export default function AdminDashboard() {
   const toast = useToast();
   const [data, setData] = useState(null);
 
-  // .then() (not await) so React's lint rule sees the state is set later.
   const load = useCallback(
     () =>
       api

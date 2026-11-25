@@ -11,14 +11,6 @@ import SheetTabs from "../../components/SheetTabs";
 import { programTabs } from "../../lib/programs";
 import { ReviewModal, VerifyEnrollmentModal } from "./StaffApplicationsPage";
 
-/*
-  Auto-Review (staff). Sorts every submitted / under-review application:
-    Ready to forward      complete, AI-checked with no flag, nothing expired
-    Needs manual review   AI flag, unreadable or unchecked file, expired document
-    Probably incomplete   missing required document, or already holds a scholarship
-  It changes nothing by itself. Staff tick and press Forward / Send back.
-  The agency still decides; its answer is recorded in Approved Lists.
-*/
 const GROUPS = [
   ["ready", "Ready to forward", "success"],
   ["manual", "Needs manual review", "warning"],
@@ -33,10 +25,8 @@ export default function AutoReviewPage() {
   const [result, setResult] = useState(null);
   const [tab, setTab] = useState("ready");
   const [picked, setPicked] = useState([]);
-  const [remarks, setRemarks] = useState({}); // id -> edited remark
+  const [remarks, setRemarks] = useState({});
   const [busy, setBusy] = useState(false);
-  // The review window opens ON this page: closing it keeps you here (same program tab and group)
-  // and the numbers are counted again.
   const [selected, setSelected] = useState(null);
   const [verifying, setVerifying] = useState(null);
 
@@ -54,11 +44,9 @@ export default function AutoReviewPage() {
       const { data } = await api.get(`/applications/${id}`);
       setSelected((current) => (current?.id === id ? data : current));
     } catch {
-      /* the window keeps the last data */
     }
   }
 
-  // .then() (not await) so React's lint rule sees the state is set later.
   const run = useCallback(
     () =>
       api
@@ -133,7 +121,6 @@ export default function AutoReviewPage() {
 
   if (!result) return <Loading />;
 
-  // Program tabs (like sheets in Excel); each list is A to Z by last name.
   const tabs = programTabs(result.rows, (row) => ({ id: row.scholarship_id, name: row.scholarship, short_name: row.short_name }));
   const activeProgram = tabs.some((t) => t.key === programId) ? programId : "all";
   const inProgram = result.rows.filter((row) => activeProgram === "all" || String(row.scholarship_id) === activeProgram);
@@ -318,7 +305,7 @@ export default function AutoReviewPage() {
           application={selected}
           onClose={() => {
             setSelected(null);
-            run(); // count again: the reviewed student may have moved to another group
+            run();
           }}
           onChanged={() => reloadReview(selected.id)}
           onVerify={() => setVerifying(selected)}

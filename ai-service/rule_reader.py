@@ -1,21 +1,3 @@
-"""
-Reads a scholarship memo / announcement and SUGGESTS its eligibility rules
-(ASSISTIVE ONLY). OAS staff see every suggestion with the sentence it came
-from, tick the ones that are right, and press Save themselves. Nothing is
-saved or approved here.
-
-Two ways to read:
-  1. A local large language model through Ollama (free, runs on the OAS
-     computer, nothing leaves it). It uses the installed model
-     (qwen2.5:1.5b or llama3.2:3b first) unless OLLAMA_MODEL is set.
-       Install Ollama (ollama.com), then:  ollama pull llama3.2:3b
-       Settings (.env of the AI service): OLLAMA_URL, OLLAMA_MODEL
-     The model must quote the sentence for every value. Values whose quote
-     is not found in the memo are marked "check": a language model can be
-     wrong, so it is never trusted blindly.
-  2. Without Ollama: simple patterns (GWA 2.50, income 300,000, "first year",
-     document names, fields of study). Fewer details, but always works.
-"""
 import json
 import os
 import re
@@ -24,13 +6,11 @@ import urllib.request
 from fit_matcher import fields_of
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
-# Empty = use whichever model is installed (qwen2.5:1.5b or llama3.2:3b first).
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "").strip()
 PREFERRED_MODELS = ("qwen2.5:1.5b", "llama3.2:3b", "qwen2.5:3b", "llama3.2:1b")
 
 
 def ollama_model(timeout=3):
-    """The model to use: OLLAMA_MODEL if set, else the best one Ollama has installed."""
     if OLLAMA_MODEL:
         return OLLAMA_MODEL
     with urllib.request.urlopen(OLLAMA_URL.rstrip("/") + "/api/tags", timeout=timeout) as response:
@@ -62,14 +42,11 @@ YEAR_PATTERNS = {
 }
 MONTHS = "january february march april may june july august september october november december".split()
 
-
-# ---------------------------------------------------------------- text helpers
 def _norm(text):
     return re.sub(r"\s+", " ", (text or "")).strip().lower()
 
 
 def _sentences(text):
-    # Memos wrap lines in the middle of sentences: join them first, then split at . ; ! ?
     flat = re.sub(r"\s+", " ", text or "")
     return [s.strip() for s in re.split(r"(?<=[.;!?])\s+", flat) if s.strip()]
 
@@ -87,7 +64,6 @@ def _quote_found(quote, text):
 
 
 def read_file_text(path, filename=""):
-    """Plain text of a memo: PDF (text or OCR), Word .docx, .txt, or a picture (OCR)."""
     name = (filename or path).lower()
     if name.endswith(".txt"):
         with open(path, encoding="utf-8", errors="replace") as handle:
@@ -101,18 +77,16 @@ def read_file_text(path, filename=""):
             for row in table.rows:
                 parts.append(" | ".join(cell.text.strip() for cell in row.cells))
         return "\n".join(parts)
-    from ocr_engine import extract_text   # PDF and pictures (PaddleOCR for scans)
+    from ocr_engine import extract_text
 
     result = extract_text(path, filename)
     if result.get("error"):
         raise ValueError(result["error"])
     return result.get("text", "")
 
-
-# ---------------------------------------------------------------- 1. patterns
 def pattern_suggest(text, options):
     s = {}
-    low = re.sub(r"\s+", " ", text or "")   # one line: wrapped sentences still match
+    low = re.sub(r"\s+", " ", text or "")
 
     m = re.search(r"(?:gwa|general weighted average|weighted average|grade)[^.\n]{0,80}?\b([1-3]\.\d{1,2})\b", low, re.I)
     if m:
@@ -157,8 +131,6 @@ def pattern_suggest(text, options):
 
     return s
 
-
-# ---------------------------------------------------------------- 2. local LLM
 PROMPT = """You read a Philippine scholarship memo and extract its eligibility rules.
 Answer ONLY with JSON in exactly this shape. Use null when the memo does not say it. Do not guess.
 For every value, "quote" must be the exact sentence from the memo that says it.
@@ -193,10 +165,7 @@ def _ollama(text, options, model, timeout=180):
         answer = json.loads(response.read().decode())
     return json.loads(answer.get("response") or "{}")
 
-
-# ---------------------------------------------------------------- cleaning
 def _clean(raw, text, options, source):
-    """Keep only valid values; list values must be from the allowed choices; check every quote."""
     out = {}
     allowed = {"year_levels": options.get("year_levels"), "colleges": options.get("colleges"),
                "required_documents": options.get("documents")}
@@ -237,7 +206,6 @@ def _clean(raw, text, options, source):
 
 
 def suggest(text, options, use_llm=True):
-    """Returns {method, suggestions, warnings}."""
     text = (text or "").strip()
     if len(text) < 20:
         raise ValueError("The memo text is too short to read.")
@@ -249,7 +217,6 @@ def suggest(text, options, use_llm=True):
         try:
             model = ollama_model()
             llm = _clean(_ollama(text, options, model), text, options, "llm")
-            # The model's answers first; the patterns fill what it left out.
             merged = {**patterns, **llm}
             return {"method": f"ollama:{model}", "suggestions": merged, "warnings": warnings}
         except Exception as e:

@@ -4,26 +4,10 @@ namespace App\Support;
 
 use App\Models\AiRecommendation;
 
-/*
-|--------------------------------------------------------------------------
-| "What to do next" for an AI recommendation
-|--------------------------------------------------------------------------
-| Plain rules on top of the eligibility checks; nothing is predicted.
-|
-| Important: the % counts checks met, so a LOW % with "Meets the rules"
-| usually means documents are missing, not that the student is unlikely.
-| That is why the advice lists the actual missing items.
-|
-| Score bands (same as the filter on AI Recommendations):
-|   90-100  ready: invite or add
-|   50-89   invite, naming the missing documents
-|   0-49    qualifies, most documents missing: a reminder is optional
-*/
 class NextSteps
 {
     private const DOC_PREFIX = 'Required document: ';
 
-    /** Advice for OAS staff (shown in the Why? window). */
     public static function forStaff(AiRecommendation $r): array
     {
         $checks = $r->checks ?? [];
@@ -60,7 +44,6 @@ class NextSteps
             return ['tone' => 'warning', 'title' => 'Missing student data', 'steps' => $steps];
         }
 
-        // Meets every must-have rule.
         if (!$r->data_verified) {
             $steps[] = 'First check the GWA against the Certificate of Grades and the income against the ITR, then press Mark GWA and income as checked.';
         }
@@ -91,14 +74,6 @@ class NextSteps
         return ['tone' => $tone, 'title' => $title, 'steps' => $steps];
     }
 
-    /**
-     * What the STUDENT still has to do for one program (no percentage shown).
-     * Each item: ['text' => ..., 'kind' => 'profile' | 'upload' | 'renew' | 'check' | 'wait', 'doc' => name].
-     */
-    /**
-     * $sentToOas: document names whose newest copy is in an application already sent to OAS.
-     * The student cannot run the AI check on those (OAS checks them), so they become "wait" items.
-     */
     public static function forStudent(AiRecommendation $r, array $sentToOas = []): array
     {
         $todo = [];
@@ -109,7 +84,7 @@ class NextSteps
             }
             if ($c['must']) {
                 if ($c['result'] !== 'no_data') {
-                    continue;   // failed programs are not shown to students at all
+                    continue;
                 }
                 $todo[] = match ($c['key']) {
                     'gwa' => ['text' => 'Enter your GWA on My Profile', 'kind' => 'profile'],
@@ -134,7 +109,6 @@ class NextSteps
         return $todo;
     }
 
-    /** Required documents that are not counted yet, sorted by what is wrong. */
     private static function documentGaps(array $checks): array
     {
         $gaps = ['missing' => [], 'problem' => [], 'unchecked' => []];

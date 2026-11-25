@@ -19,8 +19,7 @@ class Application extends Model
         'agency_submission_id',
         'enrollment_verified',
         'enrollment_verified_at',
-        'enrollment_method',    // registrar_list | manual
-        // from the agency's approved list (e.g. CHED TES billing file)
+        'enrollment_method',
         'agency_control_number',
         'agency_award_number',
         'agency_amount',
@@ -36,7 +35,6 @@ class Application extends Model
         'enrollment_verified_at' => 'datetime',
     ];
 
-    /** A new application belongs to the school year in which it is started (one per program per year). */
     protected static function booted(): void
     {
         static::creating(function (Application $application) {
@@ -45,12 +43,10 @@ class Application extends Model
                     ? self::schoolYearOf($application->created_at)
                     : ExternalGrantee::currentSchoolYear();
             }
-            // The semester of the current school year, when the OAS set one in Settings.
             if (empty($application->semester) && $application->school_year === ExternalGrantee::currentSchoolYear()) {
                 $semester = Setting::get('current_semester');
                 $application->semester = in_array($semester, Setting::SEMESTERS, true) ? $semester : null;
             }
-            // Every application belongs to a processing batch of its program and period.
             if (empty($application->processing_batch_id) && $application->scholarship_id) {
                 $application->processing_batch_id = ProcessingBatch::forWork(
                     (int) $application->scholarship_id, $application->school_year, $application->semester, auth()->id()
@@ -59,7 +55,6 @@ class Application extends Model
         });
     }
 
-    /** Rows inserted directly (the bulk demo seeder) get the batch of their program and school year. */
     public static function fillMissingBatches(): int
     {
         $count = 0;
@@ -76,7 +71,6 @@ class Application extends Model
         return $count;
     }
 
-    /** "2026-2027" for any date (a school year starts in August). */
     public static function schoolYearOf($date): string
     {
         $date = \Illuminate\Support\Carbon::parse($date);
@@ -85,7 +79,6 @@ class Application extends Model
         return $start.'-'.($start + 1);
     }
 
-    /** Rows inserted directly (e.g. the bulk demo seeder) get the school year of their start date. */
     public static function fillMissingSchoolYears(): int
     {
         $count = 0;
@@ -98,7 +91,6 @@ class Application extends Model
         return $count;
     }
 
-    // Lets the student pages tell this year's application from an old one.
     protected $appends = ['this_school_year'];
 
     public function getThisSchoolYearAttribute(): bool
@@ -111,11 +103,6 @@ class Application extends Model
         return $query->where('school_year', ExternalGrantee::currentSchoolYear());
     }
 
-    /**
-     * Work that can still be pending: the application has no batch, or its batch is not completed.
-     * A completed batch was closed on purpose (with a reason when work was left open), so its
-     * applications stay in the history and the Data Bank but are not shown as new pending tasks.
-     */
     public function scopeInOpenWork($query)
     {
         return $query->where(function ($q) {
@@ -154,30 +141,16 @@ class Application extends Model
         return $this->hasMany(Document::class);
     }
 
-    // Every step this application went through, oldest first.
     public function statusLogs()
     {
         return $this->hasMany(ApplicationStatusLog::class)->orderBy('created_at')->orderBy('id');
     }
 
-    // The most recent step (used for "last activity" on the staff list).
     public function latestLog()
     {
         return $this->hasOne(ApplicationStatusLog::class)->latestOfMany();
     }
 
-    /*
-    | What OAS staff may change an application to, from each status.
-    | This keeps the steps in order: OAS checks the documents, forwards the
-    | complete application to the agency, then records the agency's decision.
-    |   draft         -> (nothing: the student has not submitted yet)
-    |   submitted     -> under review, needs action, complete (forward)
-    |   under_review  -> needs action, complete (forward)
-    |   needs_action  -> under review (the student normally resubmits)
-    |   complete      -> approved / rejected by the agency, or back to under review
-    |   approved      -> complete ("undo", only while not yet tagged as grantee)
-    |   rejected      -> complete ("undo")
-    */
     public const STAFF_NEXT = [
         'draft' => [],
         'submitted' => ['under_review', 'needs_action', 'complete'],
@@ -188,19 +161,14 @@ class Application extends Model
         'rejected' => ['complete'],
     ];
 
-    /** Statuses staff may move this application to right now. */
     public function staffNextStatuses(): array
     {
         $next = self::STAFF_NEXT[$this->status] ?? [];
 
-        // An approved student who is already tagged as a grantee cannot be
-        // "un-approved" here; change the scholar record instead.
         if ($this->status === 'approved' && $this->isTaggedGrantee()) {
             $next = [];
         }
 
-        // Only a complete application (no missing required document) can be
-        // forwarded to the agency.
         if (in_array('complete', $next, true) && $this->status !== 'approved' && $this->status !== 'rejected'
             && $this->missingRequirementNames()) {
             $next = array_values(array_diff($next, ['complete']));
@@ -209,10 +177,8 @@ class Application extends Model
         return $next;
     }
 
-    /** Why a status change is not allowed, or null when it is. */
     public function staffChangeError(string $to): ?string
     {
-        // Saving remarks without changing the status is always fine once submitted.
         if ($to === $this->status && $this->status !== 'draft') {
             return null;
         }
@@ -246,14 +212,12 @@ class Application extends Model
 
     public function isTaggedGrantee(): bool
     {
-        // Scholar records are kept per school year: only this application's year counts.
         return ScholarRecord::where('student_id', $this->student_id)
             ->where('scholarship_id', $this->scholarship_id)
             ->where('school_year', $this->school_year)
             ->exists();
     }
 
-    /** Names of REQUIRED requirements that have no uploaded document yet. */
     public function missingRequirementNames(): array
     {
         $this->loadMissing('scholarship.requirements', 'documents');
@@ -266,10 +230,6 @@ class Application extends Model
             ->pluck('name')->values()->all();
     }
 
-    /*
-    | forwarded_at for applications that were forwarded before this column
-    | existed: the date of their "complete" step, else the submission date.
-    */
     public static function backfillForwardedAt(): int
     {
         $count = 0;

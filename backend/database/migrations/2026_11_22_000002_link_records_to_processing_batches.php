@@ -5,20 +5,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-/*
-|--------------------------------------------------------------------------
-| Links to processing batches, and a few workflow columns
-|--------------------------------------------------------------------------
-| Only ADDS nullable columns; existing rows keep working.
-|   applications           processing_batch_id, semester, enrollment_method
-|   agency_list_uploads    processing_batch_id, file_sha256 (same file uploaded again)
-|   payroll_records        processing_batch_id
-|   students               is_demo (only demo students can be removed by demo:reset)
-|
-| Existing applications and approved lists are put into one batch per program
-| and school year, named "... (before batches)", so the old records show in
-| the new pages. Scholar records and payroll are linked in the next migration.
-*/
 return new class extends Migration
 {
     public function up(): void
@@ -27,7 +13,6 @@ return new class extends Migration
             $table->foreignId('processing_batch_id')->nullable()->after('school_year')
                 ->constrained('processing_batches')->nullOnDelete();
             $table->string('semester', 30)->nullable()->after('school_year');
-            // registrar_list = checked against the Registrar's uploaded list; manual = checked by staff.
             $table->string('enrollment_method', 20)->nullable()->after('enrollment_verified_at');
         });
 
@@ -81,9 +66,6 @@ return new class extends Migration
                 ->where('school_year', $pair->school_year)->update(['processing_batch_id' => $batchId]);
         }
 
-        // Enrollment already verified before this change: the method is not known; leave it empty.
-
-        // Demo accounts made by the seeders: student1..N@carsu.edu.ph and ...@demo.carsu.edu.ph.
         $demoUsers = DB::table('users')->where('role', 'student')->get(['id', 'email'])
             ->filter(fn ($u) => preg_match('/^student\d+@carsu\.edu\.ph$/i', $u->email)
                 || str_ends_with(strtolower($u->email), '@demo.carsu.edu.ph'))

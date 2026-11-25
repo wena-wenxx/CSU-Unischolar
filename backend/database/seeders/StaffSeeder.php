@@ -15,7 +15,7 @@ class StaffSeeder extends Seeder
                 'email' => 'oas.staff@carsu.edu.ph',
             ],
             [
-                'name' => 'Andrea Mae Villareal',   // fictional OAS staff account
+                'name' => 'Andrea Mae Villareal',
                 'password' => Hash::make('Staff@12345'),
                 'role' => 'staff',
             ]

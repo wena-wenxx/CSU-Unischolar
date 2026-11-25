@@ -1,20 +1,8 @@
 import api from "../services/api";
 import { parseCSV } from "./csv";
 
-/*
-  Reads a list file chosen on Approved Lists or Enrollment into rows of cells.
-    .csv                       read in the browser (no server needed)
-    .xlsx .docx                read by Laravel (POST /staff/read-table), no AI service needed
-    .pdf .png .jpg             read by the AI service (through the same address)
-  For files read on the server, title lines above the header (agency name,
-  school year...) are dropped: the list starts at the widest row near the top.
-  Returns { rows, warnings, metadata, cells, method }. cells (scanned forms only) has, for each row,
-  { conf, note, check } per cell: check = true means "hard to read, compare with the paper".
-*/
 export const LIST_ACCEPT = ".csv,.xlsx,.docx,.pdf,.png,.jpg,.jpeg";
 
-// Excel on Windows often saves "CSV" in the old Windows-1252 code page: Ñ would come out as "�".
-// Read the bytes as UTF-8 first; if they are not valid UTF-8, read them as Windows-1252.
 export async function csvText(file) {
   const bytes = await file.arrayBuffer();
   try {
@@ -24,7 +12,6 @@ export async function csvText(file) {
   }
 }
 
-// options.signal: an AbortController signal, for the "Cancel" button while a file is read.
 export async function readListFile(file, { signal } = {}) {
   const name = file.name.toLowerCase();
 
@@ -57,7 +44,6 @@ export async function readListFile(file, { signal } = {}) {
     .filter(({ row }) => row.some((cell) => String(cell || "").trim()));
   const top = kept.slice(0, 30);
   const widest = top.reduce((best, item, index) => (item.row.length > (top[best]?.row.length || 0) ? index : best), 0);
-  // A header repeated further down (a second sheet, a table that continues on the next page) is not a row.
   const headerKey = (kept[widest]?.row || []).map((cell) => String(cell || "").trim().toLowerCase()).join("|");
   const list = kept
     .slice(widest)

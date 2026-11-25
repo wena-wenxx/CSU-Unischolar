@@ -8,8 +8,6 @@ OAS staff check documents with AI help, forward applications, read the agencies'
 scanned CHED TES billing file), verify enrollment, tag grantees, prepare payroll and print the General Payroll
 (Form 6-A). **The AI only suggests and highlights. People decide.**
 
-More detail for the thesis and the defense: [`docs/THESIS_APPENDIX.md`](docs/THESIS_APPENDIX.md).
-
 ---
 
 ## What each role can do
@@ -98,6 +96,16 @@ cd ai-service && (activate .venv) && pip install -r requirements.txt
 ```
 `php artisan migrate` keeps your data. `php artisan migrate:fresh --seed` **erases** it and reloads the demo data.
 
+## Faster reading of scanned lists
+
+- Excel and Word lists are read by Laravel itself and take a second. If one seems slow, the backend is
+  still busy with an earlier request: `php artisan serve` handles one request at a time, and a scanned PDF keeps
+  it busy until it is read, even after **Cancel reading**. Wait for it, or stop the backend (Ctrl+C) and start it again.
+- Scanned PDFs: PaddleOCR reads each page; cells it is unsure of are read a second time with Tesseract, which is
+  much faster. Install Tesseract once (`winget install -e --id UB-Mannheim.TesseractOCR`) and restart the AI service.
+  To read those cells with PaddleOCR again (slower), set `OCR_CELL_ENGINE=paddle` before starting the AI service.
+- Reading the same file again returns the saved result at once, until the AI service is restarted.
+
 ## Testing
 
 | What | Command | Expected |
@@ -147,7 +155,7 @@ PaddleOCR on your computer. See the appendix.
 | `frontend/` | React website: `src/pages/{student,staff,admin}`, `src/components`, `src/lib`, `public/` (CSU logo, campus photo, announcement pictures, video guides) |
 | `ai-service/` | Python service: `validation.py` (document check), `ocr_engine.py`, `list_reader.py` + `ruled_table.py` (lists and scanned forms), `fit_matcher.py`, `rule_reader.py`, `samples/`, `tests/` |
 | `tools/` | Video-guide recorder (`tutorials/`), survey analysis (`survey/`) |
-| `docs/` | `THESIS_APPENDIX.md` (details, results, test plan, deployment) and `samples/` |
+| `docs/` | `samples/` (sample scholarship memo) |
 
 ## Credits
 

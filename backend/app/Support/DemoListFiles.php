@@ -4,13 +4,6 @@ namespace App\Support;
 
 use ZipArchive;
 
-/*
-| Writes small SAMPLE list files (Excel .xlsx, Word .docx, PDF, CSV) for
-| testing External Grantees, without extra PHP libraries:
-| .xlsx and .docx are ZIP files of XML, made with ZipArchive (PHP "zip"
-| extension); the PDF is written by hand with real, selectable text.
-| Used only by: php artisan demo:external-lists
-*/
 class DemoListFiles
 {
     private static function esc(string $text): string
@@ -18,11 +11,10 @@ class DemoListFiles
         return htmlspecialchars($text, ENT_XML1 | ENT_QUOTES, 'UTF-8');
     }
 
-    /** CSV (opens in Excel). */
     public static function csv(string $path, array $header, array $rows): void
     {
         $handle = fopen($path, 'w');
-        fwrite($handle, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel shows Ñ correctly
+        fwrite($handle, "\xEF\xBB\xBF");
         fputcsv($handle, $header);
         foreach ($rows as $row) {
             fputcsv($handle, $row);
@@ -30,7 +22,6 @@ class DemoListFiles
         fclose($handle);
     }
 
-    /** Excel workbook with one sheet: title lines, then the header and rows. */
     public static function xlsx(string $path, array $titles, array $header, array $rows, string $sheet = 'Grantees'): void
     {
         $lines = array_merge(array_map(fn ($t) => [$t], $titles), [[]], [$header], $rows);
@@ -87,7 +78,6 @@ class DemoListFiles
         $zip->close();
     }
 
-    /** Word document: title paragraphs, a table, and a closing note. */
     public static function docx(string $path, array $titles, array $header, array $rows, string $footer = ''): void
     {
         $p = fn (string $text, bool $bold = false) => '<w:p><w:r>'.($bold ? '<w:rPr><w:b/></w:rPr>' : '')
@@ -131,14 +121,6 @@ class DemoListFiles
         $zip->close();
     }
 
-    /**
-     * One-page PDF with a real text table (selectable text, like a list
-     * exported from Excel or Word). $columns = [x position, ...] in points.
-     */
-    /**
-     * A simple text PDF (real text, so it is read without OCR). Long lists continue on more pages,
-     * with the column header repeated on every page (like a real printed list).
-     */
     public static function pdf(string $path, array $titles, array $header, array $rows, array $columns, string $footer = ''): void
     {
         $str = function (string $text) {
@@ -165,7 +147,7 @@ class DemoListFiles
         };
         $printHeader();
         foreach ($rows as $row) {
-            if ($y < 70) {   // page full: next page, header again
+            if ($y < 70) {
                 $content[] = $text('F1', 8, 50, 40, 'Page '.(count($pages) + 1).($footer !== '' ? ' - '.$footer : ''));
                 $pages[] = implode("\n", $content);
                 $content = [];
@@ -184,7 +166,6 @@ class DemoListFiles
         }
         $pages[] = implode("\n", $content);
 
-        // objects: 1 catalog, 2 pages, 3 font, 4 bold font, then per page: page object + contents
         $count = count($pages);
         $kids = implode(' ', array_map(fn ($i) => (5 + 2 * $i).' 0 R', range(0, $count - 1)));
         $objects = [

@@ -9,10 +9,6 @@ use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-/*
-| "Your scholarship application was approved" e-mail to the student.
-| The view is resources/views/emails/application-approved.blade.php.
-*/
 class ApplicationApprovedMail extends Mailable
 {
     use Queueable, SerializesModels;

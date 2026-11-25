@@ -3,12 +3,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import { useAuth } from "../lib/auth";
 
-/*
-  Search box in the top bar (every page).
-  - Page names are matched here in the browser ("payroll" -> Go to Payroll).
-  - Students, programs and applications come from GET /search?q=...
-  Arrow keys move through the suggestions, Enter opens one, Escape closes.
-*/
 const PAGES = {
   staff: [
     ["Dashboard", "/staff/dashboard", "home overview numbers"],
@@ -70,7 +64,6 @@ export default function SearchBox() {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
 
-  // Ask the server 250 ms after the user stops typing.
   useEffect(() => {
     const q = text.trim();
     if (q.length < 2) return undefined;
@@ -91,7 +84,6 @@ export default function SearchBox() {
     };
   }, [text]);
 
-  // Close when clicking elsewhere.
   useEffect(() => {
     function onClick(event) {
       if (boxRef.current && !boxRef.current.contains(event.target)) setOpen(false);
@@ -135,7 +127,6 @@ export default function SearchBox() {
         Search
       </label>
       <span className="search-icon" aria-hidden="true">
-        {/* A drawn magnifier: the old "⌕" character showed as a small "o" on Windows fonts. */}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
           <circle cx="10.5" cy="10.5" r="6.5" />
           <line x1="15.5" y1="15.5" x2="20.5" y2="20.5" />

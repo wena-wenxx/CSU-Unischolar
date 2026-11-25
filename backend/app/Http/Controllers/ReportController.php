@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\EmailLog;
 use Illuminate\Http\Request;
 
-/* Staff: the e-mails the system sent (newest first). */
 class ReportController extends Controller
 {
     public function emailLogs(Request $request)

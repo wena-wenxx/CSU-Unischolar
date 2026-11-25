@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-/** One list of applications OAS actually sent to an agency, on one date. */
 class AgencySubmission extends Model
 {
     protected $fillable = [

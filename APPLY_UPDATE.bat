@@ -150,7 +150,6 @@ echo  Next: start the system as usual (php artisan serve, the AI service,
 echo  npm run dev) and open Processing Batches in the staff sidebar.
 echo  OCR: install Tesseract once:  winget install -e --id UB-Mannheim.TesseractOCR
 echo  then check http://127.0.0.1:8001/health  ^(ocr_engine must not be none^).
-echo  Test guide: TESTING_GUIDE.md
 echo  Optional in backend\.env:  MAIL_MAILER=log   and, on the demo laptop
 echo  only, DEMO_RESET_ALLOWED=true  (then: php artisan demo:reset).
 echo  Check the changes with "git status" before you commit.

@@ -1,29 +1,3 @@
-"""
-Makes the TEST FILES for trying the whole OAS workflow on this computer.
-
-    cd ai-service
-    python samples/make_test_files.py
-
-It reads the test student's name and Student ID from backend/.env (TEST_STUDENT_*), so the lists can
-contain her (the real test student, used with her permission). Everybody else is FICTIONAL: the named
-demo students made by the seeders (2026-00001 Juan Navarro, 2026-00002 Maria Santos, 2026-00003 Ana
-Ramirez, 2026-00004 Pedro Garcia) and made-up people. Every page says it is a test file.
-
-Output (inside private-test-data/, which is NOT uploaded to GitHub):
-    private-test-data/generated/lists/
-        01-tes-billing-GOOD-scanned.pdf      scanned-looking TES billing list (needs OCR)
-        02-tes-billing-GOOD-digital.pdf      the same list as a clear PDF with real text (no OCR needed)
-        03-tes-billing-PROBLEMS-scanned.pdf  unknown Student ID, wrong name, duplicate row, wrong total
-        04-approved-list-GOOD.xlsx           approved list from an agency (Excel)
-        05-approved-list-PROBLEMS.xlsx       the same problems in Excel, plus a row with no Student ID
-        06-registrar-enrollment-list.xlsx    the Registrar's enrolled students (one is NOT on it)
-    private-test-data/generated/problem-documents/
-        blank-unreadable-scan.pdf            nothing to read -> "very little text" / manual review
-        password-protected.pdf               password "test123" -> clear message
-        broken-not-a-real-pdf.pdf            not really a PDF -> "could not be read"
-        library-card-wrong-document.png      a picture of the wrong kind of document
-        too-big-over-10MB.pdf                over the 10 MB upload limit -> refused
-"""
 import os
 import random
 import sys
@@ -33,7 +7,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE))
 
-import fitz  # PyMuPDF
+import fitz
 from PIL import Image, ImageDraw, ImageFilter
 
 import tes_billing_sample as tes
@@ -64,7 +38,6 @@ TEST = {
     "program": (ENV.get("TEST_STUDENT_COURSE") or "Bachelor of Science in Information Technology").upper(),
 }
 
-# The named demo students of the seeders (fictional).
 DEMO = [
     ("2026-00001", "NAVARRO", "JUAN", "LOPEZ", "MALE", "BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY", "4"),
     ("2026-00002", "SANTOS", "MARIA", "CRUZ", "FEMALE", "BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY", "3"),
@@ -91,18 +64,17 @@ def good_rows():
 
 
 def problem_rows():
-    rows = good_rows()[:3]                                    # test student, Juan, Maria: fine
+    rows = good_rows()[:3]
     rows.append(row(4, "2099-00099", "DELA PEÑA", "ROSA", "SANTOS", "FEMALE",
-                    "BACHELOR OF ARTS IN SOCIOLOGY", "1"))     # Student ID not in the system
+                    "BACHELOR OF ARTS IN SOCIOLOGY", "1"))
     rows.append(row(5, "2026-00003", "CRUZ", "ANITA", "REYES", "FEMALE",
-                    "BACHELOR OF SCIENCE IN COMPUTER SCIENCE", "2"))   # Ana's ID, another name
+                    "BACHELOR OF SCIENCE IN COMPUTER SCIENCE", "2"))
     rows.append(row(6, "2026-00001", "NAVARRO", "JUAN", "LOPEZ", "MALE",
-                    "BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY", "4"))   # duplicate of row 2
+                    "BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY", "4"))
     return rows
 
 
 def rows_on_page_top(words):
-    """Where the table starts on a page of make_pages (260 on the first page) and how many rows it has."""
     has_title = any(w[4] == "CONSOLIDATED" for w in words)
     top = 260 if has_title else 170
     controls = [w for w in words if len(w[4]) == 5 and w[4].isdigit() and w[0] < tes.LEFT + 120]
@@ -110,18 +82,15 @@ def rows_on_page_top(words):
 
 
 def pdf_from_pages(path, pages, digital=False):
-    """Scanned-looking (pictures only) or digital (real text, drawn lines) PDF of the same pages."""
     doc = fitz.open()
     pw, ph = 949.68, 614.88
     sx, sy = pw / tes.WIDTH, ph / tes.HEIGHT
     for img, words in pages:
         page = doc.new_page(width=pw, height=ph)
         if digital:
-            # table lines from the picture's dark pixels are not needed: draw the words as real text
             for x0, y0, x1, y1, text, _conf in words:
                 size = max(4.5, (y1 - y0) * sy * 0.8)
                 page.insert_text((x0 * sx, y1 * sy - 1), text, fontsize=size, fontname="helv")
-            # the ruled lines of the table, as real (vector) lines like a PDF exported from Excel
             xs = [tes.LEFT + (tes.RIGHT - tes.LEFT) * p for p in tes.LINES]
             top, count = rows_on_page_top(words)
             for x in xs:
@@ -165,7 +134,7 @@ def registrar_list(path):
     ws.append([f"TEST FILE - REGISTRAR ENROLLMENT LIST, 1st Semester AY {SCHOOL_YEAR}"])
     ws.append(["Student ID", "Last Name", "First Name", "Course", "Year Level", "Status"])
     ws.append([TEST["student_id"], TEST["last"].title(), TEST["first"].title(), TEST["program"].title(), "4th Year", "Enrolled"])
-    for sid, last, first, _m, _s, program, year in DEMO[:3]:       # Pedro Garcia (2026-00004) is NOT enrolled
+    for sid, last, first, _m, _s, program, year in DEMO[:3]:
         ws.append([sid, last.title(), first.title(), program.title(), f"{year}th Year" if year not in "123" else
                    {"1": "1st Year", "2": "2nd Year", "3": "3rd Year"}[year], "Enrolled"])
     wb.save(str(path))
@@ -174,7 +143,6 @@ def registrar_list(path):
 def problem_documents(folder):
     folder.mkdir(parents=True, exist_ok=True)
 
-    # 1. A blank, speckled scan: nothing readable.
     img = Image.effect_noise((1240, 1754), 12).convert("L").point(lambda v: 235 if v > 100 else 225)
     buf = folder / "_blank.png"
     img.save(buf)
@@ -184,17 +152,14 @@ def problem_documents(folder):
     doc.save(str(folder / "blank-unreadable-scan.pdf"))
     buf.unlink()
 
-    # 2. Password-protected PDF (password: test123).
     doc = fitz.open()
     page = doc.new_page()
     page.insert_text((72, 100), "TEST FILE - Certificate of Indigency (fictional) - this PDF has a password", fontsize=11)
     doc.save(str(folder / "password-protected.pdf"), encryption=fitz.PDF_ENCRYPT_AES_256,
              owner_pw="owner123", user_pw="test123")
 
-    # 3. Not really a PDF (a text file with a .pdf name).
     (folder / "broken-not-a-real-pdf.pdf").write_text("This is not a PDF file. TEST FILE.", encoding="utf-8")
 
-    # 4. The wrong kind of document: a (fictional) library card.
     card = Image.new("RGB", (1400, 900), (245, 245, 240))
     d = ImageDraw.Draw(card)
     font, big = tes._font(42), tes._font(64)
@@ -206,7 +171,6 @@ def problem_documents(folder):
     d.text((80, 780), "TEST FILE - NOT AN OFFICIAL DOCUMENT", fill=(160, 20, 20), font=font)
     card.filter(ImageFilter.GaussianBlur(0.5)).save(folder / "library-card-wrong-document.png")
 
-    # 5. Over the 10 MB upload limit (random pictures cannot be compressed).
     doc = fitz.open()
     rnd = random.Random(5)
     for _ in range(4):
@@ -230,7 +194,6 @@ def main():
     clean_pages = tes.make_pages(good, rows_per_page=12, tilt=0.0, split_last_row=False, school_year=SCHOOL_YEAR, campus=campus)
     pdf_from_pages(lists / "02-tes-billing-GOOD-digital.pdf", clean_pages, digital=True)
 
-    # The printed total says 6 grantees x 10,000 = 60,000, but a wrong 50,000 is printed below (summed: 60,000).
     bad_pages = tes.make_pages(problems, rows_per_page=12, tilt=0.3, split_last_row=False, school_year=SCHOOL_YEAR, campus=campus)
     img, words = bad_pages[-1]
     d = ImageDraw.Draw(img)

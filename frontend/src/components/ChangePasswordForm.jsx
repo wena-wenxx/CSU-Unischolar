@@ -3,11 +3,6 @@ import api, { errMsg } from "../services/api";
 import { useAuth } from "../lib/auth";
 import { useToast } from "../lib/toast";
 
-/*
-  Change my password: current password, new password twice.
-  The new one needs 8+ characters with at least one letter and one number.
-  onDone runs after a successful change.
-*/
 export default function ChangePasswordForm({ onDone }) {
   const toast = useToast();
   const { updateUser } = useAuth();

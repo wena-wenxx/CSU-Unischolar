@@ -1,9 +1,3 @@
-/*
-  How OAS staff can confirm that a document is genuine. The AI cannot prove
-  this: it only reads the text and points out possible problems. These steps
-  follow what the issuing offices themselves offer (PSA, PhilSys Check, the
-  CSU Registrar, the barangay, BIR / employer).
-*/
 const COMMON = "Open the file: the name and Student ID must match the student, and the date must be recent.";
 
 export const VERIFY_GUIDE = {

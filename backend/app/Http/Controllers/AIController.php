@@ -7,11 +7,6 @@ use App\Jobs\ValidateDocumentJob;
 use App\Support\DocumentChecker;
 use Illuminate\Http\Request;
 
-/**
- * Sends an uploaded document to the Python AI service (FastAPI + PaddleOCR)
- * and saves what comes back. The AI only FLAGS possible problems; OAS staff
- * always make the final decision.
- */
 class AIController extends Controller
 {
     public function validateDocument(Request $request, $documentId)
@@ -22,10 +17,6 @@ class AIController extends Controller
             'requirement'
         ])->findOrFail($documentId);
 
-        // Staff can check any document. A student can check their OWN file
-        // while it is still theirs to change: saved in My Documents, or in a
-        // draft / needs-action application. (The AI only flags; nothing is
-        // approved or rejected automatically.)
         if ($request->user()->role !== 'staff') {
             $mine = $document->student_id
                 && $request->user()->student
@@ -42,8 +33,6 @@ class AIController extends Controller
 
         DocumentChecker::expireIfStale($document);
 
-        // Verified by a staff member: the AI check is not needed any more. Staff can still run it on purpose
-        // (confirm = true); the staff decision stays either way (it is saved separately from the AI result).
         if ($document->staff_verified_at && !$request->boolean('confirm')) {
             return response()->json([
                 'message' => 'This document was already verified by OAS staff'.($document->staffVerifier?->name ? " ({$document->staffVerifier->name})" : '')
@@ -53,7 +42,6 @@ class AIController extends Controller
             ], 409);
         }
 
-        // Already being checked: do not start a second check of the same file.
         if (DocumentChecker::isRunning($document)) {
             return response()->json([
                 'message' => 'The AI check of this document is already running. The result will appear here when it is ready.',
@@ -69,8 +57,6 @@ class AIController extends Controller
 
         DocumentChecker::begin($document);
 
-        // AI worker running: the check is done there and this request returns at once,
-        // so the rest of the website does not wait for the AI.
         if (DocumentChecker::workerRunning()) {
             ValidateDocumentJob::dispatch($document->id)->onConnection('database')->onQueue('ai');
 
@@ -81,7 +67,6 @@ class AIController extends Controller
             ], 202);
         }
 
-        // No worker: check inside this request, with a time limit below PHP's own limit.
         $outcome = DocumentChecker::run($document, DocumentChecker::inlineTimeout());
 
         return response()->json([
@@ -92,16 +77,6 @@ class AIController extends Controller
         ], $outcome['http']);
     }
 
-    /*
-    | GET /documents/{documentId}/check-status
-    | The page asks this every few seconds while a check runs in the AI worker.
-    | running = still checking; done = finished (see document.status and validation_result);
-    | failed = it stopped, with the reason in "message".
-    */
-    /*
-    | POST /documents/{documentId}/cancel-check
-    | "Cancel" on a running AI check (the student who owns the file, or staff). Nothing is saved.
-    */
     public function cancelCheck(Request $request, $documentId)
     {
         $document = Document::findOrFail($documentId);
@@ -149,13 +124,6 @@ class AIController extends Controller
         ]);
     }
 
-    /*
-    | POST /documents/{documentId}/verify   (OAS staff)
-    | Body: verified (true | false), note (how it was checked, optional)
-    | A person's confirmation that the document is genuine, e.g. the PhilID
-    | QR was checked in PhilSys Check or the barangay confirmed the clearance.
-    | The AI never does this; it only flags.
-    */
     public function verify(Request $request, $documentId)
     {
         if ($request->user()->role !== 'staff') {

@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-/* How well one scholarship fits one student's field (AI service). Ranks and explains only. */
 class ProgramFit extends Model
 {
     public $timestamps = false;
@@ -25,7 +24,6 @@ class ProgramFit extends Model
         return $this->belongsTo(Scholarship::class);
     }
 
-    /** For the API: {level, label, fields, words, method}. */
     public function summary(): array
     {
         return [

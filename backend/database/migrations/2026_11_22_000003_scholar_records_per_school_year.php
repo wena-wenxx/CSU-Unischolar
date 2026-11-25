@@ -5,19 +5,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-/*
-|--------------------------------------------------------------------------
-| Scholar records per school year (requested by the OAS:
-| "data or records per semester and academic year")
-|--------------------------------------------------------------------------
-| Before: one scholar record per student per program, for all years.
-| After:  one scholar record per student per program PER SCHOOL YEAR, with the
-|         semester and processing batch. Older years stay as history.
-|
-| Existing records get the school year of the approved application that made
-| them (or of the date they were tagged), so no record is lost or merged.
-| Payroll entries keep pointing to the same scholar record.
-*/
 return new class extends Migration
 {
     public function up(): void
@@ -45,13 +32,11 @@ return new class extends Migration
                 ->update(['school_year' => $year, 'processing_batch_id' => $batch]);
         }
 
-        // Payroll entries belong to the batch of their scholar record.
         foreach (DB::table('scholar_records')->whereNotNull('processing_batch_id')->get(['id', 'processing_batch_id']) as $record) {
             DB::table('payroll_records')->where('scholar_record_id', $record->id)
                 ->update(['processing_batch_id' => $record->processing_batch_id]);
         }
 
-        // New key first (it also serves the student_id foreign key in MySQL), then drop the old one.
         Schema::table('scholar_records', function (Blueprint $table) {
             $table->unique(['student_id', 'scholarship_id', 'school_year'], 'scholar_records_one_per_program_year');
         });
@@ -78,7 +63,6 @@ return new class extends Migration
         });
     }
 
-    /** "2026-2027" for any date (a school year starts in August). */
     private static function schoolYearOf($date): string
     {
         $date = \Illuminate\Support\Carbon::parse($date ?? now());

@@ -22,13 +22,6 @@ class PayrollController extends Controller
         }
     }
 
-    /*
-    | The term we are in now. The admin sets it in System Settings (school
-    | year + semester). If it was never set, it is worked out from today's
-    | date (Philippine time), CSU calendar roughly:
-    |   August-December = 1st Semester, January-May = 2nd Semester,
-    |   June-July = Summer. Returns [AY start year, term index].
-    */
     private static function currentTerm(): array
     {
         $year = Setting::get('current_school_year');
@@ -53,7 +46,6 @@ class PayrollController extends Controller
         return self::TERMS[$index].' AY '.$year.'-'.($year + 1);
     }
 
-    /** "1st Semester AY 2026-2027": the current term, used as the default period. */
     public static function currentPeriod(): string
     {
         [$year, $index] = self::currentTerm();
@@ -66,7 +58,6 @@ class PayrollController extends Controller
         return mb_strtolower(trim($a)) === mb_strtolower(trim($b));
     }
 
-    /** Same term, ignoring spacing, case and the "AY" word ("1st Semester AY 2026-2027" = "1st semester 2026-2027"). */
     private function sameTerm(string $a, string $b): bool
     {
         $plain = fn ($v) => preg_replace('/\s+/', ' ', trim(preg_replace('/\bAY\b/i', ' ', mb_strtolower($v))));
@@ -74,11 +65,6 @@ class PayrollController extends Controller
         return $plain($a) === $plain($b);
     }
 
-    /*
-    | GET /payroll/periods
-    | Choices for the Period dropdown: the last three terms, the current term
-    | and the next one, plus any other period already used in payroll.
-    */
     public function periods(Request $request)
     {
         $this->staffOnly($request);
@@ -86,7 +72,6 @@ class PayrollController extends Controller
         [$year, $index] = self::currentTerm();
         $current = self::termLabel($year, $index);
 
-        // Step back three terms, then list five terms in order.
         for ($i = 0; $i < 3; $i++) {
             $index--;
             if ($index < 0) {
@@ -115,16 +100,6 @@ class PayrollController extends Controller
         return response()->json(['current' => $current, 'periods' => array_values($list)]);
     }
 
-    /*
-    | POST /payroll/prepare
-    | Body: period (required), scholarship_id (optional: one program, or all),
-    |       amount (optional: only with one program, replaces its amount),
-    |       confirm (false = preview only, true = create the draft entries)
-    |
-    | Every active grantee is checked. Included: currently enrolled, not yet
-    | in payroll for this period, and the program has an amount. ATM problems
-    | do not stop preparation; they are shown as warnings.
-    */
     public function prepare(Request $request)
     {
         $this->staffOnly($request);
@@ -152,8 +127,6 @@ class PayrollController extends Controller
             ->values();
 
         $rows = $records->map(function (ScholarRecord $record) use ($data, $period) {
-            // An amount typed for this payroll wins; otherwise the amount on the agency's list (e.g. the TES
-            // billing file) for this grantee; otherwise the program's amount.
             $amount = $data['amount'] ?? ($record->award_amount !== null ? (float) $record->award_amount : $record->scholarship?->amount);
             $reason = null;
 
@@ -162,7 +135,6 @@ class PayrollController extends Controller
             } elseif (!$record->currently_enrolled) {
                 $reason = 'Not currently enrolled';
             } elseif ($record->enrollment_period && !$this->sameTerm($record->enrollment_period, $period)) {
-                // Enrollment was checked for another term: check this term's Registrar list first.
                 $reason = "Enrollment not yet checked for this period (last checked: {$record->enrollment_period})";
             } elseif ($record->payrollRecords->contains(fn ($p) => $this->samePeriod($p->period, $period))) {
                 $reason = 'Already in payroll for this period';
@@ -216,7 +188,6 @@ class PayrollController extends Controller
             foreach ($included as $row) {
                 PayrollRecord::create([
                     'scholar_record_id' => $row['scholar_record_id'],
-                    // the processing batch of the grantee's scholar record (program and school year)
                     'processing_batch_id' => $labels[$row['scholar_record_id']]->processing_batch_id,
                     'amount' => $row['amount'],
                     'period' => $period,
@@ -227,7 +198,6 @@ class PayrollController extends Controller
             }
         });
         } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
-            // Someone else prepared the same payroll at the same moment: nothing was saved twice.
             return response()->json(['message' => 'This payroll was just prepared by someone else. Refresh the page to see it.'], 409);
         }
 
@@ -241,10 +211,6 @@ class PayrollController extends Controller
         ], 201);
     }
 
-    /*
-    | POST /payroll/bulk-status   Body: ids [..], status draft|ready|processed
-    | Allowed steps: draft -> ready -> processed, and ready -> draft.
-    */
     public function bulkStatus(Request $request)
     {
         $this->staffOnly($request);
@@ -276,11 +242,6 @@ class PayrollController extends Controller
         ]);
     }
 
-    /*
-    | GET /payroll/history
-    | One row per period and program: number of scholars, total amount and
-    | how many entries are draft / ready / processed. Newest first.
-    */
     public function history(Request $request)
     {
         $this->staffOnly($request);
@@ -311,11 +272,6 @@ class PayrollController extends Controller
 
         return response()->json($rows);
     }
-    /*
-    |--------------------------------------------------------------------------
-    | STAFF - LIST PAYROLL
-    |--------------------------------------------------------------------------
-    */
 
     public function index(Request $request)
     {
@@ -325,7 +281,6 @@ class PayrollController extends Controller
             ], 403);
         }
 
-        // Only the columns the payroll list and CSV use (keeps the page fast).
         $records = PayrollRecord::with([
             'scholarRecord:id,student_id,scholarship_id,school_year,semester,status,currently_enrolled,has_atm,atm_funds,atm_note',
             'scholarRecord.student:id,student_id,first_name,middle_name,last_name,course,year_level',
@@ -340,13 +295,6 @@ class PayrollController extends Controller
         return response()->json($records);
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | STAFF - CREATE PAYROLL RECORD
-    |--------------------------------------------------------------------------
-    */
-
     public function store(Request $request, $scholarRecordId = null)
     {
         if ($request->user()->role !== 'staff') {
@@ -355,9 +303,6 @@ class PayrollController extends Controller
             ], 403);
         }
 
-        // The route is /scholar-records/{scholarRecordId}/payroll, so the
-        // scholar record ID normally comes from the URL. A body value is
-        // still accepted for older clients.
         if ($scholarRecordId !== null) {
             $request->merge(['scholar_record_id' => $scholarRecordId]);
         }
@@ -402,8 +347,6 @@ class PayrollController extends Controller
                 $data['amount'],
             'period' =>
                 $data['period'],
-            // If staff did not type an ATM status, use the scholar record's
-            // ATM status ("ATM · funded", "No ATM · For ATM application" ...).
             'bank_atm_status' =>
                 $data['bank_atm_status']
                 ?? mb_substr($scholar->atm_label, 0, 50),
@@ -422,13 +365,6 @@ class PayrollController extends Controller
             ])
         ], 201);
     }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | STAFF - UPDATE PAYROLL
-    |--------------------------------------------------------------------------
-    */
 
     public function update(Request $request, $id)
     {
@@ -453,9 +389,6 @@ class PayrollController extends Controller
 
         $payroll = PayrollRecord::findOrFail($id);
 
-        // Same rules as the Mark Ready / Mark Processed buttons:
-        //   draft -> ready -> processed, ready -> draft; a processed entry (stipend released) never changes;
-        //   amount and period can change only while the entry is a draft.
         if ($payroll->status === 'processed') {
             return response()->json(['message' => 'This entry is already processed (stipend released) and cannot be changed.'], 422);
         }
@@ -494,16 +427,6 @@ class PayrollController extends Controller
         ]);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | GENERAL PAYROLL (General Form No. 6-A)
-    |--------------------------------------------------------------------------
-    | POST /payroll/form        the sheets as data (printable page / PDF)
-    | POST /payroll/form/docx   the same sheets as a Word document
-    | Body: ids [..] (payroll entries of ONE program and ONE period),
-    |       batch, voucher, purpose, sheet_start, per_sheet, split_atm,
-    |       prepared_name, prepared_title
-    */
     private function formOptions(Request $request): array
     {
         return $request->validate([
@@ -528,13 +451,11 @@ class PayrollController extends Controller
         return response()->json(GeneralPayrollForm::build($data['ids'], $data, $request->user()));
     }
 
-    /** POST /payroll/form/docx: the form as a Word file. */
     public function formDocx(Request $request)
     {
         return $this->formFile($request, 'docx');
     }
 
-    /** POST /payroll/form/pdf: the form as a PDF file (no print window needed). */
     public function formPdf(Request $request)
     {
         return $this->formFile($request, 'pdf');

@@ -9,20 +9,12 @@ use App\Models\Student;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
-/**
- * FICTIONAL DEMO DATA: eight OAS announcements with pictures, one pending
- * "request a correction" and three Contact OAS messages from demo students.
- * Safe to run again (skips what already exists).
- */
 class PortalDemoSeeder extends Seeder
 {
     public function run(): void
     {
         $staff = User::where('role', 'staff')->first();
 
-        // Eight sample announcements. Pictures are original drawings in
-        // frontend/public/announcements/ (no agency logos are used).
-        // Dates fit the demo programs: expired ones are shown to staff only.
         $announcements = [
             [
                 'title' => 'OAS Office Closed on November 5',
@@ -107,7 +99,6 @@ class PortalDemoSeeder extends Seeder
             );
         }
 
-        // Contact OAS: two waiting for an answer, one already answered.
         $messages = [
             ['2026-00004', 'documents', 'Barangay clearance is still being processed', "Good day po. My barangay clearance will only be released next week. Can I submit my application first and upload it later?", 2, null],
             ['2026-00006', 'payroll', 'No ATM card yet', "I was tagged as a grantee but I do not have an ATM card yet. Where should I apply for one?", 1, null],
@@ -121,7 +112,6 @@ class PortalDemoSeeder extends Seeder
                 continue;
             }
 
-            // unguarded: the seeder sets the dates too
             ContactMessage::unguarded(fn () => ContactMessage::firstOrCreate(
                 ['student_id' => $student->id, 'subject' => $subject],
                 [

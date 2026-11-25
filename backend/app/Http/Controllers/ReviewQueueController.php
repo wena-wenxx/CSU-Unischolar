@@ -10,22 +10,6 @@ use App\Models\ScholarRecord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-/*
-|--------------------------------------------------------------------------
-| Auto-Review (staff)
-|--------------------------------------------------------------------------
-| Sorts every submitted / under-review application into three lists.
-| It only SUGGESTS: nothing changes until a staff member presses a button.
-|   ready       every required document uploaded, AI-checked with no flag,
-|               none expired, student holds no other active scholarship
-|               -> "Forward selected to the agency"
-|   manual      something for a person to look at (AI flag, AI could not
-|               read the file, not AI-checked yet, expired document)
-|   incomplete  a required document is missing, or the student already
-|               holds another active scholarship -> "Send back (Needs
-|               action)" with a pre-written remark staff can edit
-| The agency still makes the decision (recorded later in Approved Lists).
-*/
 class ReviewQueueController extends Controller
 {
     private function staffOnly(Request $request): void
@@ -35,7 +19,6 @@ class ReviewQueueController extends Controller
         }
     }
 
-    // POST /staff/auto-review   Body: scholarship_id (optional)
     public function run(Request $request)
     {
         $this->staffOnly($request);
@@ -56,7 +39,6 @@ class ReviewQueueController extends Controller
             ->get()
             ->groupBy('student_id');
 
-        // Scholarships from outside parties (External Grantees) count too.
         $externalGrants = ExternalGrantee::query()
             ->counting()
             ->whereIn('student_id', $applications->pluck('student_id'))
@@ -87,8 +69,6 @@ class ReviewQueueController extends Controller
                 }
                 $name = $document->typeName();
 
-                // A person already checked it (e.g. with the issuing office): the AI result does not
-                // override that decision, so it is not sent back to manual review.
                 if ($document->staff_verified_at) {
                     if ($document->isExpired()) {
                         $review[] = "{$name} expired on ".$document->expiresAt()?->format('M j, Y');
@@ -112,7 +92,6 @@ class ReviewQueueController extends Controller
 
             $group = $blocking ? 'incomplete' : ($review ? 'manual' : 'ready');
 
-            // A suggested remark built from THIS student's actual problems (staff edit it before sending).
             $remarks = null;
             if ($group === 'incomplete' && !$missing) {
                 $remarks = 'You already hold an active scholarship. Only one active scholarship is allowed; please visit the OAS.';
@@ -146,7 +125,6 @@ class ReviewQueueController extends Controller
         ]);
     }
 
-    // POST /staff/applications/forward   Body: ids [..]
     public function forward(Request $request)
     {
         $this->staffOnly($request);
@@ -185,7 +163,6 @@ class ReviewQueueController extends Controller
         ]);
     }
 
-    // POST /staff/applications/needs-action   Body: items [{id, remarks}]
     public function needsAction(Request $request)
     {
         $this->staffOnly($request);
@@ -226,11 +203,6 @@ class ReviewQueueController extends Controller
         ]);
     }
 
-    /*
-    | GET /staff/applications/{id}/suggested-remark
-    | The remark Auto-Review would suggest for this one application (from its own AI flags and missing
-    | documents). Only a suggestion for the Remarks box: nothing is sent or changed.
-    */
     public function suggestedRemark(Request $request, $id)
     {
         $this->staffOnly($request);

@@ -11,22 +11,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
-/**
- * VOLUME demo data: makes the system look like it has run for a full
- * scholarship cycle.
- *
- * ALL OF THIS IS FICTIONAL DEMO DATA. Names are random combinations of
- * common Filipino first names and surnames; they do not belong to real
- * CSU students. Student IDs, contact numbers, incomes and documents are
- * made up. Every document is a watermarked SAMPLE PDF.
- *
- * The AI results stored here were produced by Support/DemoValidator.php,
- * a copy of the rules in ai-service/validation.py, run on each sample
- * document's text. They are demo flags, not accuracy measurements.
- *
- * The same data is produced every time (fixed random seed).
- * Skips itself if bulk data already exists.
- */
 class BulkDemoSeeder extends Seeder
 {
     private const STUDENTS = 120;
@@ -48,7 +32,6 @@ class BulkDemoSeeder extends Seeder
     private const BARANGAYS = ['Ampayon', 'Libertad', 'Doongan', 'Bancasi', 'Baan', 'Tiniwisan', 'Taguibo', 'Villa Kananga',
         'Maon', 'Obrero', 'San Vicente', 'Agusan Pequeño', 'Ambago', 'Bonbon', 'Pinamanculan'];
 
-    // course, college, weight
     private const COURSES = [
         ['Bachelor of Science in Information Technology', 'College of Computing and Information Sciences', 22],
         ['Bachelor of Science in Computer Science', 'College of Computing and Information Sciences', 14],
@@ -58,20 +41,16 @@ class BulkDemoSeeder extends Seeder
         ['Bachelor of Science in Civil Engineering', 'College of Engineering and Geo-Sciences', 16],
     ];
 
-    // How popular each OAS-processed program is (higher = more applicants).
     private const POPULARITY = [
         DemoDataSeeder::TES => 30, DemoDataSeeder::SA => 26, DemoDataSeeder::TDP_TES => 22,
         DemoDataSeeder::CMSP => 16, DemoDataSeeder::TDP_SUC => 14, DemoDataSeeder::CULTURE => 8,
     ];
 
-    // Agency-direct programs: students apply at the agency; OAS only records
-    // the agency's grantees (as if uploaded in Approved Lists).
     private const AGENCY_DIRECT = [
         DemoDataSeeder::DOST => 5, DemoDataSeeder::LANDBANK => 4, DemoDataSeeder::DA_ACEF => 3,
         DemoDataSeeder::GIAHEP => 2, DemoDataSeeder::NGCP => 2, DemoDataSeeder::MEKONG => 1,
     ];
 
-    // Status mix for applications that do not end in a grantee record.
     private const STATUS_WEIGHTS = [
         'draft' => 8, 'submitted' => 17, 'under_review' => 16, 'needs_action' => 10,
         'complete' => 22, 'approved' => 9, 'rejected' => 18,
@@ -85,7 +64,6 @@ class BulkDemoSeeder extends Seeder
         'Slots for this program were already filled.',
     ];
 
-    // When a document is uploaded into the wrong slot, which document is it really?
     private const WRONG_UPLOAD = [
         Doc::INDIGENCY => Doc::BARANGAY, Doc::BARANGAY => Doc::INDIGENCY, Doc::COR => Doc::BARANGAY,
         Doc::GRADES => Doc::INDIGENCY, Doc::VALID_ID => Doc::BIRTH, Doc::BIRTH => Doc::ITR,
@@ -104,7 +82,7 @@ class BulkDemoSeeder extends Seeder
             return;
         }
 
-        mt_srand(20261006); // fixed seed: same data every time
+        mt_srand(20261006);
 
         $this->password = Hash::make('Student@12345');
         $this->staffId = DB::table('users')->where('role', 'staff')->value('id');
@@ -118,8 +96,6 @@ class BulkDemoSeeder extends Seeder
 
         $this->command?->info("Bulk demo data: {$this->files} sample documents written.");
     }
-
-    // ------------------------------------------------------------------ helpers
 
     private function chance(float $p): bool
     {
@@ -166,8 +142,6 @@ class BulkDemoSeeder extends Seeder
         }
     }
 
-    // ------------------------------------------------------------------ people
-
     private function makePerson(int $i): array
     {
         $female = $this->chance(0.55);
@@ -187,7 +161,6 @@ class BulkDemoSeeder extends Seeder
             'middle' => $middle,
             'last' => $last,
             'sex' => $female ? 'Female' : 'Male',
-            // CSU-style ID: entry year + 5 digits (fictional)
             'student_id' => sprintf('%s-%05d', $year, 10000 + $i * 700 + mt_rand(0, 699)),
             'year' => (int) $year,
             'course' => $course,
@@ -227,9 +200,6 @@ class BulkDemoSeeder extends Seeder
             'year_level' => $p['year_level'],
             'college' => $p['college'],
             'contact_number' => $p['contact'],
-            // Same values as printed on their sample Grades and ITR. About 7 in 10
-            // were already checked by OAS (fixed by the Student ID, so the random
-            // data above stays exactly the same).
             'gwa' => $p['gwa'],
             'family_income' => $p['family_income'],
             'eligibility_updated_at' => $joined,
@@ -240,7 +210,6 @@ class BulkDemoSeeder extends Seeder
 
         $p['row_id'] = $studentRowId;
 
-        // Which programs this student applied to this cycle (1 to 3).
         $open = array_filter(self::POPULARITY, fn ($w, $name) => isset($this->programs[$name])
             && $this->programs[$name]['status'] !== 'inactive', ARRAY_FILTER_USE_BOTH);
         $chosen = [];
@@ -250,10 +219,8 @@ class BulkDemoSeeder extends Seeder
         }
         $chosen = array_keys($chosen);
 
-        // About 45% of students currently hold a scholarship (one only).
         $granteeProgram = $this->chance(0.45) ? $this->pick($chosen) : null;
 
-        // About 1 in 10 of the others is a grantee of an agency-direct program.
         if (!$granteeProgram && $this->chance(0.1)) {
             $direct = array_filter(self::AGENCY_DIRECT, fn ($w, $name) => isset($this->programs[$name]), ARRAY_FILTER_USE_BOTH);
             if ($direct) {
@@ -262,7 +229,6 @@ class BulkDemoSeeder extends Seeder
             }
         }
 
-        // About 15% also finished (or dropped) a scholarship last year.
         $pastOptions = array_values(array_diff(array_keys($open), $chosen));
         if ($pastOptions && $this->chance(0.15)) {
             $this->seedPastScholarship($p, $this->pick($pastOptions));
@@ -276,7 +242,6 @@ class BulkDemoSeeder extends Seeder
 
             $status = $this->weighted(self::STATUS_WEIGHTS);
 
-            // One active scholarship only: other approvals for a grantee are declined.
             if ($granteeProgram && $status === 'approved') {
                 $status = 'rejected';
                 $remark = 'Already holds another active scholarship (one active scholarship per student).';
@@ -286,8 +251,6 @@ class BulkDemoSeeder extends Seeder
             unset($remark);
         }
     }
-
-    // ------------------------------------------------------------- applications
 
     private function seedApplication(array $p, string $programName, string $status, ?string $remark = null, ?Carbon $submitted = null): int
     {
@@ -327,7 +290,6 @@ class BulkDemoSeeder extends Seeder
     {
         $program = $this->programs[$programName];
 
-        // 40% are continuing scholars first tagged last school year.
         $continuing = $this->chance(0.4);
         $submitted = $continuing
             ? $this->between('2025-07-01', '2025-08-20')
@@ -340,7 +302,6 @@ class BulkDemoSeeder extends Seeder
             'enrollment_verified' => true, 'enrollment_verified_at' => $verifiedAt, 'updated_at' => $verifiedAt,
         ]);
 
-        // A few stopped this semester (leave of absence, shifted, ...).
         $status = $this->chance(0.08) ? 'inactive' : 'active';
         $hasAtm = $this->chance(0.7);
 
@@ -362,7 +323,6 @@ class BulkDemoSeeder extends Seeder
         }
 
         if ($status === 'active') {
-            // Current semester: some ready, some draft, some not prepared yet (for batch payroll).
             $current = $this->weighted(['ready' => 35, 'draft' => 35, 'none' => 30]);
             if ($current !== 'none') {
                 $this->payroll($recordId, $program['amount'], self::CURRENT_PERIOD, $current, $hasAtm,
@@ -371,7 +331,6 @@ class BulkDemoSeeder extends Seeder
         }
     }
 
-    // A grantee recorded from an agency-direct program's list (no documents, no OAS payroll).
     private function seedAgencyDirectGrantee(array $p, string $programName): void
     {
         $program = $this->programs[$programName];
@@ -435,7 +394,7 @@ class BulkDemoSeeder extends Seeder
     {
         DB::table('payroll_records')->insert([
             'scholar_record_id' => $recordId,
-            'amount' => $amount, // demo amount
+            'amount' => $amount,
             'period' => $period,
             'bank_atm_status' => $hasAtm ? 'Yes' : 'No',
             'status' => $status,
@@ -444,22 +403,17 @@ class BulkDemoSeeder extends Seeder
         ]);
     }
 
-    // ---------------------------------------------------------------- documents
-
     private function seedDocuments(array $p, int $applicationId, array $program, string $status, Carbon $uploadedAt): void
     {
         $requirements = $program['requirements'];
 
-        // Drafts have only some documents so far.
         if ($status === 'draft') {
             $requirements = array_slice($requirements, 0, mt_rand(0, max(0, count($requirements) - 1)));
         }
 
-        // Did staff already run the AI check on this application?
         $checked = in_array($status, ['under_review', 'needs_action', 'complete', 'approved', 'rejected'], true)
             || ($status === 'submitted' && $this->chance(0.3));
 
-        // needs_action: exactly one document has a clear problem (OAS asked to fix it).
         $mustFlag = $status === 'needs_action' && $requirements ? mt_rand(0, count($requirements) - 1) : -1;
         $problemRate = ['rejected' => 0.10, 'approved' => 0.01][$status] ?? 0.03;
 
@@ -547,7 +501,6 @@ class BulkDemoSeeder extends Seeder
         }
     }
 
-    /** @return array [pdf bytes, text the AI would read] */
     private function samplePdf(string $requirement, array $p, ?string $problem): array
     {
         if ($problem === 'unreadable') {
@@ -571,7 +524,6 @@ class BulkDemoSeeder extends Seeder
         return [DemoPdf::make($title, $lines, $issuer), Doc::text($title, $lines, $issuer)];
     }
 
-    // Change one letter, like a typing mistake on the document.
     private function typo(string $name): string
     {
         $letters = preg_split('//u', $name, -1, PREG_SPLIT_NO_EMPTY);

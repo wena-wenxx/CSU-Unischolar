@@ -3,10 +3,6 @@ import { TUTORIALS, TUTORIALS_FOR } from "../lib/tutorials";
 
 const clock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
-/*
-  Video guides on the Help page. The video does not start by itself: the person presses Play.
-  Each chapter button jumps to that part. No sound: the steps are written in the video.
-*/
 export default function TutorialVideos({ role }) {
   const keys = TUTORIALS_FOR[role] || [];
   const [active, setActive] = useState(keys[0]);
@@ -66,7 +62,6 @@ export default function TutorialVideos({ role }) {
           playsInline
           onTimeUpdate={(event) => setNow(Math.floor(event.currentTarget.currentTime))}
         >
-          {/* WebM for Chrome, Edge and Firefox; MP4 for Safari and older browsers. */}
           <source src={guide.src.replace(".mp4", ".webm")} type="video/webm" />
           <source src={guide.src} type="video/mp4" />
           Your browser cannot play this video.

@@ -1,7 +1,3 @@
-/*
-  Small line icons drawn for ScholarGuide (24 x 24 grid, 1.8 px stroke, no icon package needed).
-    <Icon name="home" />     the icon takes the text colour (currentColor) and is hidden from screen readers.
-*/
 const PATHS = {
   home: "M3 10.5 12 3l9 7.5M5 9.5V20h5v-6h4v6h5V9.5",
   award: "M12 14a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm-3.5-1.3L7 21l5-3 5 3-1.5-8.3",

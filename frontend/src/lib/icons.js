@@ -1,4 +1,3 @@
-/* Which line icon (components/Icon.jsx) a page uses: the menu, dashboard cards and shortcut tiles share this. */
 export function iconFor(path = "") {
   const rules = [
     [/dashboard/, "home"],

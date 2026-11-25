@@ -1,22 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import api, { errMsg, isCancel } from "../services/api";
 
-/*
-  AI document checks, one per document.
-
-  - Every document has its OWN "Checking..." state: starting a check on a second document no longer
-    resets the first one (the old pages kept one shared id).
-  - When the AI worker runs, the server answers at once (202) and the check continues in the worker;
-    this hook then asks GET /documents/{id}/check-status every few seconds until it is done.
-  - A check can never stay on "Checking..." forever: it stops after MAX_WAIT_MS with a message, and the
-    server releases a check that never finished.
-
-  Usage:
-    const ai = useAiChecks({ toast, onChange: load });
-    ai.start(document.id)      ai.isRunning(document.id)      ai.resume(documents)
-    ai.cancel(document.id)     ai.cancelAll()                  (Cancel buttons: nothing is saved)
-*/
-
 const POLL_MS = 3000;
 const MAX_WAIT_MS = 7 * 60 * 1000;
 
@@ -27,8 +11,6 @@ function doneMessage(document, fallback) {
   return ["info", fallback || "AI check finished."];
 }
 
-// Documents "Check all" sends: never checked, or the AI could not read them. Files already checked
-// (no issue or flagged) and files verified by staff are not checked again.
 export function needsAiCheck(document) {
   return Boolean(document) && !document.staff_verified_at && ["uploaded", "needs_review"].includes(document.status);
 }
@@ -37,10 +19,8 @@ export function useAiChecks({ toast, onChange, confirm }) {
   const [running, setRunning] = useState(() => new Set());
   const timers = useRef({});
   const alive = useRef(true);
-  const controllers = useRef({}); // document id -> AbortController of the request that starts the check
-  const stopAll = useRef(false); // "Cancel all" stops the rest of "AI check all"
-  // poll() and start() call themselves again later; they do it through these refs (set after render),
-  // so the call always uses the newest version of the function.
+  const controllers = useRef({});
+  const stopAll = useRef(false);
   const pollRef = useRef(null);
   const startRef = useRef(null);
 
@@ -95,7 +75,6 @@ export function useAiChecks({ toast, onChange, confirm }) {
           const [kind, text] = doneMessage(data.document);
           finish(id, kind, text);
         } catch (err) {
-          // A short network or database hiccup: try again, but never forever.
           if (Date.now() - startedAt > MAX_WAIT_MS) finish(id, "error", errMsg(err, "Could not get the AI result."));
           else pollRef.current?.(id, startedAt);
         }
@@ -106,7 +85,7 @@ export function useAiChecks({ toast, onChange, confirm }) {
 
   const start = useCallback(
     async (id, force = false) => {
-      if (timers.current[id] || running.has(id)) return; // already checking this document
+      if (timers.current[id] || running.has(id)) return;
       mark(id, true);
       const controller = new AbortController();
       controllers.current[id] = controller;
@@ -120,8 +99,7 @@ export function useAiChecks({ toast, onChange, confirm }) {
         const [kind, text] = doneMessage(response.data?.document, response.data?.message);
         finish(id, kind, text);
       } catch (err) {
-        if (isCancel(err)) return; // the Cancel button already cleaned up
-        // Verified by staff already: ask before checking again (the staff decision is kept either way).
+        if (isCancel(err)) return;
         if (err.response?.status === 409 && err.response.data?.needs_confirmation && !force) {
           mark(id, false);
           const again = confirm
@@ -144,7 +122,6 @@ export function useAiChecks({ toast, onChange, confirm }) {
     startRef.current = start;
   }, [poll, start]);
 
-  // "Cancel": stops following the check on this page and asks the server to cancel it (nothing is saved).
   const cancel = useCallback(
     async (id, quiet = false) => {
       controllers.current[id]?.abort();
@@ -170,7 +147,6 @@ export function useAiChecks({ toast, onChange, confirm }) {
     toast?.info?.(ids.length ? `Cancelled ${ids.length} AI check${ids.length === 1 ? "" : "s"}. Nothing was saved.` : "No AI check was running.");
   }, [cancel, toast]);
 
-  // "AI check all documents": one after another, only those that still need it.
   const startAll = useCallback(
     async (documents) => {
       const todo = (documents || []).filter(needsAiCheck).filter((d) => !timers.current[d.id]);
@@ -180,14 +156,13 @@ export function useAiChecks({ toast, onChange, confirm }) {
       }
       stopAll.current = false;
       for (const document of todo) {
-        if (stopAll.current) break; // "Cancel all" pressed
+        if (stopAll.current) break;
         await start(document.id);
       }
     },
     [start, toast]
   );
 
-  // Documents already "processing" when the page opens (e.g. after a reload): follow them too.
   const resume = useCallback(
     (documents) => {
       (documents || []).forEach((document) => {

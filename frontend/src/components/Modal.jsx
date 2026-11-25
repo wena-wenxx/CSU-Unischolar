@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ConfirmContext } from "../lib/confirm";
 
-/*
-  Modal window. Closes with the × button, the Escape key, or a click
-  on the dark background.
-
-    <Modal title="Tag as Grantee" onClose={close} footer={<buttons/>}>
-      ...form fields...
-    </Modal>
-*/
 export default function Modal({ title, subtitle, onClose, size = "normal", footer, children }) {
   useEffect(() => {
     function onKey(event) {
@@ -53,20 +45,12 @@ export default function Modal({ title, subtitle, onClose, size = "normal", foote
   );
 }
 
-/*
-  Yes/No question in a modal (replaces window.confirm()).
-
-    const confirm = useConfirm();
-    if (!(await confirm({ title: "Submit?", message: "...", confirmLabel: "Submit" }))) return;
-*/
-
 export function ConfirmProvider({ children }) {
   const [request, setRequest] = useState(null);
 
   const confirm = useCallback(
     (options) =>
       new Promise((resolve) => {
-        // confirm("Question?") works too: a plain string is the message (it used to be lost).
         setRequest({ ...(typeof options === "string" ? { message: options } : options), resolve });
       }),
     []

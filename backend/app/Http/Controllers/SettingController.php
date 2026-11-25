@@ -6,8 +6,6 @@ use App\Models\Setting;
 
 class SettingController extends Controller
 {
-    // GET /settings/public: OAS contact details and the current term,
-    // for the Contact OAS page and the page footer (any logged-in user).
     public function publicSettings()
     {
         $values = Setting::allValues();
@@ -21,18 +19,12 @@ class SettingController extends Controller
             'oas_facebook' => $values['oas_facebook'],
             'oas_about' => $values['oas_about'],
             'current_period' => PayrollController::currentPeriod(),
-            // One source for every page's academic-year and semester boxes (Admin > Settings, or today's date).
             'current_school_year' => \App\Models\ExternalGrantee::currentSchoolYear(),
             'current_semester' => $values['current_semester'] ?: preg_replace('/ AY .*$/', '', PayrollController::currentPeriod()),
             'semesters' => Setting::SEMESTERS,
         ]);
     }
 
-    /*
-    | GET /office-contact  (no login needed)
-    | Only the OAS public contact details, for the login page
-    | ("Forgot your password?" / "Need help?").
-    */
     public function officeContact()
     {
         $values = Setting::allValues();
@@ -42,7 +34,6 @@ class SettingController extends Controller
             'oas_location' => $values['oas_location'],
             'oas_email' => $values['oas_email'],
             'oas_phone' => $values['oas_phone'],
-            // Demo accounts for testing; only when DEMO_LOGIN_ACCOUNTS=true in .env.
             'demo_accounts' => config('demo.show_on_login') ? [
                 ['role' => 'OAS staff', 'email' => 'oas.staff@carsu.edu.ph', 'password' => 'Staff@12345'],
                 ['role' => 'Admin', 'email' => 'admin@carsu.edu.ph', 'password' => 'Admin@12345'],

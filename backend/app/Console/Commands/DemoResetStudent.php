@@ -12,20 +12,6 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
-/*
-| php artisan demo:reset-student                      (the test student from TEST_STUDENT_EMAIL)
-| php artisan demo:reset-student student3@carsu.edu.ph
-| php artisan demo:reset-student 221-00797 --documents
-|
-| Puts ONE student back to "has not applied yet", so the whole process can be tried again:
-|   removed  their applications (with the documents attached to them, AI results and status history),
-|            grantee records and payroll entries, and invitations/notices sent to them;
-|            their AI Recommendations go back to "new" (they appear in the active list again)
-|   kept     the account, password, profile and photo, and the files in My Documents
-|            (add --documents to remove those too), messages, and the activity log
-| Only the test student or a demo student, only on a local demo computer
-| (APP_ENV=local and DEMO_RESET_ALLOWED=true), and only after typing RESET.
-*/
 class DemoResetStudent extends Command
 {
     protected $signature = 'demo:reset-student
@@ -87,8 +73,6 @@ class DemoResetStudent extends Command
         $files = $appDocs->merge($libraryDocs)->pluck('file_path')->filter()->all();
 
         DB::transaction(function () use ($student, $apps, $libraryDocs) {
-            // Grantee records first (payroll entries go with them), then applications
-            // (their documents, AI results and status history go with them).
             ScholarRecord::where('student_id', $student->id)->delete();
             Application::whereIn('id', $apps->pluck('id'))->delete();
             Document::whereIn('id', $libraryDocs->pluck('id'))->delete();
@@ -97,7 +81,6 @@ class DemoResetStudent extends Command
                 ->update(['staff_status' => 'new', 'invited_at' => null]);
         });
 
-        // The files themselves (only files no remaining document points to).
         $stillUsed = Document::whereIn('file_path', $files)->pluck('file_path')->all();
         foreach (array_diff($files, $stillUsed) as $path) {
             Storage::disk(Document::DISK)->delete($path);

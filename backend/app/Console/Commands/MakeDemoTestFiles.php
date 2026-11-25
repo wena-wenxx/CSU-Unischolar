@@ -8,24 +8,6 @@ use App\Support\DemoListFiles;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 
-/*
-| php artisan demo:test-files
-|
-| Extra FICTIONAL test files for the demonstration, made from the demo students in YOUR database
-| (so every Student ID matches), in the column names the importers read:
-|
-|   approved-large-<program>.pdf     a long approved list over several pages (pagination, bulk processing)
-|   approved-large-<program>.xlsx    the same list in Excel
-|   approved-with-problems.csv       duplicate row, a row with no Student ID (name only), a wrong ID format,
-|                                    a real ID with a different name, an unknown ID, a blank row
-|   registrar-enrollment-list.xlsx   the Registrar's enrolled students: every approved applicant and active
-|                                    grantee EXCEPT one (to show "not enrolled"), plus other students
-|   README.txt                       what to choose and what to expect
-|
-| Other ready-made files: php artisan demo:approved-lists (one list per program, PDF/Word/Excel/CSV),
-| php artisan demo:external-lists, and ai-service/samples/make_test_files.py (scanned TES billing).
-| No real student data is used. Output: storage/app/demo-test-files/
-*/
 class MakeDemoTestFiles extends Command
 {
     protected $signature = 'demo:test-files {--dir= : Save somewhere else}';
@@ -39,7 +21,6 @@ class MakeDemoTestFiles extends Command
         File::cleanDirectory($dir);
         $readme = ['FICTIONAL test files for CSU UniScholar (demo students only). Made '.now('Asia/Manila')->format('F j, Y g:i A').'.', ''];
 
-        // 1. A long list for the program with the most forwarded applications, padded with unknown IDs
         $forwarded = Application::with(['student', 'scholarship'])->where('status', 'complete')->get()
             ->filter(fn ($a) => $a->student)->groupBy('scholarship_id')->sortByDesc(fn ($g) => $g->count())->first();
         if ($forwarded) {
@@ -51,7 +32,6 @@ class MakeDemoTestFiles extends Command
                 $rows[] = ['', $a->student->student_id, mb_strtoupper($a->student->last_name), $a->student->first_name,
                     self::short($a->student->course), $a->student->year_level, 'Batch 3'];
             }
-            // other (fictional) grantees of the agency who are not CSU students in this system
             for ($i = 1; count($rows) < 120; $i++) {
                 $rows[] = ['', sprintf('2099-%05d', $i), 'SAMPLE'.$i, 'Not In System', 'BS Biology', '1st Year', 'Batch 3'];
             }
@@ -67,7 +47,6 @@ class MakeDemoTestFiles extends Command
                 .$forwarded->count().' forwarded demo students become approved (except any who already hold another scholarship), '
                 .(count($rows) - $forwarded->count()).' rows with 2099-xxxxx IDs are "unmatched" (not in the system).';
 
-            // 2. Problems list (CSV) for the same program
             $students = $forwarded->pluck('student')->values();
             $p = [];
             if ($students->count() >= 3) {
@@ -75,12 +54,12 @@ class MakeDemoTestFiles extends Command
                 $b = $students[1];
                 $c = $students[2];
                 $p[] = [$a->student_id, $a->last_name, $a->first_name, 'Approved'];
-                $p[] = [$a->student_id, $a->last_name, $a->first_name, 'Approved'];                  // duplicate row
-                $p[] = ['', $b->last_name, $b->first_name, 'Approved'];                                   // no Student ID: matched by name only if unique
-                $p[] = [str_replace('-', '', $c->student_id).'X', $c->last_name, $c->first_name, 'Approved']; // wrong ID format
-                $p[] = [$c->student_id, 'DIFFERENT', 'Person', 'Approved'];                             // real ID, other name -> check
-                $p[] = ['2099-99999', 'UNKNOWN', 'Student', 'Approved'];                                 // unknown ID
-                $p[] = ['', '', '', ''];                                                                  // blank row
+                $p[] = [$a->student_id, $a->last_name, $a->first_name, 'Approved'];
+                $p[] = ['', $b->last_name, $b->first_name, 'Approved'];
+                $p[] = [str_replace('-', '', $c->student_id).'X', $c->last_name, $c->first_name, 'Approved'];
+                $p[] = [$c->student_id, 'DIFFERENT', 'Person', 'Approved'];
+                $p[] = ['2099-99999', 'UNKNOWN', 'Student', 'Approved'];
+                $p[] = ['', '', '', ''];
                 DemoListFiles::csv("{$dir}/approved-with-problems.csv", ['Student ID', 'Last Name', 'First Name', 'Approval Status'], $p);
                 $readme[] = "approved-with-problems.csv -> program: {$program->name}. Expected: row 2 approved; row 3 a duplicate (error); row 4 matched by name or unmatched;"
                     .' row 5 wrong ID format (unmatched); row 6 "check: name differs"; row 7 unmatched; the blank row is skipped.';
@@ -91,8 +70,6 @@ class MakeDemoTestFiles extends Command
 
         $test = \App\Models\Student::where('student_id', config('demo.test_student.student_id'))->first();
 
-        // 3. One approved list per open program WITH the test student, so her application can be approved
-        //    once it is forwarded (process the file of the program she applied to).
         if ($test) {
             $byProgram = Application::with('student')->where('status', 'complete')->get()->groupBy('scholarship_id');
             foreach (\App\Models\Scholarship::where('status', 'active')->orderBy('name')->get() as $program) {
@@ -114,8 +91,6 @@ class MakeDemoTestFiles extends Command
                 .' forwarded (Complete); before that her row shows as "not forwarded".';
         }
 
-        // 3b. A numbered TES approved list with EVERY student in the system (A to Z), plus 5 agency rows that are
-        //     not CSU students here: tests a longer list in one go (works even right after demo:clean).
         $tes = \App\Models\Scholarship::where('short_name', 'TES')->first()
             ?? \App\Models\Scholarship::where('status', 'active')->orderBy('name')->first();
         $everyone = \App\Models\Student::whereNotNull('student_id')->orderBy('last_name')->orderBy('first_name')->get();
@@ -141,12 +116,9 @@ class MakeDemoTestFiles extends Command
                 .' (one-scholarship rule); 2099 rows -> unmatched.';
         }
 
-        // 4. Registrar list: approved applicants + active grantees, minus ONE (shows "not enrolled")
         $ids = Application::with('student')->where('status', 'approved')->get()->pluck('student')
             ->merge(ScholarRecord::with('student')->where('status', 'active')->get()->pluck('student'))
             ->filter()->unique('id')->sortBy(fn ($s) => $s->last_name.' '.$s->first_name)->values();
-        // One demo student is left out on purpose ("not enrolled"), preferably one who is approved or a grantee;
-        // every other student in the system is enrolled (so it also works right after demo:clean), the test student always.
         $left = $ids->first(fn ($s) => $s->is_demo)
             ?? \App\Models\Student::where('is_demo', true)->orderBy('last_name')->orderBy('first_name')->first();
         $enrolled = \App\Models\Student::whereNotNull('student_id')->get()

@@ -10,15 +10,9 @@ use Illuminate\Support\Facades\URL;
 
 class Document extends Model
 {
-    /*
-    | How long each kind of document counts as current, in months from the
-    | day it was uploaded. null = does not expire.
-    | These are SUGGESTED values for the prototype; confirm them with the OAS
-    | and change them here.
-    */
     public const VALIDITY_MONTHS = [
-        'Certificate of Registration (COR)' => 6,     // one semester
-        'Certificate of Grades' => 6,                 // one semester
+        'Certificate of Registration (COR)' => 6,
+        'Certificate of Grades' => 6,
         'Certificate of Indigency' => 6,
         'Barangay Clearance' => 6,
         'Certificate of Good Moral Character' => 6,
@@ -37,8 +31,6 @@ class Document extends Model
 
     protected static function booted(): void
     {
-        // Every document belongs to a student: take it from the application
-        // when the caller did not set it.
         static::creating(function (Document $document) {
             if (!$document->student_id && $document->application_id) {
                 $document->student_id = Application::whereKey($document->application_id)->value('student_id');
@@ -46,13 +38,6 @@ class Document extends Model
         });
     }
 
-    /*
-    | Privacy (Data Privacy Act): student documents are kept on the PRIVATE
-    | disk (storage/app/private/documents), not in the public web folder.
-    | They open only through a signed link that expires (file_url), which the
-    | API gives only to the owner and to OAS staff. Files saved by older
-    | versions in the public folder still open the same way.
-    */
     public const DISK = 'local';
 
     protected $appends = ['file_url'];
@@ -62,7 +47,6 @@ class Document extends Model
         return $this->id ? URL::temporarySignedRoute('documents.file', now()->addMinutes(30), ['id' => $this->id]) : null;
     }
 
-    /** The disk that actually has this file (private first; public = saved by an older version). */
     public static function diskFor(?string $path): ?string
     {
         if (!$path) {
@@ -77,7 +61,6 @@ class Document extends Model
         return null;
     }
 
-    /** Full path on this computer, or null when the file is missing. */
     public function absolutePath(): ?string
     {
         $disk = self::diskFor($this->file_path);
@@ -91,7 +74,6 @@ class Document extends Model
     public function validationResult() { return $this->hasOne(ValidationResult::class); }
     public function staffVerifier() { return $this->belongsTo(User::class, 'staff_verified_by'); }
 
-    // "Certificate of Grades", taken from the requirement or the saved type.
     public function typeName(): string
     {
         return $this->requirement?->name ?: ($this->document_type ?: 'Other document');
@@ -115,8 +97,6 @@ class Document extends Model
         return $expires !== null && $expires->isPast();
     }
 
-    // Deletes the stored file only if no other document row still uses it
-    // (a reused document shares one file between applications).
     public static function deleteFileIfUnused(string $path, ?int $exceptId = null): void
     {
         $stillUsed = self::where('file_path', $path)
@@ -129,8 +109,6 @@ class Document extends Model
         }
     }
 
-    // Seeded documents are created "now"; date them to the day before their
-    // application was submitted, so expiry and history look real.
     public static function alignSeededDates(): int
     {
         $count = 0;
@@ -150,7 +128,6 @@ class Document extends Model
         return $count;
     }
 
-    // Fills student_id on rows inserted directly by the bulk seeders.
     public static function backfillOwners(): int
     {
         return DB::update('UPDATE documents SET student_id = (SELECT applications.student_id FROM applications WHERE applications.id = documents.application_id) WHERE student_id IS NULL AND application_id IS NOT NULL');

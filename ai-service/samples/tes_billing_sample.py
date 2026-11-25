@@ -1,23 +1,10 @@
-"""
-FICTIONAL TES billing file (TES Continuing – Consolidated Grantees Details) for tests and demos.
-
-It copies the LAYOUT of the CHED form (16 columns, wrapped Student Number / award number / program,
-a row that continues on the next page, the totals and signature lines on the last page) with made-up
-people. Nothing here is a real student.
-
-    python samples/tes_billing_sample.py out.pdf          # scanned-looking PDF with a BAD hidden text layer
-    python samples/tes_billing_sample.py out.pdf --clean  # same pages, no hidden text
-
-make_pages() is used by the tests: it returns each page picture together with the exact position of
-every word, so the table reader can be tested without an OCR program.
-"""
 import io
 import random
 import sys
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-WIDTH, HEIGHT = 2640, 1710            # about 200 dpi, landscape long bond (like the real scan)
+WIDTH, HEIGHT = 2640, 1710
 LINES = (0.0, 0.0453, 0.0894, 0.1666, 0.2552, 0.3300, 0.4080, 0.4447, 0.4868, 0.6042, 0.6337,
          0.7739, 0.8295, 0.8590, 0.9019, 0.9429, 1.0)
 LEFT, RIGHT = 40, 2600
@@ -63,7 +50,6 @@ def _font(size):
 
 
 def _wrap(field, value):
-    """How the real form wraps a value inside its cell."""
     if field == "student_id" and value.count("-") == 1:
         a, b = value.split("-")
         return [a + "-", b]
@@ -86,12 +72,6 @@ def _wrap(field, value):
 
 def make_pages(rows, rows_per_page=12, tilt=0.0, split_last_row=True, seed=3, mistakes=None,
                school_year="2098-2099", campus="Sample State University-Main Campus"):
-    """
-    -> [(PIL image, words)], words = [(x0, y0, x1, y1, text, confidence)] in picture coordinates.
-    The first page has the title; the last row of a page can continue on the next page (like the real
-    scan), and the last page has the totals and the signature lines.
-    mistakes: {(control_number, field): wrong text} puts an OCR-like mistake in the words.
-    """
     mistakes = mistakes or {}
     rnd = random.Random(seed)
     font, small, big = _font(18), _font(17), _font(30)
@@ -115,7 +95,7 @@ def make_pages(rows, rows_per_page=12, tilt=0.0, split_last_row=True, seed=3, mi
                 x = box[2] + d.textlength(" ", font=f)
 
         put(60, 20, MARK, small)
-        top = 170                        # room above the table for the end of a row from the page before
+        top = 170
         if index == 0:
             put(900, 70, "CONSOLIDATED CONTINUING TES GRANTEES DETAILS", big)
             put(950, 120, f"TES Batch 2 - First Semester, Academic Year {school_year}", font)
@@ -123,7 +103,7 @@ def make_pages(rows, rows_per_page=12, tilt=0.0, split_last_row=True, seed=3, mi
             top = 260
         cut = split_last_row and index < len(chunks) - 1
         y_lines = [top + k * ROW_H for k in range(len(chunk) + 1)]
-        if cut:          # the last row runs off the bottom of the page and continues on the next
+        if cut:
             y_lines = y_lines[:-1]
         bottom = y_lines[-1] + (ROW_H * 2 // 3 if cut else 0)
         for y in y_lines:
@@ -136,18 +116,16 @@ def make_pages(rows, rows_per_page=12, tilt=0.0, split_last_row=True, seed=3, mi
                 value = mistakes.get((row["control_number"], field), row[field])
                 lines = _wrap(field, value)
                 if cut and r == len(chunk) - 1 and field == "award_number":
-                    lines = lines[:2]           # the rest is printed on the next page
+                    lines = lines[:2]
                 for k, line in enumerate(lines):
                     put(xs[c] + 12, y0 + 12 + k * 30, line, small if field in ("email", "program") else font)
         pages.append([img, words, chunk[-1] if cut else None])
 
-    # continued rows and the totals page
     for k in range(1, len(pages)):
         prev_row = pages[k - 1][2]
         if prev_row:
             img, words = pages[k][0], pages[k][1]
             d = ImageDraw.Draw(img)
-            # a short band above the first line holding the end of the award number
             tail = prev_row["award_number"].split("-")[-1]
             box = d.textbbox((xs[2] + 12, 120), tail, font=font)
             d.text((xs[2] + 12, 120), tail, fill=20, font=font)
@@ -197,28 +175,26 @@ def _rotate_words(words, angle):
 
 
 def garble(text, seed=1):
-    """What a cheap scanner OCR does to the hidden text layer."""
     rnd = random.Random(seed)
     swap = {"T": "l", "E": "€", "a": "o", "0": "O", "1": "l", "2": "Z", "S": "5", "i": "!"}
     return "".join(swap[ch] if ch in swap and rnd.random() < 0.35 else ch for ch in text)
 
 
 def write_pdf(path, pages, bad_layer=True):
-    """Pages -> a PDF that looks like a scan; with bad_layer, an invisible, garbled text layer is added."""
     from reportlab.pdfgen import canvas
     from reportlab.lib.utils import ImageReader
 
-    pw, ph = 949.68, 614.88          # the real file's page size in points
+    pw, ph = 949.68, 614.88
     c = canvas.Canvas(path, pagesize=(pw, ph))
     for img, words in pages:
-        jpeg = io.BytesIO()                 # a real scanner saves each page as a JPEG picture
+        jpeg = io.BytesIO()
         img.convert("RGB").save(jpeg, "JPEG", quality=70)
         jpeg.seek(0)
         c.drawImage(ImageReader(jpeg), 0, 0, pw, ph)
         if bad_layer:
             sx, sy = pw / WIDTH, ph / HEIGHT
             t = c.beginText()
-            t.setTextRenderMode(3)       # invisible text, like a scanner's OCR layer
+            t.setTextRenderMode(3)
             for k, (x0, y0, x1, y1, text, _conf) in enumerate(words):
                 t.setFont("Helvetica", max(4, (y1 - y0) * sy * 0.9))
                 t.setTextOrigin(x0 * sx, ph - y1 * sy)

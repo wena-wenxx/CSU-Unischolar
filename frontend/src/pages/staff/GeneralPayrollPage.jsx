@@ -5,24 +5,16 @@ import { downloadPayrollFile, peso, readFormAddress } from "../../lib/payrollFor
 import { useToast } from "../../lib/toast";
 import Loading from "../../components/Loading";
 
-/*
-  General Payroll (General Form No. 6-A, revised July 1, 1995): the OAS's
-  official payroll sheet, filled in from ScholarGuide. Opens on its own page
-  (no menu) so it prints like the paper form: long bond (8.5 x 13 in),
-  landscape. Download it as PDF or Word, or print it from here.
-*/
 export default function GeneralPayrollPage() {
   const toast = useToast();
   const location = useLocation();
   const [body] = useState(() => readFormAddress(location.search));
   const [form, setForm] = useState(null);
-  // Opened without chosen entries (e.g. typed address or bookmark): explain instead of a server error.
   const [error, setError] = useState(() =>
     body.ids.length === 0 ? "No payroll entries were chosen. Go back to Payroll, select the entries, then press General Payroll (Form 6-A)." : ""
   );
   const [busy, setBusy] = useState("");
 
-  // .then() (not await) so React's lint rule sees the state is set later.
   useEffect(() => {
     if (body.ids.length === 0) return;
     api
@@ -121,7 +113,6 @@ function Sheet({ form, sheet }) {
           ))}
         </colgroup>
         <thead>
-          {/* Two header rows, like the OAS form: "Less: Miscellaneous / CHED Grants" sits over two empty sub-columns. */}
           <tr>
             <th rowSpan={2}>No.</th>
             <th rowSpan={2}>ID NO.</th>
@@ -212,7 +203,6 @@ function Sheet({ form, sheet }) {
         </tbody>
       </table>
 
-      {/* Signatures in the OAS layout: 5 across, a line, then 3 + the witness lines. */}
       <table className="gp-signs">
         <tbody>
           <tr className="gp-cert-row">
@@ -286,7 +276,6 @@ function Sheet({ form, sheet }) {
   );
 }
 
-// As the OAS form prints a signatory: the name in capitals, the degree after the comma as written ("…, MSc", "…, PhD").
 function signName(name) {
   const [who, ...rest] = String(name).split(",");
   return who.trim().toUpperCase() + (rest.length ? `, ${rest.join(",").trim()}` : "");

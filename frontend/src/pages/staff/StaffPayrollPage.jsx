@@ -18,16 +18,6 @@ import SearchField from "../../components/SearchField";
 import { matchesWords, searchWords } from "../../lib/search";
 import { byLastName, lastFirst, programTabs } from "../../lib/programs";
 
-/*
-  Payroll (status tracking only; no money is moved by this system).
-  1. Prepare: choose the program and the period, preview who is included
-     (each scholar gets their own program's amount), then confirm.
-  2. Payroll list: filter, select, mark Ready / Processed, and make the
-     official General Payroll (General Form No. 6-A) for one program and one
-     period: print / save as PDF, or download it as Word.
-  3. History: totals per period and program.
-*/
-
 const STATUS_FILTERS = [
   ["all", "All"],
   ["draft", "Draft"],
@@ -62,7 +52,6 @@ export default function StaffPayrollPage() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // List filters. /staff/payroll?status=ready opens the list already filtered.
   const [statusFilter, setStatusFilter] = useState(() => {
     const wanted = new URLSearchParams(location.search).get("status");
     return STATUS_FILTERS.some(([key]) => key === wanted) ? wanted : "all";
@@ -75,8 +64,6 @@ export default function StaffPayrollPage() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
 
-  // Written with .then() (not await) so React's lint rule can see that the
-  // state is set later, when the server answers, not during the effect.
   const load = useCallback(
     () =>
       Promise.all([api.get("/payroll"), api.get("/scholarships"), api.get("/payroll/periods"), api.get("/payroll/history")])
@@ -105,14 +92,12 @@ export default function StaffPayrollPage() {
     const haystack = `${lastFirst(record?.student)} ${record?.student?.student_id || ""}`.toLowerCase();
     return matchesWords(haystack, words);
   });
-  // One tab per program (like sheets in Excel); each list is A to Z.
   const tabs = programTabs(filtered, (item) => item.scholar_record?.scholarship);
   const activeProgram = tabs.some((tab) => tab.key === programFilter) ? programFilter : "all";
   const shown = filtered
     .filter((item) => activeProgram === "all" || String(item.scholar_record?.scholarship_id) === activeProgram)
     .sort((a, b) => byLastName(a.scholar_record?.student, b.scholar_record?.student));
 
-  // Long lists: 25 rows first, then Show more (resets on another tab, filter or search).
   const page = usePaged(shown, `${activeProgram}|${shown.length}|${shown[0]?.id}`);
 
   const shownIds = shown.map((item) => item.id);
@@ -404,11 +389,6 @@ export default function StaffPayrollPage() {
   );
 }
 
-/*
-  General Payroll (General Form No. 6-A) for the entries in the list (or the
-  selected ones): ONE program and ONE period per form. Opens the printable
-  form as a PDF or Word file, or opens it on screen to print.
-*/
 function PayrollFormDialog({ entries, usingSelection, onClose }) {
   const toast = useToast();
   const navigate = useNavigate();
@@ -536,8 +516,6 @@ function AtmBadge({ record }) {
   const tone = group === "funded" ? "success" : group === "waiting" ? "warning" : "neutral";
   return <span className={`status status-${tone}`}>{record.atm_label}</span>;
 }
-
-/* ---------- 1. Prepare payroll: choose, preview, confirm ---------- */
 
 function PreparePanel({ scholarships, periods, onPrepared }) {
   const toast = useToast();

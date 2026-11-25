@@ -13,16 +13,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
-/*
-|--------------------------------------------------------------------------
-| System administrator
-|--------------------------------------------------------------------------
-| The admin manages ACCOUNTS (staff, admins, students), reads the ACTIVITY
-| LOG and changes SYSTEM SETTINGS. The admin does not review applications,
-| tag grantees or prepare payroll: that stays with OAS staff, so every
-| decision in the records was made by the office that owns it.
-| Accounts are never deleted, only deactivated, so their history is kept.
-*/
 class AdminController extends Controller
 {
     private function adminOnly(Request $request): User
@@ -36,7 +26,6 @@ class AdminController extends Controller
         return $user;
     }
 
-    // GET /admin/dashboard
     public function dashboard(Request $request)
     {
         $this->adminOnly($request);
@@ -74,10 +63,6 @@ class AdminController extends Controller
         ]);
     }
 
-    /*
-    | GET /admin/users?role=staff|admin|office|student&q=&status=active|inactive&page=
-    | role=office lists staff and admins together (Manage Staff).
-    */
     public function users(Request $request)
     {
         $this->adminOnly($request);
@@ -131,7 +116,6 @@ class AdminController extends Controller
 
     private function temporaryPassword(): string
     {
-        // Easy to read out loud: no 0/O or 1/I/L.
         $letters = 'ABCDEFGHJKMNPQRSTUVWXYZ';
         $code = '';
         for ($i = 0; $i < 4; $i++) {
@@ -141,14 +125,6 @@ class AdminController extends Controller
         return 'Csu-'.$code.'-'.random_int(2000, 9999);
     }
 
-    /*
-    | POST /admin/users
-    | Staff/admin: name, email, role.
-    | Student: first_name, middle_name, last_name, sex, student_id, course,
-    |          year_level, college, contact_number, email.
-    | password is optional: when empty a temporary one is made and shown once.
-    | The new user must change it at first login.
-    */
     public function store(Request $request)
     {
         $admin = $this->adminOnly($request);
@@ -215,7 +191,6 @@ class AdminController extends Controller
         ], 201);
     }
 
-    // PATCH /admin/users/{id}: name, e-mail, role (staff <-> admin), student details.
     public function update(Request $request, $id)
     {
         $admin = $this->adminOnly($request);
@@ -286,7 +261,6 @@ class AdminController extends Controller
         return User::where('role', 'admin')->where('is_active', true)->count();
     }
 
-    // POST /admin/users/{id}/reset-password   Body: password (optional)
     public function resetPassword(Request $request, $id)
     {
         $admin = $this->adminOnly($request);
@@ -296,7 +270,7 @@ class AdminController extends Controller
         $password = $data['password'] ?? $this->temporaryPassword();
 
         $user->forceFill(['password' => Hash::make($password), 'must_change_password' => true])->save();
-        $user->tokens()->delete(); // signs the user out everywhere
+        $user->tokens()->delete();
 
         ActivityLog::record($admin, 'account.password_reset', "Reset the password of {$user->name} ({$user->email}).", $user);
 
@@ -306,7 +280,6 @@ class AdminController extends Controller
         ]);
     }
 
-    // POST /admin/users/{id}/active   Body: active (true/false)
     public function setActive(Request $request, $id)
     {
         $admin = $this->adminOnly($request);
@@ -336,10 +309,6 @@ class AdminController extends Controller
         ]);
     }
 
-    /*
-    | GET /admin/activity?q=&role=&action=&from=&to=&page=&export=1
-    | action may be a group: "auth", "account", "application", "payroll" ...
-    */
     public function activity(Request $request)
     {
         $this->adminOnly($request);
@@ -380,7 +349,6 @@ class AdminController extends Controller
         ]);
     }
 
-    // GET /admin/settings
     public function settings(Request $request)
     {
         $this->adminOnly($request);
@@ -394,7 +362,6 @@ class AdminController extends Controller
         ]);
     }
 
-    // PUT /admin/settings
     public function updateSettings(Request $request)
     {
         $admin = $this->adminOnly($request);

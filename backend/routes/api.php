@@ -29,73 +29,43 @@ use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentDocumentController;
 use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| Public
-|--------------------------------------------------------------------------
-*/
-
-// At most 10 tries a minute per e-mail and computer: stops password guessing.
-// No public sign-up: accounts are created by the System Admin (ADMIN_ROLE.md), so nobody can
-// make an account with someone else's Student ID. (AuthController::register is kept but not routed.)
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
-Route::get('/office-contact', [SettingController::class, 'officeContact']);   // login page help (public contact only)
+Route::get('/office-contact', [SettingController::class, 'officeContact']);
 
 Route::middleware(['auth:sanctum', \App\Http\Middleware\RequirePasswordChange::class])->group(function () {
-
-    /*
-    |--------------------------------------------------------------------------
-    | Authentication
-    |--------------------------------------------------------------------------
-    */
-
     Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::get('/user', [AuthController::class, 'me']);
     Route::post('/change-password', [AuthController::class, 'changePassword']);
-    Route::post('/profile/photo', [ProfilePhotoController::class, 'store']);      // any role: photo in the sidebar
+    Route::post('/profile/photo', [ProfilePhotoController::class, 'store']);
     Route::delete('/profile/photo', [ProfilePhotoController::class, 'destroy']);
     Route::get('/settings/public', [SettingController::class, 'publicSettings']);
-    Route::get('/search', [SearchController::class, 'search']);   // top-bar search box
-
-    /*
-    |--------------------------------------------------------------------------
-    | Student
-    |--------------------------------------------------------------------------
-    */
+    Route::get('/search', [SearchController::class, 'search']);
 
     Route::get('/profile', [StudentController::class, 'profile']);
     Route::get('/student/history', [StudentController::class, 'history']);
-    Route::get('/student/matches', [StudentController::class, 'matches']);   // scholarships that fit the student
+    Route::get('/student/matches', [StudentController::class, 'matches']);
     Route::patch('/profile', [StudentController::class, 'updateProfile']);
-    Route::patch('/profile/eligibility', [StudentController::class, 'updateEligibility']);   // GWA + family income
-    Route::patch('/profile/interests', [StudentController::class, 'updateInterests']);       // optional field and goals (AI field fit)
+    Route::patch('/profile/eligibility', [StudentController::class, 'updateEligibility']);
+    Route::patch('/profile/interests', [StudentController::class, 'updateInterests']);
     Route::get('/student/notifications', [StudentController::class, 'notifications']);
     Route::post('/student/notifications/read', [StudentController::class, 'markNotificationsRead']);
     Route::get('/student/change-requests', [StudentController::class, 'changeRequests']);
     Route::post('/student/change-requests', [StudentController::class, 'storeChangeRequest']);
 
-    // Contact OAS (students write, staff reply)
     Route::get('/student/messages', [ContactController::class, 'mine']);
     Route::post('/student/messages', [ContactController::class, 'store']);
     Route::get('/staff/messages', [ContactController::class, 'index']);
-    Route::get('/staff/alerts', [\App\Http\Controllers\StaffAlertController::class, 'index']);        // "what to do next" after a student's action
+    Route::get('/staff/alerts', [\App\Http\Controllers\StaffAlertController::class, 'index']);
     Route::post('/staff/alerts/seen', [\App\Http\Controllers\StaffAlertController::class, 'seen']);
     Route::post('/staff/messages/{id}/reply', [ContactController::class, 'reply']);
     Route::post('/staff/messages/{id}/status', [ContactController::class, 'setStatus']);
 
-    // My Documents: every file the student uploaded, reusable across applications
     Route::get('/student/documents', [StudentDocumentController::class, 'index']);
     Route::post('/student/documents', [StudentDocumentController::class, 'store']);
     Route::post('/student/documents/{id}/replace', [StudentDocumentController::class, 'replace']);
     Route::delete('/student/documents/{id}', [StudentDocumentController::class, 'destroy'])->whereNumber('id');
     Route::post('/applications/{id}/documents/reuse', [ApplicationController::class, 'reuseDocument']);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Scholarships
-    |--------------------------------------------------------------------------
-    */
 
     Route::get('/scholarships', [ScholarshipController::class, 'index']);
     Route::get('/scholarships/{id}', [ScholarshipController::class, 'show']);
@@ -108,12 +78,6 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\RequirePasswordChange::c
     Route::get('/requirement-types', [ScholarshipController::class, 'requirementTypes']);
     Route::get('/eligibility-options', [ScholarshipController::class, 'eligibilityOptions']);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Applications
-    |--------------------------------------------------------------------------
-    */
-
     Route::post('/applications', [ApplicationController::class, 'store']);
     Route::get('/my-applications', [ApplicationController::class, 'myApplications']);
     Route::get('/applications', [ApplicationController::class, 'index']);
@@ -122,33 +86,19 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\RequirePasswordChange::c
     Route::post('/applications/{id}/submit', [ApplicationController::class, 'submit']);
     Route::patch('/applications/{id}/review', [ApplicationController::class, 'review']);
 
-    // Auto-Review: suggestions only; staff press Forward / Send back
     Route::post('/staff/auto-review', [ReviewQueueController::class, 'run']);
     Route::post('/staff/applications/forward', [ReviewQueueController::class, 'forward']);
-    Route::get('/staff/applications/{id}/suggested-remark', [ReviewQueueController::class, 'suggestedRemark']);   // from its own AI flags (suggestion only)
+    Route::get('/staff/applications/{id}/suggested-remark', [ReviewQueueController::class, 'suggestedRemark']);
     Route::post('/staff/applications/needs-action', [ReviewQueueController::class, 'needsAction']);
     Route::post('/applications/{applicationId}/verify-enrollment', [EnrollmentController::class, 'verify']);
 
-    // Enrollment page: Registrar list + Verify All Enrollments
     Route::get('/staff/enrollment-lists', [EnrollmentListController::class, 'index']);
     Route::post('/staff/enrollment-lists', [EnrollmentListController::class, 'store']);
     Route::get('/staff/enrollment-lists/{id}/rows', [EnrollmentListController::class, 'rows'])->whereNumber('id');
     Route::post('/staff/enrollment/check', [EnrollmentListController::class, 'check']);
     Route::post('/staff/enrollment/record', [EnrollmentListController::class, 'record']);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Staff Dashboard
-    |--------------------------------------------------------------------------
-    */
-
     Route::get('/staff/dashboard', [DashboardController::class, 'index']);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Scholarship Data Bank (staff): search a student, see full history
-    |--------------------------------------------------------------------------
-    */
 
     Route::get('/staff/data-bank', [DataBankController::class, 'search']);
     Route::get('/staff/data-bank/{studentId}', [DataBankController::class, 'show']);
@@ -157,13 +107,12 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\RequirePasswordChange::c
     Route::get('/staff/agency-lists', [AgencyListController::class, 'index']);
     Route::post('/staff/agency-lists', [AgencyListController::class, 'store']);
     Route::get('/staff/agency-lists/{id}', [AgencyListController::class, 'show']);
-    Route::post('/staff/agency-lists/{id}/done', [AgencyListController::class, 'markDone']);                   // "Done processing" (changes no application)
-    Route::post('/staff/agency-lists/{id}/rows/{row}/link', [AgencyListController::class, 'linkRow']);          // unmatched row -> a student found in Data Bank
-    Route::post('/staff/agency-lists/{id}/set-aside', [AgencyListController::class, 'setAsideRows']);           // several rows, one reason
-    Route::post('/staff/agency-lists/{id}/rows/{row}/resume', [AgencyListController::class, 'resumeRow']);      // undo set aside
-    Route::post('/staff/agency-lists/{id}/rows/{row}/set-aside', [AgencyListController::class, 'setAsideRow']); // keep it unmatched, with a note
+    Route::post('/staff/agency-lists/{id}/done', [AgencyListController::class, 'markDone']);
+    Route::post('/staff/agency-lists/{id}/rows/{row}/link', [AgencyListController::class, 'linkRow']);
+    Route::post('/staff/agency-lists/{id}/set-aside', [AgencyListController::class, 'setAsideRows']);
+    Route::post('/staff/agency-lists/{id}/rows/{row}/resume', [AgencyListController::class, 'resumeRow']);
+    Route::post('/staff/agency-lists/{id}/rows/{row}/set-aside', [AgencyListController::class, 'setAsideRow']);
 
-    // Processing batches: one cycle of one program (e.g. TES – 1st Semester AY 2026-2027)
     Route::get('/staff/processing-batches', [ProcessingBatchController::class, 'index']);
     Route::post('/staff/processing-batches', [ProcessingBatchController::class, 'store']);
     Route::get('/staff/processing-batches/{id}', [ProcessingBatchController::class, 'show']);
@@ -179,32 +128,20 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\RequirePasswordChange::c
     });
     Route::get('/staff/email-logs', [ReportController::class, 'emailLogs']);
 
-    /*
-    |--------------------------------------------------------------------------
-    | AI Recommendations (rule-based eligibility scores; staff decide)
-    |--------------------------------------------------------------------------
-    */
-
     Route::get('/staff/recommendations', [RecommendationController::class, 'index']);
     Route::post('/staff/recommendations/recalculate', [RecommendationController::class, 'recalculate']);
     Route::post('/staff/recommendations/notifications/check', [RecommendationController::class, 'checkNotifications']);
     Route::post('/staff/recommendations/notifications', [RecommendationController::class, 'sendNotifications']);
     Route::get('/staff/recommendations/{id}', [RecommendationController::class, 'show']);
     Route::post('/staff/recommendations/{id}/invite', [RecommendationController::class, 'invite']);
-    Route::get('/staff/notices', [RecommendationController::class, 'sentNotices']);   // sent invitations and notices: whom, when, status
-    Route::get('/staff/invitation-activity', [RecommendationController::class, 'activity']);   // dashboard: invitations sent, opened, applied
+    Route::get('/staff/notices', [RecommendationController::class, 'sentNotices']);
+    Route::get('/staff/invitation-activity', [RecommendationController::class, 'activity']);
     Route::post('/staff/recommendations/{id}/add', [RecommendationController::class, 'add']);
     Route::post('/staff/recommendations/{id}/dismiss', [RecommendationController::class, 'dismiss']);
     Route::post('/staff/recommendations/{id}/wrong', [RecommendationController::class, 'wrong']);
     Route::post('/staff/recommendations/{id}/restore', [RecommendationController::class, 'restore']);
     Route::get('/staff/recommendation-logs', [RecommendationController::class, 'logs']);
     Route::post('/staff/students/{id}/eligibility', [RecommendationController::class, 'verifyStudentData']);
-
-    /*
-    |--------------------------------------------------------------------------
-    | External Grantees (lists from LGUs, CHED, foundations; staff confirm)
-    |--------------------------------------------------------------------------
-    */
 
     Route::get('/staff/external-grantees', [ExternalGranteeController::class, 'index']);
     Route::patch('/staff/external-grantees/{id}', [ExternalGranteeController::class, 'update']);
@@ -214,72 +151,41 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\RequirePasswordChange::c
     Route::get('/staff/external-grantees/uploads/{id}/file', [ExternalGranteeController::class, 'download']);
     Route::post('/staff/external-grantees/uploads/{id}/save', [ExternalGranteeController::class, 'save']);
     Route::post('/staff/external-grantees/uploads/{id}/discard', [ExternalGranteeController::class, 'discard']);
-    Route::post('/staff/read-table', [ExternalGranteeController::class, 'readTable']);   // Approved Lists / Enrollment: Excel, Word, PDF
+    Route::post('/staff/read-table', [ExternalGranteeController::class, 'readTable']);
     Route::post('/staff/forwarded/export', [ForwardedExportController::class, 'export']);
     Route::get('/staff/agency-submissions', [\App\Http\Controllers\AgencySubmissionController::class, 'index']);
-    Route::post('/staff/agency-submissions', [\App\Http\Controllers\AgencySubmissionController::class, 'store']);     // "Record as sent": one date for the whole list
-    Route::post('/staff/forwarded/documents-zip', [\App\Http\Controllers\AgencySubmissionController::class, 'documentsZip']);   // ticked document types only
-    Route::post('/staff/billing-statement', [\App\Http\Controllers\BillingStatementController::class, 'export']);   // billing list (CHED TES Form 2 column order) as Excel or PDF   // Forwarded to Agency as Excel or PDF
-    Route::post('/staff/ai/suggest-rules', [AiRulesController::class, 'suggest']);          // AI reads a memo, suggests eligibility rules
-
-    /*
-    |--------------------------------------------------------------------------
-    | Announcements (students read; staff manage)
-    |--------------------------------------------------------------------------
-    */
+    Route::post('/staff/agency-submissions', [\App\Http\Controllers\AgencySubmissionController::class, 'store']);
+    Route::post('/staff/forwarded/documents-zip', [\App\Http\Controllers\AgencySubmissionController::class, 'documentsZip']);
+    Route::post('/staff/billing-statement', [\App\Http\Controllers\BillingStatementController::class, 'export']);
+    Route::post('/staff/ai/suggest-rules', [AiRulesController::class, 'suggest']);
 
     Route::get('/announcements', [AnnouncementController::class, 'index']);
     Route::post('/announcements', [AnnouncementController::class, 'store']);
     Route::get('/announcements/{id}', [AnnouncementController::class, 'show']);
-    // POST with _method=PUT is used when a picture is sent (file uploads need POST).
     Route::put('/announcements/{id}', [AnnouncementController::class, 'update']);
     Route::delete('/announcements/{id}', [AnnouncementController::class, 'destroy']);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Documents
-    |--------------------------------------------------------------------------
-    */
-
     Route::post('/applications/{id}/documents', [ApplicationController::class, 'uploadDocument']);
     Route::post('/documents/{documentId}/validate', [AIController::class, 'validateDocument']);
-    Route::get('/documents/{documentId}/check-status', [AIController::class, 'checkStatus']);   // result of a check running in the AI worker
-    Route::post('/documents/{documentId}/cancel-check', [AIController::class, 'cancelCheck']);   // "Cancel" on a running AI check
-    Route::post('/documents/{documentId}/verify', [AIController::class, 'verify']);   // staff: "verified genuine"
-
-    /*
-    |--------------------------------------------------------------------------
-    | Scholar Records (grantee tagging)
-    |--------------------------------------------------------------------------
-    */
+    Route::get('/documents/{documentId}/check-status', [AIController::class, 'checkStatus']);
+    Route::post('/documents/{documentId}/cancel-check', [AIController::class, 'cancelCheck']);
+    Route::post('/documents/{documentId}/verify', [AIController::class, 'verify']);
 
     Route::get('/scholar-records', [ScholarRecordController::class, 'index']);
     Route::get('/scholar-records/{id}', [ScholarRecordController::class, 'show']);
     Route::post('/applications/{applicationId}/scholar-record', [ScholarRecordController::class, 'store']);
     Route::patch('/scholar-records/{id}', [ScholarRecordController::class, 'update']);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Payroll
-    |--------------------------------------------------------------------------
-    */
-
     Route::get('/payroll', [PayrollController::class, 'index']);
     Route::get('/payroll/periods', [PayrollController::class, 'periods']);
     Route::get('/payroll/history', [PayrollController::class, 'history']);
     Route::post('/payroll/prepare', [PayrollController::class, 'prepare']);
     Route::post('/payroll/bulk-status', [PayrollController::class, 'bulkStatus']);
-    Route::post('/payroll/form', [PayrollController::class, 'form']);            // General Form No. 6-A (print / PDF)
-    Route::post('/payroll/form/docx', [PayrollController::class, 'formDocx']);   // the same form as Word
-    Route::post('/payroll/form/pdf', [PayrollController::class, 'formPdf']);     // the same form as PDF
+    Route::post('/payroll/form', [PayrollController::class, 'form']);
+    Route::post('/payroll/form/docx', [PayrollController::class, 'formDocx']);
+    Route::post('/payroll/form/pdf', [PayrollController::class, 'formPdf']);
     Route::post('/scholar-records/{scholarRecordId}/payroll', [PayrollController::class, 'store']);
     Route::patch('/payroll/{id}', [PayrollController::class, 'update']);
-
-    /*
-    |--------------------------------------------------------------------------
-    | System administrator: accounts, activity log, settings
-    |--------------------------------------------------------------------------
-    */
 
     Route::get('/admin/dashboard', [AdminController::class, 'dashboard']);
     Route::get('/admin/users', [AdminController::class, 'users']);
@@ -292,7 +198,6 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\RequirePasswordChange::c
     Route::put('/admin/settings', [AdminController::class, 'updateSettings']);
 });
 
-// A student document, through a signed link that expires (no login needed for the link itself).
 Route::get('/files/documents/{id}', [\App\Http\Controllers\DocumentFileController::class, 'show'])
     ->middleware(['signed', 'throttle:120,1'])
     ->name('documents.file');

@@ -4,28 +4,6 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 
-/**
- * Runs with: php artisan migrate:fresh --seed
- *
- * ALL DATA IS FICTIONAL DEMO DATA (no real CSU students).
- *
- * Demo logins:
- *   Admin        admin@carsu.edu.ph                             / Admin@12345
- *   Staff        oas.staff@carsu.edu.ph                         / Staff@12345
- *   Test student (real, with permission): e-mail from TEST_STUDENT_EMAIL in .env / Student@12345
- *   Named demo   student1@carsu.edu.ph ... student10@carsu.edu.ph / Student@12345
- *   Bulk demo    s<student id without dash>@demo.carsu.edu.ph   / Student@12345
- *                (e.g. the student 2024-10123 logs in as s202410123@demo.carsu.edu.ph)
- *
- * DemoDataSeeder: the 13 programs on the OAS list + the 10 named demo scenarios.
- * BulkDemoSeeder: 120 more students with a full cycle of applications,
- *                 documents, AI results, grantees and payroll.
- * StatusLogSeeder: timeline / notifications / "last updated" for every application.
- * PortalDemoSeeder: OAS announcements and one pending correction request.
- * ExternalGranteeSeeder: one saved outside-scholarship list (External Grantees).
- * Last: the first run of AI Recommendations (rule-based eligibility scores).
- * Run "php artisan storage:link" once so staff can open the sample files.
- */
 class DatabaseSeeder extends Seeder
 {
     public function run(): void
@@ -36,41 +14,30 @@ class DatabaseSeeder extends Seeder
             StudentSeeder::class,
             DemoDataSeeder::class,
             BulkDemoSeeder::class,
-            StatusLogSeeder::class,   // step-by-step history of every application
-            PortalDemoSeeder::class,  // announcements + one profile correction request
+            StatusLogSeeder::class,
+            PortalDemoSeeder::class,
         ]);
 
-        // Bulk applications were inserted directly; give each the school year it was started in,
-        // and the processing batch of its program and school year.
         \App\Models\Application::fillMissingSchoolYears();
         \App\Models\Application::fillMissingBatches();
 
-        // The seeders' fictional students are marked as demo (only these can be removed by demo:reset).
         \App\Support\DemoData::markSeededStudents();
 
-        // Bulk documents were inserted directly; record which student owns each.
         \App\Models\Document::backfillOwners();
         \App\Models\Document::alignSeededDates();
 
-        // Starting ATM status for every grantee (funded / pending / for ATM application).
         \App\Models\ScholarRecord::backfillAtmStatus();
 
-        // Scholar records are kept per school year; bulk records get theirs (and their batch).
         \App\Models\ScholarRecord::fillMissingSchoolYears();
 
-        // When each demo application was forwarded to its agency.
         \App\Models\Application::backfillForwardedAt();
 
-        // A demo Registrar enrollment list for "Verify All Enrollments".
         $this->call(EnrollmentListSeeder::class);
 
-        // Activity log entries for the staff steps already in the demo history.
         \App\Models\ActivityLog::backfillFromStatusLogs();
 
-        // One saved outside-scholarship list (External Grantees).
         $this->call(ExternalGranteeSeeder::class);
 
-        // First run of AI Recommendations (staff press "Recalculate" later).
         \App\Support\EligibilityEngine::recalculate();
     }
 }

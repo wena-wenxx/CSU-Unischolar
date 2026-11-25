@@ -8,27 +8,8 @@ use App\Models\User;
 use Illuminate\Validation\ValidationException;
 use ZipArchive;
 
-/*
-|--------------------------------------------------------------------------
-| General Payroll (General Form No. 6-A, revised July 1, 1995)
-|--------------------------------------------------------------------------
-| The OAS's official payroll sheet, filled in from ScholarGuide payroll
-| entries of ONE program and ONE period:
-|   build()  the sheets as data (used by the printable page and by Word)
-|   docx()   the same sheets as a Word document (.docx)
-| Each sheet holds up to N students (15 on the OAS paper form) with its own
-| total; the last sheet ends with "***NOTHING FOLLOWS***" and, when there
-| is more than one sheet, the grand total. Students with and without an ATM
-| are put on separate sheets ("WITH ATM" / "WITHOUT ATM"), like the form.
-| The deduction and witness columns are printed empty, to be filled by hand.
-*/
 class GeneralPayrollForm
 {
-    /*
-    | $ids      payroll_records ids (one program, one period)
-    | $options  batch, voucher, purpose, sheet_start, per_sheet, split_atm,
-    |           prepared_name, prepared_title
-    */
     public static function build(array $ids, array $options, User $user): array
     {
         $records = PayrollRecord::with([
@@ -53,7 +34,6 @@ class GeneralPayrollForm
         [$semIndex, $ay] = self::semester($period);
         $rate = (float) ($program->amount ?? $records->max('amount'));
 
-        // A to Z by last name, like the OAS lists.
         $records = $records->sortBy(fn ($r) => mb_strtolower(
             ($r->scholarRecord->student->last_name ?? '').' '.($r->scholarRecord->student->first_name ?? '')
         ))->values();
@@ -103,7 +83,6 @@ class GeneralPayrollForm
                     'rows' => $rows,
                     'total' => $sheetTotal,
                     'is_last' => $last,
-                    // Grand total of this ATM group, printed on its last sheet when it has several.
                     'grand_total' => $last && $chunks->count() > 1 ? $groupTotal : null,
                 ];
             }
@@ -133,7 +112,6 @@ class GeneralPayrollForm
         ];
     }
 
-    /** [1 or 2, "2026-2027" or null] from "1st Semester AY 2026-2027". Summer goes in the first column. */
     private static function semester(string $period): array
     {
         $ay = preg_match('/(\d{4})\s*-\s*(\d{4})/', $period, $m) ? "{$m[1]}-{$m[2]}" : null;
@@ -141,7 +119,6 @@ class GeneralPayrollForm
         return [str_starts_with(mb_strtolower($period), '2nd') ? 2 : 1, $ay];
     }
 
-    // "DELA CRUZ, JUAN S."
     private static function name($student): string
     {
         $middle = trim((string) $student->middle_name);
@@ -150,10 +127,6 @@ class GeneralPayrollForm
         return mb_strtoupper(trim($student->last_name).', '.trim($student->first_name).$initial);
     }
 
-    /**
-     * A signatory name as the OAS form prints it: the name in capitals, the degree after the comma as written
-     * ("Airish Pelemeniano - Jumonong, MSc" -> "AIRISH PELEMENIANO - JUMONONG, MSc"; "PhD" stays "PhD").
-     */
     public static function signName(?string $name): string
     {
         $name = trim((string) $name);
@@ -170,14 +143,11 @@ class GeneralPayrollForm
         return $value === null ? '' : number_format($value, 2);
     }
 
-    /* ------------------------------------------------------------------ Word */
-
     private static function esc(string $text): string
     {
         return htmlspecialchars($text, ENT_XML1 | ENT_QUOTES, 'UTF-8');
     }
 
-    /** One run of text. $o: b (bold), i (italic), sz (half-points), color, u (underline). */
     private static function run(string $text, array $o = []): string
     {
         $pr = '<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>'
@@ -190,11 +160,9 @@ class GeneralPayrollForm
         return '<w:r><w:rPr>'.$pr.'</w:rPr><w:t xml:space="preserve">'.self::esc($text).'</w:t></w:r>';
     }
 
-    /** A paragraph. $align: left|center|right. */
     private static function p(string $runs, string $align = 'left', int $after = 0, string $look = ''): string
     {
         $jc = ['left' => 'left', 'center' => 'center', 'right' => 'right'][$align];
-        // $look: 'yellow' (shaded band), 'box' (yellow box with a border), 'underline' (line under the paragraph)
         $extra = match ($look) {
             'yellow' => '<w:shd w:val="clear" w:color="auto" w:fill="FFEB3B"/>',
             'box' => '<w:pBdr><w:top w:val="single" w:sz="8" w:space="1" w:color="333333"/><w:left w:val="single" w:sz="8" w:space="4" w:color="333333"/>'
@@ -208,7 +176,6 @@ class GeneralPayrollForm
             .self::indOf($extra).'<w:jc w:val="'.$jc.'"/></w:pPr>'.$runs.'</w:p>';
     }
 
-    // Word wants pPr children in order: pBdr, shd, spacing, ind, jc.
     private static function pprOrder(string $extra): string
     {
         return preg_replace('#<w:ind [^>]*/>#', '', $extra);
@@ -219,13 +186,11 @@ class GeneralPayrollForm
         return preg_match('#<w:ind [^>]*/>#', $extra, $m) ? $m[0] : '';
     }
 
-    /** A table cell. $o: w (twips), fill, span, align, vmerge, noborder, rule (line under a borderless cell). */
     private static function cell(string $content, array $o = []): string
     {
         $pr = '<w:tcW w:w="'.($o['w'] ?? 600).'" w:type="dxa"/>'
             .(!empty($o['span']) ? '<w:gridSpan w:val="'.$o['span'].'"/>' : '')
             .(isset($o['vmerge']) ? '<w:vMerge'.($o['vmerge'] === 'restart' ? ' w:val="restart"' : '').'/>' : '')
-            // Borders on every cell of the main table (some Word viewers ignore table-level borders).
             .(!empty($o['noborder'])
                 ? '<w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/>'
                     .(!empty($o['rule']) ? '<w:bottom w:val="single" w:sz="8" w:space="0" w:color="333333"/>' : '<w:bottom w:val="nil"/>')
@@ -237,10 +202,6 @@ class GeneralPayrollForm
         return '<w:tc><w:tcPr>'.$pr.'</w:tcPr>'.($content !== '' ? $content : self::p('')).'</w:tc>';
     }
 
-    /**
-     * PDF with every sheet on its own landscape long-bond page (8.5 x 13 in).
-     * Uses dompdf (install once: composer require dompdf/dompdf).
-     */
     public static function pdf(array $form): string
     {
         if (!class_exists(\Dompdf\Dompdf::class)) {
@@ -248,26 +209,24 @@ class GeneralPayrollForm
         }
 
         $options = new \Dompdf\Options();
-        $options->set('isRemoteEnabled', false);      // never fetch files from the internet
+        $options->set('isRemoteEnabled', false);
         $options->set('defaultFont', 'Helvetica');
         $options->set('tempDir', sys_get_temp_dir());
 
         $dompdf = new \Dompdf\Dompdf($options);
         $dompdf->loadHtml(view('pdf.general-payroll', ['form' => $form])->render());
-        $dompdf->setPaper([0, 0, 936, 612]);         // 13 x 8.5 in in points (72 per inch): landscape long bond
+        $dompdf->setPaper([0, 0, 936, 612]);
         $dompdf->render();
 
         return $dompdf->output();
     }
 
-    /** Word document (.docx) with every sheet on its own landscape long-bond page. */
     public static function docx(array $form): string
     {
         if (!class_exists(ZipArchive::class)) {
             throw new \RuntimeException('PHP zip extension is off. Turn on "extension=zip" in php.ini to make Word files.');
         }
 
-        // Column widths in twips (1 inch = 1440). Total = 18000 (12.5 in).
         $w = [500, 1150, 2900, 750, 1100, 1100, 400, 400, 1150, 400, 1050, 1000, 400, 400, 1150, 1300, 2850];
         $grid = '<w:tblGrid>'.implode('', array_map(fn ($x) => '<w:gridCol w:w="'.$x.'"/>', $w)).'</w:tblGrid>';
         $border = '<w:tblBorders>'.implode('', array_map(fn ($s) => "<w:{$s} w:val=\"single\" w:sz=\"6\" w:space=\"0\" w:color=\"333333\"/>",
@@ -277,18 +236,15 @@ class GeneralPayrollForm
         $money = fn ($v) => self::money($v);
         $red = 'C0392B';
         $sig = $form['signatories'];
-        // Name in bold capitals with the position below it, like the OAS form (no line: they sign over the name).
         $person = fn (string $slot) => self::p(self::run(self::signName($sig[$slot]['name']) ?: ' ', ['b' => true, 'sz' => 17]))
             .self::p(self::run((string) $sig[$slot]['title'], ['sz' => 16]), 'left', 40);
 
         $body = '';
         foreach ($form['sheets'] as $i => $sheet) {
-            // ---- top: form number, title, sheet no, voucher, release banner
             $left = self::p(self::run('General Form No.(6 A)', ['sz' => 15]))
                 .self::p(self::run('(Revised July 1,1995)', ['sz' => 15]), 'left', 80)
                 .self::p(self::run('GENERAL PAYROLL', ['b' => true, 'sz' => 28]), 'center', 80)
                 .self::p(self::run('We hereby acknowledge to have received of the sum herein specified opposite our respective names being full compensation for our services for the period', ['sz' => 15]));
-            // Like the OAS form: only the voucher box and the "Release of" band are yellow.
             $right = self::p(self::run('Sheet No: '.$sheet['sheet_no'], ['sz' => 15]), 'left', 40)
                 .self::p(self::run('Journal Voucher:', ['sz' => 15]), 'left', 0)
                 .self::p(self::run($form['voucher'] ?: ' ', ['b' => true, 'sz' => 22, 'color' => 'D35400']), 'center', 100, 'box')
@@ -301,9 +257,6 @@ class GeneralPayrollForm
                 .self::cell($right, ['w' => 8400, 'valign' => 'top', 'noborder' => true])
                 .'</w:tr></w:tbl>';
 
-            // ---- the table
-            // Two header rows, like the OAS form: "Less: Miscellaneous / CHED Grants" sits over two
-            // empty sub-columns; every other heading fills both rows.
             $h = fn (string $content, int $wi) => self::cell($content, ['w' => $wi, 'vmerge' => 'restart']);
             $t = fn (string $text) => self::p(self::run($text, ['b' => true, 'sz' => 14]), 'center');
             $sem = fn (string $label) => $t($label).self::p(self::run($money($form['rate']), ['sz' => 14]), 'center');
@@ -372,9 +325,6 @@ class GeneralPayrollForm
 
             $body .= self::p('', 'left', 120);
 
-            // ---- certifications and signatures, in the OAS layout (5 columns):
-            //   row 1: OAS staff | Scholarship Coordinator | OAS Director | Registrar | VP, then a line across
-            //   row 2: Chief Accountant | University President | (gap) | Cashier | two witness lines
             $cw = 3600;
             $c = fn (string $content, int $span = 1, array $o = []) => self::cell($content === '' ? self::p('') : $content,
                 ['w' => $cw * $span, 'span' => $span > 1 ? $span : null, 'valign' => 'bottom', 'noborder' => true] + $o);
@@ -405,7 +355,6 @@ class GeneralPayrollForm
             }
         }
 
-        // Long bond (8.5 x 13 in), landscape, 0.4 in margins.
         $section = '<w:sectPr><w:pgSz w:w="18720" w:h="12240" w:orient="landscape"/>'
             .'<w:pgMar w:top="500" w:right="360" w:bottom="500" w:left="360" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr>';
 

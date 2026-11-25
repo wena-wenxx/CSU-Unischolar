@@ -1,16 +1,8 @@
 import { useMemo, useState } from "react";
 
-/*
-  The rows read from an approved list, before processing.
-  - Every row is shown (scroll inside the box), in the order of the file.
-  - Cells that were hard to read (scanned files) are highlighted; hover to see why.
-  - Click any cell to correct it. Corrections are used when the list is processed.
-  props: headers, rows (data rows only), cells (same shape, or null), firstLine, pickedColumn,
-         onEdit(rowIndex, columnIndex, value)
-*/
 export default function ListPreview({ headers, rows, cells, firstLine, pickedColumn, onEdit }) {
   const [onlyCheck, setOnlyCheck] = useState(false);
-  const [editing, setEditing] = useState(null); // [row, column]
+  const [editing, setEditing] = useState(null);
   const [draft, setDraft] = useState("");
 
   const needsCheck = (r, c) => Boolean(cells?.[r]?.[c]?.check);

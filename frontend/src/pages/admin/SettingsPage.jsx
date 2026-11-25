@@ -4,12 +4,6 @@ import { useToast } from "../../lib/toast";
 import PageHeader from "../../components/PageHeader";
 import Loading from "../../components/Loading";
 
-/*
-  System Settings (admin):
-  - current school year and semester (the default payroll period),
-  - OAS contact details shown to students (Contact OAS page and page footer).
-  - signatories printed on the General Payroll (General Form No. 6-A).
-*/
 export default function SettingsPage() {
   const toast = useToast();
   const [form, setForm] = useState(null);
@@ -19,7 +13,6 @@ export default function SettingsPage() {
   const fill = (values) =>
     Object.fromEntries(Object.entries(values).map(([key, value]) => [key, value ?? ""]));
 
-  // .then() (not await) so React's lint rule sees the state is set later.
   const load = useCallback(
     () =>
       api

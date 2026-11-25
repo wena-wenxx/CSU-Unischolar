@@ -22,24 +22,15 @@ function validateDocumentUpload(file) {
   return "";
 }
 
-/*
-  My Documents: every file the student has uploaded, by type.
-  - shows whether each file is still valid (not expired),
-  - shows the AI check result, with the reasons when something was flagged,
-  - lets the student upload or replace a file (drafts are updated too),
-  - files saved here can be picked when applying, instead of uploading again.
-*/
 export default function MyDocumentsPage() {
   const toast = useToast();
 
   const [data, setData] = useState(null);
-  const [files, setFiles] = useState({}); // type -> chosen File
+  const [files, setFiles] = useState({});
   const [inputKeys, setInputKeys] = useState({});
-  const [busy, setBusy] = useState(null); // type or "check-<id>"
-  const [history, setHistory] = useState({}); // type -> open?
+  const [busy, setBusy] = useState(null);
+  const [history, setHistory] = useState({});
 
-  // Written with .then() (not await) so React's lint rule can see that the
-  // state is set later, when the server answers, not during the effect.
   const load = useCallback(
     () =>
       loadMyDocuments()
@@ -55,11 +46,10 @@ export default function MyDocumentsPage() {
     load();
   }, [load]);
 
-  // One "Checking..." state per document; checks running in the AI worker are followed until they finish.
   const ai = useAiChecks({ toast, onChange: load });
   const confirm = useConfirm();
-  const uploadControl = useRef(null); // the upload in progress ("Cancel upload")
-  const [uploadingType, setUploadingType] = useState(null); // which card is uploading (shows the Cancel button)
+  const uploadControl = useRef(null);
+  const [uploadingType, setUploadingType] = useState(null);
   const { resume } = ai;
   useEffect(() => {
     resume(data?.documents);
@@ -99,7 +89,7 @@ export default function MyDocumentsPage() {
     } catch (err) {
       if (isCancel(err)) {
         toast.info("Upload cancelled. The file is still chosen; press Upload to try again.");
-        load(); // show the real state (a file that had fully arrived may have been kept)
+        load();
       }
       else toast.error(errMsg(err, "Upload failed."));
     } finally {
@@ -114,7 +104,6 @@ export default function MyDocumentsPage() {
     setInputKeys((k) => ({ ...k, [type]: (k[type] || 0) + 1 }));
   }
 
-  // "Delete file": only while no submitted application uses it (the server checks this too).
   async function remove(type, current) {
     const ok = await confirm({
       title: `Delete ${current.original_filename}?`,

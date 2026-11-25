@@ -9,16 +9,6 @@ use App\Models\ProfileChangeRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
-/*
-|--------------------------------------------------------------------------
-| "What to do next" alerts for OAS staff
-|--------------------------------------------------------------------------
-| When a student does something that needs the OAS (submits, submits again after Needs Action,
-| uploads a replacement, sends a message, asks for a profile correction), the staff bell shows it
-| within seconds with the next step and a button that opens the right page.
-| Built only from saved records (status history, documents, messages, requests): nothing new is
-| stored except, per staff account, the time the alerts were last seen.
-*/
 class StaffAlertController extends Controller
 {
     private const DAYS = 14;
@@ -35,14 +25,12 @@ class StaffAlertController extends Controller
         return 'staff_alerts_seen:'.$request->user()->id;
     }
 
-    // GET /staff/alerts
     public function index(Request $request)
     {
         $this->staffOnly($request);
         $since = now()->subDays(self::DAYS);
         $alerts = collect();
 
-        // 1. Applications the student submitted (first time, or again after Needs Action)
         ApplicationStatusLog::with(['application.student:id,first_name,last_name,student_id', 'application.scholarship:id,name,short_name'])
             ->where('to_status', 'submitted')
             ->where('created_at', '>=', $since)
@@ -51,7 +39,7 @@ class StaffAlertController extends Controller
             ->each(function ($log) use ($alerts) {
                 $app = $log->application;
                 if (!$app || !in_array($app->status, ['submitted', 'under_review'], true)) {
-                    return;   // already handled by staff: no longer a "next step"
+                    return;
                 }
                 $again = $log->from_status === 'needs_action';
                 $program = $app->scholarship?->short_name ?: $app->scholarship?->name;
@@ -69,7 +57,6 @@ class StaffAlertController extends Controller
                 ]);
             });
 
-        // 2. Replacement documents uploaded while the application waits in Needs Action
         Document::with(['application.student:id,first_name,last_name,student_id', 'application.scholarship:id,name,short_name', 'requirement:id,name'])
             ->whereNotNull('application_id')
             ->where('created_at', '>=', $since)
@@ -88,7 +75,6 @@ class StaffAlertController extends Controller
                 ]);
             });
 
-        // 3. Messages from students not answered yet
         ContactMessage::with('student:id,first_name,last_name,student_id')
             ->where('status', 'open')->where('created_at', '>=', $since)
             ->latest()->limit(20)->get()
@@ -103,7 +89,6 @@ class StaffAlertController extends Controller
                 'kind' => 'message',
             ]));
 
-        // 4. Profile corrections waiting for a decision
         ProfileChangeRequest::with('student:id,first_name,last_name,student_id')
             ->where('status', 'pending')->where('created_at', '>=', $since)
             ->latest()->limit(20)->get()
@@ -128,7 +113,6 @@ class StaffAlertController extends Controller
         ]);
     }
 
-    // POST /staff/alerts/seen   (the bell was opened)
     public function seen(Request $request)
     {
         $this->staffOnly($request);

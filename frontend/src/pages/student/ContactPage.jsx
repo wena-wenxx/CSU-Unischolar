@@ -7,10 +7,6 @@ import PageHeader from "../../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 
-/*
-  Contact OAS (students): the office's hours and contact details, a form to
-  send a question, and every message sent with OAS's reply.
-*/
 const EMPTY = { topic: "", subject: "", message: "" };
 
 const STATUS = {
@@ -25,7 +21,6 @@ export default function ContactPage() {
   const [office, setOffice] = useState(null);
   const [topics, setTopics] = useState({});
   const [messages, setMessages] = useState(null);
-  // "Ask OAS" from a notice opens this page with the topic and subject filled in.
   const location = useLocation();
   const [form, setForm] = useState(() => {
     const query = new URLSearchParams(location.search);
@@ -33,7 +28,6 @@ export default function ContactPage() {
   });
   const [sending, setSending] = useState(false);
 
-  // .then() (not await) so React's lint rule sees the state is set later.
   const load = useCallback(
     () =>
       Promise.all([api.get("/settings/public"), api.get("/student/messages")])

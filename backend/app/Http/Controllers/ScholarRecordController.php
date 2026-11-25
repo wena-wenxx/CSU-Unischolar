@@ -10,12 +10,6 @@ use Illuminate\Http\Request;
 
 class ScholarRecordController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | STAFF - LIST SCHOLARS
-    |--------------------------------------------------------------------------
-    */
-
     public function index(Request $request)
     {
         if ($request->user()->role !== 'staff' && !$request->user()->isAdmin()) {
@@ -34,13 +28,6 @@ class ScholarRecordController extends Controller
         return response()->json($records);
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | STAFF - VIEW ONE SCHOLAR RECORD
-    |--------------------------------------------------------------------------
-    */
-
     public function show(Request $request, $id)
     {
         if ($request->user()->role !== 'staff') {
@@ -58,17 +45,6 @@ class ScholarRecordController extends Controller
         return response()->json($record);
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | STAFF - TAG GRANTEE (CREATE SCHOLAR RECORD)
-    |--------------------------------------------------------------------------
-    | Allowed only after the agency approved the application AND OAS
-    | verified enrollment (POST /applications/{id}/verify-enrollment).
-    | Body: has_atm (boolean), remarks (optional).
-    | currently_enrolled is optional; it defaults to the verification result.
-    */
-
     public function store(Request $request, $applicationId = null)
     {
         if ($request->user()->role !== 'staff') {
@@ -77,9 +53,6 @@ class ScholarRecordController extends Controller
             ], 403);
         }
 
-        // The route is /applications/{applicationId}/scholar-record, so the
-        // application ID normally comes from the URL. A body value is still
-        // accepted for older clients.
         if ($applicationId !== null) {
             $request->merge(['application_id' => $applicationId]);
         }
@@ -112,8 +85,6 @@ class ScholarRecordController extends Controller
             ], 422);
         }
 
-        // Hard rule: one active scholarship per student (including scholarships
-        // from outside parties recorded in External Grantees).
         $holding = $application->student?->otherActiveScholarship($application->scholarship_id);
 
         if ($holding) {
@@ -122,9 +93,6 @@ class ScholarRecordController extends Controller
             ], 422);
         }
 
-        // One scholar record per program per school year (older years stay as history).
-        // Pressing "Tag as Grantee" again updates that record; it never makes a copy, and it does not
-        // overwrite ATM details or remarks that were not sent again.
         $keys = [
             'student_id' => $application->student_id,
             'scholarship_id' => $application->scholarship_id,
@@ -139,7 +107,6 @@ class ScholarRecordController extends Controller
             'status' => 'active',
             'currently_enrolled' => $data['currently_enrolled'] ?? true,
             'has_atm' => $hasAtm,
-            // The term whose enrollment was checked (payroll for another term asks for a new check).
             'enrollment_period' => $application->semester ? "{$application->semester} AY {$application->school_year}" : null,
             'grantee_tagged_at' => $existing?->grantee_tagged_at ?? now(),
         ];
@@ -154,8 +121,6 @@ class ScholarRecordController extends Controller
         }
 
         $record = ScholarRecord::updateOrCreate($keys, $values + array_filter([
-            // carried over from the agency's approved list, when there was one
-            // (a value already on the record is kept when the application has none)
             'control_number' => $application->agency_control_number,
             'award_number' => $application->agency_award_number,
             'award_amount' => $application->agency_amount,
@@ -163,7 +128,6 @@ class ScholarRecordController extends Controller
         ], fn ($value) => $value !== null && $value !== ''));
         $wasTagged = $existing && $existing->status === 'active';
 
-        // A grant from an earlier school year of the same program is now finished (kept as history).
         $finished = ScholarRecord::where('student_id', $application->student_id)
             ->where('scholarship_id', $application->scholarship_id)
             ->where('id', '!=', $record->id)
@@ -184,13 +148,6 @@ class ScholarRecordController extends Controller
             ])
         ], $wasTagged ? 200 : 201);
     }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | STAFF - UPDATE SCHOLAR
-    |--------------------------------------------------------------------------
-    */
 
     public function update(Request $request, $id)
     {
@@ -217,13 +174,11 @@ class ScholarRecordController extends Controller
 
         $record = ScholarRecord::findOrFail($id);
 
-        // Re-activating a grant follows the same one-active-scholarship rule as tagging.
         if (($data['status'] ?? null) === 'active' && $record->status !== 'active'
             && ($holding = $record->student?->otherActiveScholarship($record->scholarship_id))) {
             return response()->json(['message' => "Student already has another active scholarship: {$holding}."], 422);
         }
 
-        // Funds only apply to a grantee with an ATM; the note only to one without.
         if (array_key_exists('has_atm', $data)) {
             if ($data['has_atm']) {
                 $data['atm_note'] = null;

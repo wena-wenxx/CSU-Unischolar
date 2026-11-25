@@ -11,21 +11,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
-/*
-| php artisan demo:clean
-|
-| "Start clean" on a DEMO computer: removes every record and every upload history, in all roles, so the
-| whole process can be tested from zero:
-|   removed  applications, documents (and the files), AI results, status history, approved-list uploads,
-|            agency submissions, Registrar/enrollment lists, external grantee lists, grantee records,
-|            payroll, batches, invitations/notices, AI recommendations, messages, profile change
-|            requests, e-mail log and the activity log (AI Recommendations are scored again for everyone)
-|   kept     every account (admin, staff, the test student, demo students) with password and profile,
-|            scholarship programs and their requirements, settings, announcements
-| Refused when the database has a real student (not demo, not the test student): real data is never
-| removed by a demo command. Works only with APP_ENV=local and DEMO_RESET_ALLOWED=true, after typing
-| CLEAN ALL. To get the sample history back afterwards: php artisan demo:reset --full
-*/
 class DemoClean extends Command
 {
     protected $signature = 'demo:clean
@@ -33,7 +18,6 @@ class DemoClean extends Command
 
     protected $description = 'Demo computer only: remove all applications, uploads and history (accounts and programs are kept).';
 
-    /** Children first, so foreign keys never block a delete. */
     private const TABLES = [
         'payroll_records' => 'Payroll entries',
         'scholar_records' => 'Grantee records',
@@ -111,8 +95,6 @@ class DemoClean extends Command
             Storage::disk('local')->delete($path);
         }
 
-        // AI Recommendations are worked out from the students' profiles (not history): score everyone again
-        // right away, so the page lists every student and not only the first one whose profile changes.
         $scored = \App\Support\EligibilityEngine::recalculate();
         $this->line("AI Recommendations scored again: {$scored['students']} students x {$scored['scholarships']} programs.");
 

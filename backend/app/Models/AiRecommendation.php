@@ -4,15 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-/*
-| One recommendation = one student x one scholarship, calculated by
-| App\Support\EligibilityEngine. It only SUGGESTS: staff decide (staff_status).
-*/
 class AiRecommendation extends Model
 {
     public const VERDICTS = ['eligible', 'not_eligible', 'no_data'];
 
-    // What OAS staff did with the recommendation.
     public const STAFF_STATUSES = ['new', 'invited', 'added', 'dismissed', 'wrong'];
 
     protected $fillable = [

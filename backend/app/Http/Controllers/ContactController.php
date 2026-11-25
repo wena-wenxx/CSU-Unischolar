@@ -6,13 +6,6 @@ use App\Models\ActivityLog;
 use App\Models\ContactMessage;
 use Illuminate\Http\Request;
 
-/*
-|--------------------------------------------------------------------------
-| Contact OAS
-|--------------------------------------------------------------------------
-| Students: send a message and read the reply (Contact OAS page).
-| Staff: list messages, reply, close (Messages page + dashboard).
-*/
 class ContactController extends Controller
 {
     private function student(Request $request)
@@ -33,7 +26,6 @@ class ContactController extends Controller
         }
     }
 
-    // GET /student/messages: my messages, newest first. Opening the page marks replies as read.
     public function mine(Request $request)
     {
         $student = $this->student($request);
@@ -52,7 +44,6 @@ class ContactController extends Controller
         return response()->json(['topics' => ContactMessage::TOPICS, 'messages' => $messages]);
     }
 
-    // POST /student/messages   Body: topic, subject, message
     public function store(Request $request)
     {
         $student = $this->student($request);
@@ -63,7 +54,6 @@ class ContactController extends Controller
             'message' => 'required|string|max:3000',
         ]);
 
-        // Simple flood guard: at most 5 open messages at a time.
         $open = ContactMessage::where('student_id', $student->id)->where('status', 'open')->count();
         if ($open >= 5) {
             return response()->json([
@@ -78,7 +68,6 @@ class ContactController extends Controller
         return response()->json(['message' => 'Message sent. OAS will reply here.', 'item' => $message], 201);
     }
 
-    // GET /staff/messages?status=open|answered|closed|all&q=
     public function index(Request $request)
     {
         $this->staffOnly($request);
@@ -100,7 +89,7 @@ class ContactController extends Controller
                     ->orWhere('first_name', 'like', "%{$q}%")
                     ->orWhere('student_id', 'like', "%{$q}%")
                     ->when(strlen(preg_replace('/\D/', '', $q)) >= 4, fn ($d) => $d->orWhereRaw("replace(student_id, '-', '') like ?", ['%'.preg_replace('/\D/', '', $q).'%'])))))
-            ->latest()   // newest message first, in every tab (the newest is what staff look for)
+            ->latest()
             ->latest('id')
             ->limit(200)
             ->get();
@@ -116,7 +105,6 @@ class ContactController extends Controller
         ]);
     }
 
-    // POST /staff/messages/{id}/reply   Body: reply, close (optional)
     public function reply(Request $request, $id)
     {
         $this->staffOnly($request);
@@ -142,7 +130,6 @@ class ContactController extends Controller
         return response()->json(['message' => 'Reply sent. The student sees it on their Contact OAS page.', 'item' => $message->fresh()]);
     }
 
-    // POST /staff/messages/{id}/status   Body: status open|closed
     public function setStatus(Request $request, $id)
     {
         $this->staffOnly($request);

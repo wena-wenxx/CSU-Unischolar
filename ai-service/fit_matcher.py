@@ -1,43 +1,12 @@
-"""
-Field fit for AI Recommendations (ASSISTIVE ONLY).
-
-How well does a scholarship fit a student's field of study? The rules in
-Laravel (EligibilityEngine) still decide who is ELIGIBLE; this only ranks
-and explains the fit, so staff and students see which programs suit the
-student's course and goals. Nothing is approved or rejected here.
-
-Two parts, both explainable:
-  1. Fields: both texts are tagged with fields of study (Agriculture,
-     Engineering, Computing, Sciences, ...) by keyword lists below. A shared
-     field is shown as the reason ("Matches your field: Agriculture").
-  2. Text similarity (how close the meanings are):
-       - with fastembed installed: a pretrained sentence-embedding model
-         (default BAAI/bge-small-en-v1.5, free, runs offline on the CPU after
-         the first download). No training data is needed: it already knows
-         English, so "agribusiness" and "farming" end up close together.
-       - without it: TF-IDF word matching (built in, always works).
-
-Levels returned for each student-program pair:
-  any     the program names no field (open to all courses, e.g. TES)
-  high    the program's field is one of the student's fields
-  medium  no shared field, but the texts are similar (threshold below)
-  low     the program targets other fields
-The similarity number is relative (compare programs for ONE student); it is
-not a chance of approval.
-"""
 import math
 import os
 import re
 from collections import Counter
 
 MODEL_NAME = os.getenv("FIT_MODEL", "BAAI/bge-small-en-v1.5")
-# "medium" when there is no shared field but the texts are this similar.
-# Embedding similarities run higher than TF-IDF ones, so each method has its own.
 MEDIUM_EMBEDDING = float(os.getenv("FIT_MEDIUM_EMBEDDING", "0.62"))
 MEDIUM_TFIDF = float(os.getenv("FIT_MEDIUM_TFIDF", "0.18"))
 
-# Fields of study. Patterns are matched on lower-case text. Plain "science"
-# is NOT a pattern: "Bachelor of Science" is in almost every course name.
 FIELDS = {
     "Agriculture": [r"agricultur", r"\bagri", r"agribusiness", r"horticultur", r"animal science", r"forestry",
                     r"fisher", r"aquacultur", r"veterinar", r"food technology", r"\bfarm", r"\bcrop"],
@@ -46,7 +15,6 @@ FIELDS = {
                   r"software", r"programming", r"\bbsit\b"],
     "Sciences": [r"basic sciences?", r"applied sciences?", r"\bbiology", r"chemistry", r"physics", r"mathematic",
                  r"environmental science", r"marine science", r"geology", r"\bstatistics"],
-    # Not plain "education": "tertiary education subsidy" is about money, not a field.
     "Education": [r"(secondary|elementary|teacher|physical|mathematics|science|early childhood|special|technology and livelihood) education",
                   r"\bbsed\b", r"\bbeed\b", r"teacher", r"\bteach"],
     "Business": [r"accountan", r"accounting", r"business", r"management", r"economics", r"entrepreneur"],
@@ -64,7 +32,6 @@ _model_error = None
 
 
 def _embedder():
-    """The pretrained model, loaded once. None when fastembed is not installed or cannot load."""
     global _model, _model_error
     if _model is not None or _model_error is not None:
         return _model
@@ -72,7 +39,7 @@ def _embedder():
         from fastembed import TextEmbedding
 
         _model = TextEmbedding(MODEL_NAME)
-    except Exception as e:  # not installed, no internet for the first download, ...
+    except Exception as e:
         _model_error = f"{type(e).__name__}: {e}"
         _model = None
     return _model
@@ -86,7 +53,6 @@ def status():
 def fields_of(text):
     low = (text or "").lower()
     found = [name for name, patterns in FIELDS.items() if any(re.search(p, low) for p in patterns)]
-    # "IT" only in capitals: the small word "it" is everywhere ("...when the agency requests it").
     if "Computing" not in found and re.search(r"\bIT\b", text or ""):
         found = [f for f in FIELDS if f in found or f == "Computing"]
     return found
@@ -98,7 +64,6 @@ def _tokens(text):
     for w in words:
         if len(w) < 3 or w in STOP:
             continue
-        # tiny stemmer: "engineering" -> "engineer", "agricultural" / "agriculture" -> "agricultur"
         for suffix in ("ation", "ing", "ies", "al", "es", "s", "e"):
             if w.endswith(suffix) and len(w) - len(suffix) >= 4:
                 w = w[: -len(suffix)]
@@ -133,11 +98,6 @@ def _cosine_dense(a, b):
 
 
 def score(students, programs, use_model=True):
-    """
-    students: [{"id": 1, "text": "Bachelor of Science in Agriculture ... goals ..."}]
-    programs: [{"id": 7, "text": "DA-ACEF ... agriculture, forestry, fisheries ..."}]
-    Returns {"method", "model", "scores": [{student_id, program_id, level, similarity, fields, words}]}
-    """
     texts = [s["text"] for s in students] + [p["text"] for p in programs]
     model = _embedder() if use_model else None
     if model is not None:

@@ -3,23 +3,13 @@ import { Link } from "react-router-dom";
 import api from "../services/api";
 import { formatDate } from "../lib/format";
 
-/*
-  Student dashboard: "Scholarships that fit you".
-  Programs whose rules the student meets (or that only need their GWA /
-  income), best first, with what is left to do. The AI field fit (round
-  12) puts programs for the student's field first and adds agency-direct
-  programs for their field ("Also for your field"). No percentage: it could be
-  read as a chance of approval. Programs the student fails, has applied
-  for, or that OAS marked wrong are not listed. Hidden when empty.
-*/
 const STATUS = {
   ready: ["Ready to apply", "success"],
-  almost: [null, "warning"], // "2 things left"
+  almost: [null, "warning"],
   need_info: ["Needs your profile info", "warning"],
 };
 const SHOWN = 3;
 
-// One short line per kind of task ("Check 5 documents with AI"); the document names are behind "Show list".
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 function checklist(todo) {
@@ -123,7 +113,6 @@ export default function MatchesCard() {
   const alsoFits = data?.also_fits || [];
   if (!matches.length && !alsoFits.length) return null;
 
-  // Profile to-dos (GWA, income, ...) are the same for every program: show them once.
   const profileTodo = [
     ...new Set(matches.flatMap((match) => match.todo.filter((item) => item.kind === "profile").map((item) => item.text))),
   ];

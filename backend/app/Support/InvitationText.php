@@ -4,19 +4,6 @@ namespace App\Support;
 
 use App\Models\AiRecommendation;
 
-/*
-|--------------------------------------------------------------------------
-| Invitation wording by match level (AI Recommendations)
-|--------------------------------------------------------------------------
-| A student with every listed rule met should not get the same message as a student with
-| missing data or an unmet rule. The level comes from the rule checks the AI Recommendation
-| already shows staff ("Why?"), never from the percentage alone, and the message always says
-| that it is not an approval:
-|
-|   high      every check met (rules and documents) and at least 80%
-|   partial   no rule clearly failed, but something is missing or not yet verified
-|   low       a must-have rule is not met (staff had to write a reason to invite anyway)
-*/
 class InvitationText
 {
     public static function level(AiRecommendation $r): string
@@ -35,16 +22,13 @@ class InvitationText
         return ['high' => 'High match', 'partial' => 'Partial match', 'low' => 'Low match'][$level] ?? 'Match';
     }
 
-    /** The part of the message that explains this student's match: what is met, missing, and what to do next. */
     public static function details(AiRecommendation $r): string
     {
-        // Older saved results can miss a field: every check gets its keys.
         $checks = collect((array) $r->checks)->map(fn ($c) => (array) $c + ['label' => 'A rule', 'rule' => '', 'value' => 'not recorded',
             'result' => 'no_data', 'must' => false, 'points' => 1]);
         $met = $checks->where('result', 'met')->pluck('label')->values();
         $notMet = $checks->where('result', 'not_met');
         $noData = $checks->where('result', 'no_data');
-        // Met, but from figures the student typed that OAS has not verified yet (half points).
         $unverified = $checks->where('result', 'met')->filter(fn ($c) => ($c['points'] ?? 1) < 1 && !empty($c['must']))->pluck('label');
 
         $lines = [];
@@ -78,7 +62,6 @@ class InvitationText
         return implode("\n", $lines);
     }
 
-    /** The full single invitation (AI Recommendations, "Send invitation"). */
     public static function invitation(AiRecommendation $r, string $name, ?string $note): string
     {
         return "Dear {$name},\n\nThe Office of Admission and Scholarship invites you to look at {$r->scholarship->name}.\n\n"

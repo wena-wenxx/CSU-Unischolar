@@ -27,14 +27,6 @@ import Modal from "../../components/Modal";
 import SearchField from "../../components/SearchField";
 import SheetTabs from "../../components/SheetTabs";
 
-/*
-  AI Recommendations (staff).
-  For every student and scholarship, the rule engine checks the scholarship's
-  eligibility rules and required documents and counts how many are met
-  (equal weight). It only SUGGESTS: staff open "Why?" to see every check,
-  then Send invitation, Add to scholarship (a draft application), Dismiss,
-  or Mark as wrong. Every page shown and every decision is logged.
-*/
 const EMPTY = { view: "recommended", applied: "", range: "", q: "", sort: "score_desc", checked: false, college: "", course: "", year_level: "" };
 const stamp = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
@@ -70,7 +62,6 @@ export default function RecommendationsPage() {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [notification, setNotification] = useState(null);
 
-  // .then() (not await) so React's lint rule sees the state is set later.
   const fetchRows = useCallback(
     (f, program, page = 1) =>
       api
@@ -99,7 +90,6 @@ export default function RecommendationsPage() {
     fetchRows(next, programId);
   }
 
-  // Needs follow-up shows the lowest scores first; the other groups the highest first.
   function chooseGroup(key) {
     const next = { ...filters, range: key, sort: key === "follow" ? "score_asc" : "score_desc" };
     setFilters(next);
@@ -234,7 +224,6 @@ export default function RecommendationsPage() {
     }
   }
 
-  // A decision in the window changes one row; update it without reloading.
   function replaceRow(updated) {
     setData((current) => ({
       ...current,
@@ -310,7 +299,6 @@ export default function RecommendationsPage() {
       <section className="card sheet-card">
         <SheetTabs tabs={tabs} value={programId} onChange={changeProgram} />
 
-        {/* Score groups: one click to see the students who need follow-up (lowest first). */}
         <div className="score-groups" role="group" aria-label="Score groups">
           {SCORE_GROUPS.map(([key, label, band]) => (
             <button
@@ -624,9 +612,7 @@ export default function RecommendationsPage() {
   );
 }
 
-/* "Why?": every check, the student's data, the decision buttons and the history. */
 function RecommendationWindow({ id: firstId, onClose, onChanged }) {
-  // "Other programs" can switch the window to another program for the same student.
   const [id, setId] = useState(firstId);
   const toast = useToast();
   const confirm = useConfirm();
@@ -662,7 +648,6 @@ function RecommendationWindow({ id: firstId, onClose, onChanged }) {
       try {
         ({ data } = await api.post(`/staff/recommendations/${id}/${action}`, body));
       } catch (err) {
-        // An invitation that was already sent needs a second "yes" (no accidental duplicates).
         if (err?.response?.status === 409 && err.response.data?.needs_confirmation) {
           const again = await confirm({
             title: "Send the invitation again?",
@@ -963,14 +948,12 @@ function RecommendationWindow({ id: firstId, onClose, onChanged }) {
   );
 }
 
-// "1", "½", "0.92" or "0" (rows calculated before points existed count 1 when met).
 function pointsText(check) {
   const points = check.points ?? (check.result === "met" ? 1 : 0);
   if (points === 0.5) return "½ of 1";
   return `${Number(points.toFixed(2))} of 1`;
 }
 
-// "Rules 3/3 · Docs 5/8": eligibility rules and application documents, counted separately.
 function splitText(checks = []) {
   const rules = checks.filter((c) => c.must);
   const docs = checks.filter((c) => !c.must);
@@ -981,7 +964,6 @@ function splitText(checks = []) {
   return parts.join(" · ");
 }
 
-// When the typed GWA or income does not match the documents, staff save the figure from the document.
 function CorrectFigures({ student, busy, onSave }) {
   const [gwa, setGwa] = useState("");
   const [income, setIncome] = useState("");

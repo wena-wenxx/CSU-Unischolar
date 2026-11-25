@@ -1,18 +1,3 @@
-"""
-Student survey (Google Forms CSV) -> counts, weighted means and themes, WITHOUT names or e-mails.
-
-    python tools/survey/analyze_student_survey.py "CSU UniScholar System: Student Survey.csv" > survey-results.md
-
-Keep the CSV itself private (it has names and e-mails): do not put it in the repository.
-
-Scales (5-point):
-    Agreement   Strongly Disagree 1, Disagree 2, Neutral 3, Agree 4, Strongly Agree 5
-    Importance  Not Important 1, Slightly Important 2, Moderately Important 3, Important 4, Very Important 5
-Verbal interpretation of a mean (equal intervals of 0.80):
-    1.00-1.80 Strongly Disagree / Not Important      1.81-2.60 Disagree / Slightly Important
-    2.61-3.40 Neutral / Moderately Important          3.41-4.20 Agree / Important
-    4.21-5.00 Strongly Agree / Very Important
-"""
 import csv
 import re
 import statistics
@@ -24,12 +9,10 @@ IMPORT = {"not important": 1, "slightly important": 2, "moderately important": 3
 AGREE_WORDS = ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"]
 IMPORT_WORDS = ["Not Important", "Slightly Important", "Moderately Important", "Important", "Very Important"]
 
-# The form labels columns 46-51 "A. Perceived Usefulness", but those six statements are about EASE OF USE
-# ("Learning to use the student portal would be easy for me"...). They are grouped by what they ask.
 GROUPS = [
     ("Perceived Usefulness (PU)", range(40, 46)),
     ("Perceived Ease of Use (PEOU)", range(46, 52)),
-    ("System Quality", [52, 53, 57]),          # item 57 (privacy) is labelled "(System Quality)" on the form
+    ("System Quality", [52, 53, 57]),
     ("Information Quality", [54, 55]),
     ("Service Quality", [56]),
     ("User Satisfaction", [58]),

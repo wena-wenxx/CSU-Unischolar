@@ -8,7 +8,6 @@ import AnnouncementImage from "../components/AnnouncementImage";
 import EmptyState from "../components/EmptyState";
 import Loading from "../components/Loading";
 
-/* One announcement: full-size picture and the whole message. */
 export default function AnnouncementDetailPage() {
   const { id } = useParams();
   const { user } = useAuth();

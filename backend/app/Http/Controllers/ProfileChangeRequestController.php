@@ -7,10 +7,6 @@ use App\Models\ProfileChangeRequest;
 use App\Models\Student;
 use Illuminate\Http\Request;
 
-/*
-| Staff side of "Request a correction". OAS checks the request with the
-| Registrar's records, then marks it resolved with a short remark.
-*/
 class ProfileChangeRequestController extends Controller
 {
     private function staffOnly(Request $request): void
@@ -20,7 +16,6 @@ class ProfileChangeRequestController extends Controller
         }
     }
 
-    // GET /staff/profile-requests?status=pending
     public function index(Request $request)
     {
         $this->staffOnly($request);
@@ -34,7 +29,6 @@ class ProfileChangeRequestController extends Controller
         return response()->json($query->get());
     }
 
-    // PATCH /staff/profile-requests/{id}
     public function resolve(Request $request, $id)
     {
         $this->staffOnly($request);
@@ -50,8 +44,6 @@ class ProfileChangeRequestController extends Controller
             return response()->json(['message' => 'This request is already resolved.'], 422);
         }
 
-        // Optional: after checking with the Registrar, copy the corrected
-        // value into the student's record.
         if (!empty($data['apply_change'])) {
             $field = $changeRequest->field;
             $value = trim($changeRequest->requested_value);

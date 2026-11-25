@@ -7,13 +7,6 @@ use App\Models\Scholarship;
 use App\Models\Student;
 use Illuminate\Http\Request;
 
-/*
-| GET /search?q=juan   (the search box in the top bar)
-| Returns up to ~12 suggestions, each with a label and the page to open.
-| Staff: students (name or Student ID) and scholarship programs.
-| Students: open scholarships and their own applications.
-| Page names ("payroll", "my documents") are matched in the browser.
-*/
 class SearchController extends Controller
 {
     public function search(Request $request)
@@ -33,7 +26,6 @@ class SearchController extends Controller
         });
     }
 
-    // Admin: accounts by name, e-mail or Student ID.
     private function forAdmin(string $like): array
     {
         $users = \App\Models\User::with('student:id,user_id,student_id')
@@ -58,7 +50,6 @@ class SearchController extends Controller
 
         $students = Student::query()
             ->where(function ($query) use ($words) {
-                // Every word must match the first, middle or last name, or the Student ID.
                 foreach ($words as $word) {
                     $w = '%'.str_replace(['%', '_'], ['\%', '\_'], $word).'%';
                     $query->where(fn ($q) => $q->where('first_name', 'like', $w)

@@ -1,14 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { homePathFor, useAuth } from "../lib/auth";
 
-/*
-  Guards a group of routes.
-  - Not logged in                      -> go to /login
-  - Must change a temporary password   -> go to /account/password first
-  - Wrong role                         -> go to your own dashboard
-  - Otherwise                          -> show the page
-  role may be one role ("staff") or a list (["staff", "admin"]).
-*/
 export default function ProtectedRoute({ role }) {
   const { user } = useAuth();
   const location = useLocation();

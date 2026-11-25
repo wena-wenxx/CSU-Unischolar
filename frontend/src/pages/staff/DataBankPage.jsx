@@ -9,12 +9,6 @@ import ProfileItem from "../../components/ProfileItem";
 import EmptyState from "../../components/EmptyState";
 import Modal from "../../components/Modal";
 
-/*
-  Scholarship Data Bank (staff): one place to search any student and see
-  every application, scholarship and payroll entry they have ever had.
-  Alphabetical by last name, 25 at a time ("Show more"), with filters and
-  a CSV export of every match.
-*/
 const STANDING = {
   "": "Any scholarship standing",
   active: "Holds a scholarship now",
@@ -61,7 +55,6 @@ export default function DataBankPage() {
   const toast = useToast();
 
   const [query, setQuery] = useState("");
-  // ?batch=<id> (from Processing Batches) starts with the students of that batch.
   const [filters, setFilters] = useState(() => {
     const batch = new URLSearchParams(window.location.search).get("batch");
     return batch ? { ...EMPTY_FILTERS, processing_batch_id: batch } : EMPTY_FILTERS;
@@ -92,8 +85,6 @@ export default function DataBankPage() {
     return out;
   };
 
-  // Asks the server for one page of students. Page 1 replaces the list;
-  // later pages are added under it ("Show more").
   function fetchStudents(q, f, nextPage = 1) {
     return api
       .get("/staff/data-bank", { params: params(q, f, { page: nextPage }) })
@@ -116,7 +107,6 @@ export default function DataBankPage() {
   }
 
   async function changeFilter(key, value) {
-    // One "program" dropdown: ScholarGuide programs and outside scholarships ("ext:<name>").
     const next =
       key === "program"
         ? {
@@ -196,7 +186,6 @@ export default function DataBankPage() {
     }
   }
 
-  // .then() (not await): this also runs from the page-load effect below.
   function openStudent(id) {
     return api
       .get(`/staff/data-bank/${id}`)
@@ -206,8 +195,6 @@ export default function DataBankPage() {
 
   const location = useLocation();
 
-  // Show the first students as soon as the page opens. A link with
-  // ?student=<id> (from the search box) also opens that student's history.
   useEffect(() => {
     fetchStudents("", filters, 1);
     api
@@ -694,7 +681,6 @@ export default function DataBankPage() {
   );
 }
 
-// Every recorded step of every application (status changes, enrollment checks, tagging), newest first.
 function processingHistory(student) {
   return (student.applications || [])
     .flatMap((application) =>

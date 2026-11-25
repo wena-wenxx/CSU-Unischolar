@@ -6,11 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Scholarship extends Model
 {
-    // The OAS is in the Philippines: "today" for deadlines is Manila time.
     public const TIMEZONE = 'Asia/Manila';
 
-    // Grouped like the OAS list: CHED-funded, other government, private, university.
-    // ("lgu" is kept for older records.)
     public const CATEGORIES = ['ched', 'government', 'private', 'csu', 'lgu'];
 
     public const MODES = ['oas', 'agency_direct'];
@@ -18,9 +15,7 @@ class Scholarship extends Model
     protected $fillable = [
         'name', 'short_name', 'description', 'provider', 'category', 'application_mode',
         'application_start', 'application_end', 'amount', 'status',
-        // Eligibility rules used by AI Recommendations (empty = no rule)
         'max_gwa', 'max_family_income', 'year_levels', 'colleges', 'one_scholarship_only',
-        // Where the rules come from, and who last changed them
         'rules_source', 'rules_updated_by', 'rules_updated_at',
     ];
 
@@ -33,7 +28,6 @@ class Scholarship extends Model
         'rules_updated_at' => 'datetime',
     ];
 
-    // Sent with every scholarship so the frontend can show "Open", "Closed", ...
     protected $appends = ['availability', 'is_open'];
 
     public function requirements() { return $this->hasMany(ScholarshipRequirement::class); }
@@ -50,12 +44,6 @@ class Scholarship extends Model
         return $value ? substr((string) $value, 0, 10) : null;
     }
 
-    /*
-    | open          active, and today is inside the application period
-    | upcoming      active, but the period has not started yet
-    | deadline_passed  active, but application_end is before today
-    | closed / inactive  set by staff
-    */
     public function getAvailabilityAttribute(): string
     {
         if ($this->status !== 'active') {
@@ -77,13 +65,11 @@ class Scholarship extends Model
         return $this->availability === 'open';
     }
 
-    // Students apply directly at the agency, not in ScholarGuide.
     public function isAgencyDirect(): bool
     {
         return $this->application_mode === 'agency_direct';
     }
 
-    // Students may browse programs that are open or opening soon.
     public function scopeVisibleToStudents($query)
     {
         $today = self::today();
@@ -92,7 +78,6 @@ class Scholarship extends Model
             ->where(fn ($q) => $q->whereNull('application_end')->orWhere('application_end', '>=', $today));
     }
 
-    // Plain-language reason a student cannot apply, or null when open.
     public function closedReason(): ?string
     {
         $start = $this->day($this->application_start);

@@ -3,12 +3,6 @@ import { Link } from "react-router-dom";
 import AnnouncementImage from "./AnnouncementImage";
 import { formatDate, preview } from "../lib/format";
 
-/*
-  Latest announcements, one at a time. It moves to the next one
-  every 7 seconds; it stops while the mouse or keyboard focus is on it, and
-  never moves by itself for people who turned on "reduce motion".
-  Arrows and dots let the reader choose.
-*/
 const DELAY = 7000;
 
 export default function AnnouncementCarousel({ items, basePath }) {

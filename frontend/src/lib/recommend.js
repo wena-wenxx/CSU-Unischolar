@@ -1,9 +1,4 @@
-/*
-  Labels shared by AI Recommendations, External Grantees, the Data Bank
-  and My Profile.
-*/
 
-// What the rule engine concluded (it only suggests; staff decide).
 export const VERDICTS = {
   eligible: ["Meets the rules", "success"],
   no_data: ["Not enough data", "warning"],
@@ -21,7 +16,6 @@ export function recommendationStatus(row) {
   return RECOMMENDATION_STATUSES[row.verdict]?.[0] || "Review required";
 }
 
-// What OAS staff did with the recommendation.
 export const STAFF_STATUS = {
   new: ["New", "neutral"],
   invited: ["Invited", "success"],
@@ -30,7 +24,6 @@ export const STAFF_STATUS = {
   wrong: ["Marked wrong", "danger"],
 };
 
-// "Show" choices on AI Recommendations.
 export const VIEWS = {
   recommended: "Meets the rules (recommended)",
   no_data: "Not enough data",
@@ -41,7 +34,6 @@ export const VIEWS = {
   all: "Everything",
 };
 
-// Score ranges for the filter: [label, min, max]
 export const SCORE_RANGES = {
   "": ["Any score", null, null],
   high: ["90–100%", 90, 100],
@@ -51,7 +43,6 @@ export const SCORE_RANGES = {
   follow: ["Below 70% (needs follow-up)", 0, 69],
 };
 
-// The three score groups shown as chips above the AI Recommendations table.
 export const SCORE_GROUPS = [
   ["", "All scores", null],
   ["high", "Ready (90–100%)", "ready"],
@@ -59,7 +50,6 @@ export const SCORE_GROUPS = [
   ["follow", "Needs follow-up (below 70%)", "follow_up"],
 ];
 
-// AI field fit: ranks and explains only; the rules decide eligibility.
 export const FIT_LEVELS = {
   high: ["Matches the field", "success"],
   medium: ["Close to the field", "neutral"],
@@ -77,7 +67,6 @@ export const CHECK_RESULT = {
   no_data: ["?", "No data", "warning"],
 };
 
-// External Grantees: what the AI suggested for each line of an uploaded list.
 export const MATCH_RESULT = {
   matched: ["Matched", "success"],
   check: ["Check", "warning"],
@@ -103,14 +92,12 @@ export function gwaText(value) {
   return Number(value).toFixed(2);
 }
 
-// The student's application for the program, if any ("Not yet" when none).
 export function appliedLabel(status) {
   if (!status) return "Not yet";
   const text = status.replaceAll("_", " ");
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-// "Navarro, Juan" from a student object.
 export function studentLabel(student) {
   if (!student) return "—";
   return `${student.last_name}, ${student.first_name}`;

@@ -1,19 +1,5 @@
 import { useState } from "react";
 
-/*
-  Choose a scholarship's required documents from the standard list
-  (the same nine types students keep in My Documents), with a search box,
-  plus custom requirements typed by hand.
-
-  value:    [{ name, is_required, description }]
-  onChange: called with the new array
-  types:    [{ name, validity_months }] from GET /requirement-types
-  exclude:  names already on the program (hidden from the list)
-
-  Why the standard list matters: a requirement with a standard name can be
-  filled with a file the student already saved, and it gets an expiry date.
-  A custom name cannot.
-*/
 export default function RequirementPicker({ value, onChange, types, exclude = [], idPrefix = "req" }) {
   const [query, setQuery] = useState("");
   const [custom, setCustom] = useState("");
@@ -38,7 +24,6 @@ export default function RequirementPicker({ value, onChange, types, exclude = []
     const name = custom.trim().replace(/\s+/g, " ");
     if (!name) return;
 
-    // Typed a standard name? Tick it instead of making a custom copy.
     const standard = types.find((type) => type.name.toLowerCase() === name.toLowerCase());
     const finalName = standard ? standard.name : name;
 

@@ -1,8 +1,3 @@
-/*
-  One search box for every list: magnifying glass, the text, a Search button and a Clear button.
-  - Lists filtered as you type: leave out onSearch (the button just confirms).
-  - Lists searched on the server: pass onSearch; Enter and the button both run it.
-*/
 export default function SearchField({ id, label, value, onChange, onSearch, placeholder, busy = false }) {
   function run(event) {
     event?.preventDefault();

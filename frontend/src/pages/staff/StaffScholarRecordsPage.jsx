@@ -30,8 +30,6 @@ export default function StaffScholarRecordsPage() {
   const [atmFilter, setAtmFilter] = useState("all");
   const [program, setProgram] = useState("all");
 
-  // Written with .then() (not await) so React's lint rule can see that the
-  // state is set later, when the server answers, not during the effect.
   const load = useCallback(
     () =>
       Promise.all([api.get("/scholar-records"), api.get("/applications", { params: { status: "approved" } })])
@@ -48,9 +46,6 @@ export default function StaffScholarRecordsPage() {
     load();
   }, [load]);
 
-  // Approved applications that are not yet tagged as grantees. A scholar record is kept per school
-  // year, so a record of another school year does not count. Applications in a completed batch are
-  // history, not work still to do.
   const sameYear = (record, application) =>
     !record.school_year || !application.school_year || record.school_year === application.school_year;
   const untagged = applications.filter(
@@ -78,7 +73,6 @@ export default function StaffScholarRecordsPage() {
     }
   }
 
-  // Filters first, then one tab per program; every list is A to Z by last name.
   const words = searchWords(query);
   const filtered = records.filter((record) => {
     if (statusFilter !== "all" && record.status !== statusFilter) return false;
@@ -94,10 +88,8 @@ export default function StaffScholarRecordsPage() {
     .filter((record) => activeProgram === "all" || String(record.scholarship_id) === activeProgram)
     .sort((a, b) => byLastName(a.student, b.student));
 
-  // Long lists: 25 rows first, then Show more (resets on another tab, filter or search).
   const page = usePaged(shownRecords, `${activeProgram}|${shownRecords.length}|${shownRecords[0]?.id}`);
 
-  // The award column appears only when some grantee in view came from an agency list with award numbers.
   const showAward = shownRecords.some((r) => r.award_number);
 
   function exportShown() {
@@ -143,7 +135,6 @@ export default function StaffScholarRecordsPage() {
           <EmptyState message="No students are ready for tagging." />
         ) : (
           readyToTag.map((application) => {
-            // One active scholarship per student: say it here, before anyone presses Tag.
             const holding = records.find(
               (r) => r.student_id === application.student_id && r.status === "active" && r.scholarship_id !== application.scholarship_id
             );
@@ -377,10 +368,7 @@ const ATM_NOTES = [
   "Lost ATM, replacement requested",
 ];
 
-/* ---------- ATM questions, used when tagging and when editing ---------- */
-
 function AtmFields({ value, onChange }) {
-  // "Other": a typed status (an empty one means "Other" was just picked).
   const custom = typeof value.atm_note === "string" && !ATM_NOTES.includes(value.atm_note);
 
   return (
@@ -514,8 +502,6 @@ function AtmModal({ record, onClose, onDone }) {
     </Modal>
   );
 }
-
-/* ---------- Tag grantee form ---------- */
 
 function TagGranteeModal({ application, onClose, onDone }) {
   const toast = useToast();

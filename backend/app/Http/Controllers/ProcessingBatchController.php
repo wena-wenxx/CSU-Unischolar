@@ -9,16 +9,6 @@ use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
-/*
-|--------------------------------------------------------------------------
-| Processing batches (staff)
-|--------------------------------------------------------------------------
-| One batch = one processing cycle of one program, e.g. "TES - 1st Semester
-| AY 2026-2027". New applications and approved lists go into the open batch of
-| their program and period (one is made automatically when there is none).
-| Completing a batch only changes its status: every application, list,
-| scholar record and payroll entry stays, and the Data Bank keeps the students.
-*/
 class ProcessingBatchController extends Controller
 {
     private function staffOnly(Request $request): void
@@ -28,9 +18,6 @@ class ProcessingBatchController extends Controller
         }
     }
 
-    /*
-    | GET /staff/processing-batches   ?scholarship_id= &status=open|completed &school_year=
-    */
     public function index(Request $request)
     {
         $this->staffOnly($request);
@@ -62,10 +49,6 @@ class ProcessingBatchController extends Controller
         ]);
     }
 
-    /*
-    | POST /staff/processing-batches
-    | Body: scholarship_id, school_year, semester, name (optional), notes (optional)
-    */
     public function store(Request $request)
     {
         $this->staffOnly($request);
@@ -108,10 +91,6 @@ class ProcessingBatchController extends Controller
         ], 201);
     }
 
-    /*
-    | GET /staff/processing-batches/{id}
-    | The batch, its counts, what is still open, and its records.
-    */
     public function show(Request $request, $id)
     {
         $this->staffOnly($request);
@@ -146,9 +125,6 @@ class ProcessingBatchController extends Controller
         ]);
     }
 
-    /*
-    | PATCH /staff/processing-batches/{id}   Body: name, notes
-    */
     public function update(Request $request, $id)
     {
         $this->staffOnly($request);
@@ -169,12 +145,6 @@ class ProcessingBatchController extends Controller
         return response()->json(['message' => 'Batch updated.', 'batch' => $batch->fresh('scholarship:id,name,short_name')]);
     }
 
-    /*
-    | POST /staff/processing-batches/{id}/complete
-    | Body: confirm_open_items (true when staff complete it although something is
-    | still open), note (required then: why)
-    | Nothing is deleted. New work of this program and period goes into a new batch.
-    */
     public function complete(Request $request, $id)
     {
         $this->staffOnly($request);
@@ -220,9 +190,6 @@ class ProcessingBatchController extends Controller
         ]);
     }
 
-    /*
-    | POST /staff/processing-batches/{id}/reopen
-    */
     public function reopen(Request $request, $id)
     {
         $this->staffOnly($request);

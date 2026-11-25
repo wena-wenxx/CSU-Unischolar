@@ -2,11 +2,6 @@
 
 namespace Database\Seeders\Support;
 
-/**
- * Text of each SAMPLE document type used in the demo data.
- * All people, barangays and issuers are fictional; nothing here copies an
- * official form, seal or agency layout.
- */
 class DemoDocuments
 {
     public const COR = 'Certificate of Registration (COR)';
@@ -19,7 +14,6 @@ class DemoDocuments
     public const ITR = "Parents' Income Tax Return";
     public const RECOMMENDATION = 'Recommendation Letter';
 
-    // Requirement name -> file name used for uploads.
     public const FILE_NAMES = [
         self::COR => 'certificate-of-registration.pdf',
         self::GRADES => 'certificate-of-grades.pdf',
@@ -32,7 +26,6 @@ class DemoDocuments
         self::RECOMMENDATION => 'recommendation-letter.pdf',
     ];
 
-    // Short help text shown to students for each requirement.
     public const DESCRIPTIONS = [
         self::COR => 'Current semester COR, signed by the Registrar.',
         self::GRADES => 'Grades for the previous semester, with GWA.',
@@ -54,11 +47,6 @@ class DemoDocuments
         ['NSTP 102', 'National Service Training Program 2', 3, '1.50'],
     ];
 
-    /**
-     * @param  array  $p  person: first, middle, last, student_id, course, year_level, college,
-     *                    father, mother, birth_date, barangay
-     * @return array [title, lines, issuer]
-     */
     public static function content(string $requirement, array $p): array
     {
         $formal = strtoupper("{$p['last']}, {$p['first']} {$p['middle']}");
@@ -175,7 +163,6 @@ class DemoDocuments
         return ['DOCUMENT', [$full], 'Sample document'];
     }
 
-    /** Plain text of a document, the way a PDF text reader would see it. */
     public static function text(string $title, array $lines, string $issuer): string
     {
         return implode("\n", array_merge(

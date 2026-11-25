@@ -19,7 +19,6 @@ class DashboardController extends Controller
         }
 
         $apps = Application::with(['scholarship.requirements', 'documents', 'processingBatch:id,status'])->get();
-        // Pending counts leave out applications in completed batches (they are history, not new work).
         $openApps = $apps->filter(fn (Application $a) => $a->inOpenWork());
 
         $totalApplicants = $apps->pluck('student_id')->unique()->count();
@@ -28,12 +27,10 @@ class DashboardController extends Controller
         $approved = $apps->where('status', 'approved')->count();
         $activeScholars = ScholarRecord::where('status', 'active')->count();
         $payrollReady = PayrollRecord::where('status', 'ready')->count();
-        $aiFlags = Document::whereNotNull('application_id')->where('status', 'flagged')->count(); // only documents in applications
+        $aiFlags = Document::whereNotNull('application_id')->where('status', 'flagged')->count();
         $scholarships = Scholarship::count();
 
         return response()->json([
-
-            // Field names the staff dashboard in App.jsx reads.
             'total_applicants' => $totalApplicants,
             'total_applications' => $totalApplications,
             'needs_action' => $needsAction,
@@ -41,11 +38,9 @@ class DashboardController extends Controller
             'active_scholars' => $activeScholars,
             'payroll_ready' => $payrollReady,
             'ai_flags' => $aiFlags,
-            // Applications with at least one flagged document (the "Has AI flags" list).
             'applications_with_flags' => $apps->filter(fn ($a) => $a->documents->contains('status', 'flagged'))->count(),
             'scholarships' => $scholarships,
 
-            // Extra detail, kept for reports and future screens.
             'applications_by_status' => $apps->groupBy('status')->map->count(),
             'applications_with_missing_docs' => $apps->filter(fn ($a) => count($a->missingRequirementNames()) > 0)->count(),
             'documents_needing_review' => Document::whereNotNull('application_id')->whereIn('status', ['flagged', 'needs_review'])->count(),
@@ -53,7 +48,6 @@ class DashboardController extends Controller
             'currently_enrolled_grantees' => ScholarRecord::where('status', 'active')->where('currently_enrolled', true)->count(),
             'students_with_active_scholarship' => ScholarRecord::where('status', 'active')->distinct()->count('student_id'),
             'active_scholarship_programs' => Scholarship::where('status', 'active')->count(),
-            // Most recent activity first (any step: submitted, reviewed, verified...).
             'recent_applications' => Application::with(['student', 'scholarship:id,name', 'latestLog'])
                 ->where('status', '!=', 'draft')
                 ->orderByDesc('updated_at')->orderByDesc('id')
@@ -63,7 +57,6 @@ class DashboardController extends Controller
             'forwarded' => $openApps->where('status', 'complete')->count(),
             'enrollment_to_verify' => $openApps->where('status', 'approved')->where('enrollment_verified', false)->count(),
 
-            // Older names for the same numbers (backward compatibility).
             'approved_applications' => $approved,
             'active_grantees' => $activeScholars,
             'ai_flagged_documents' => $aiFlags,

@@ -5,14 +5,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-/*
-| ATM status of each grantee (status tracking only; the system does NOT
-| handle money or talk to any bank).
-|   has_atm   (already existed)  yes / no
-|   atm_funds  yes / no / pending  -> has the stipend reached the ATM?
-|   atm_note   e.g. "For ATM application", "Pending bank processing"
-| payroll_records.prepared_by: which staff member prepared the entry.
-*/
 return new class extends Migration
 {
     public function up(): void
@@ -33,7 +25,6 @@ return new class extends Migration
             }
         });
 
-        // Give existing grantees a starting value.
         ScholarRecord::backfillAtmStatus();
     }
 

@@ -223,7 +223,7 @@ class EligibilityEngineTest extends TestCase
     }
 
     /*
-    | Hand-calculated cases (written out in documentation/AUDIT_REPORT.md, section D).
+    | Hand-calculated cases.
     | Program: GWA 2.00 or better, income PHP 200,000 or less, one scholarship only, 1 required document (COR).
     */
     public function test_hand_calculated_cases(): void

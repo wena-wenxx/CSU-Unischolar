@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Model;
 
 class AgencyListUpload extends Model
 {
-    /** Row results that need a person: no student found, or something to check. */
     public const OPEN_RESULTS = ['unmatched', 'error', 'check'];
 
     protected $fillable = [
@@ -39,7 +38,6 @@ class AgencyListUpload extends Model
         return $this->belongsTo(ProcessingBatch::class);
     }
 
-    /** Rows still unmatched or to check, not yet linked or set aside by staff. */
     public function openRows(): array
     {
         return array_values(array_filter($this->details ?? [], fn ($row) => in_array($row['result'] ?? null, self::OPEN_RESULTS, true)

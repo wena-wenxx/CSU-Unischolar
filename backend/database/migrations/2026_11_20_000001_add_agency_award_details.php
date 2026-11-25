@@ -4,13 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-/*
-| The details an agency list gives for each grantee (e.g. the CHED TES billing file):
-| control number, award number, amount and batch. They are kept on the application
-| (where the list is processed) and copied to the scholar record when the student is
-| tagged as a grantee, so Scholar Records, payroll and exports can show them.
-| Only adds nullable columns: existing data is not touched.
-*/
 return new class extends Migration
 {
     public function up(): void

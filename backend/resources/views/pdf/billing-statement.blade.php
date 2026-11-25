@@ -1,4 +1,3 @@
-{{-- Billing statement as a PDF (dompdf: tables and simple CSS only). Column order of the CHED TES billing list; not the official form. --}}
 <!doctype html>
 <html>
 <head>

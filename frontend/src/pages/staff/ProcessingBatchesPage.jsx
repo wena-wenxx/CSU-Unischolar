@@ -11,15 +11,6 @@ import Loading from "../../components/Loading";
 import StatusBadge from "../../components/StatusBadge";
 import { yearChoices } from "../../lib/terms";
 
-/*
-  Processing Batches (staff): one batch = one processing cycle of one program,
-  e.g. "TES - 1st Semester AY 2026-2027".
-  New applications and approved lists go into the open batch of their program and
-  period (one is made automatically when there is none). When a cycle is finished,
-  staff mark its batch completed: nothing is deleted, the records stay in
-  Applications, Scholar Records, Payroll and the Data Bank, and the next cycle
-  starts in a new batch, so cycles never mix.
-*/
 const batchBadge = (batch) => (
   <StatusBadge status={batch.status === "open" ? "processing" : "completed"} label={batch.status === "open" ? "Open" : "Completed"} />
 );
@@ -293,7 +284,6 @@ function BatchModal({ id, onClose, onChanged }) {
   const [completing, setCompleting] = useState(false);
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
-  // Kept in a ref so a new onClose from the parent does not load the batch again.
   const closeRef = useRef(onClose);
   useEffect(() => {
     closeRef.current = onClose;

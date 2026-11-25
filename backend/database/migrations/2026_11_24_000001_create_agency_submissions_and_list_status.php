@@ -4,16 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-/*
-| Round 26 (adds only; nothing is changed or deleted):
-|
-| agency_submissions   one row each time OAS actually sends a list of applications to an agency
-|                      (date sent, program, batch, who, note). Every application in that list shares
-|                      the same "forwarded on" date.
-| applications.agency_submission_id   which submission an application was sent in (null = not sent yet).
-|                      Existing forwarded applications keep their forwarded_at date as before.
-| agency_list_uploads.done_at / done_by / done_note   "Done processing" pressed for an approved list.
-*/
 return new class extends Migration
 {
     public function up(): void
@@ -25,7 +15,7 @@ return new class extends Migration
                 $table->foreignId('processing_batch_id')->nullable()->constrained()->nullOnDelete();
                 $table->date('sent_on');
                 $table->string('agency_name')->nullable();
-                $table->string('sent_by_way', 100)->nullable();   // e-mail, hand-carried, portal...
+                $table->string('sent_by_way', 100)->nullable();
                 $table->text('note')->nullable();
                 $table->unsignedInteger('application_count')->default(0);
                 $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();

@@ -7,7 +7,6 @@ import PageHeader from "../components/PageHeader";
 import StatusBadge from "../components/StatusBadge";
 import TutorialVideos from "../components/TutorialVideos";
 
-/* Step-by-step help for the logged-in role (students and staff see different text). */
 export default function HelpPage() {
   const { user } = useAuth();
   const sections = HELP[user.role] || [];

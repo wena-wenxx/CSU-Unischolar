@@ -4,19 +4,12 @@ import { useAuth } from "../lib/auth";
 import { WELCOME_EVENT, WELCOME_STEPS } from "../lib/help";
 import Modal from "./Modal";
 
-/*
-  Five short steps shown the first time someone logs in on this browser.
-  It is remembered (per user) as soon as it appears, so it shows only once,
-  even if the person moves to another page without closing it.
-  The Help page has a button that shows it again.
-*/
 const key = (user) => `scholarguide-welcome-seen-${user.id}`;
 
 function markSeen(user) {
   try {
     window.localStorage.setItem(key(user), "yes");
   } catch {
-    // Private browsing: it will simply show again next time.
   }
 }
 

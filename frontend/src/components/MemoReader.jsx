@@ -3,13 +3,6 @@ import api, { errMsg } from "../services/api";
 import { useToast } from "../lib/toast";
 import Modal from "./Modal";
 
-/*
-  "Read the memo with AI": staff paste a scholarship memo or
-  choose its file; the AI (a local language model through Ollama, or simple
-  pattern reading when Ollama is off) suggests the eligibility rules, each
-  with the sentence it came from. Staff tick the right ones; they go into
-  the form. Nothing is saved until staff press Save on the form.
-*/
 const LABELS = {
   max_gwa: "Highest GWA allowed",
   max_family_income: "Highest annual family income",
@@ -40,7 +33,6 @@ export default function MemoReader({ form, onApply, onClose }) {
   const [picked, setPicked] = useState({});
 
   async function read() {
-    // Same limits as the server: 10 MB, PDF / Word / TXT / photo.
     if (file && file.size > 10 * 1024 * 1024) return toast.error("The memo file is larger than 10 MB. Choose a smaller file.");
     if (file && file.size === 0) return toast.error("The memo file is empty.");
     if (file && !/\.(pdf|docx|txt|png|jpe?g)$/i.test(file.name)) return toast.error("Choose a PDF, Word (.docx), TXT, PNG or JPG file.");
@@ -51,7 +43,6 @@ export default function MemoReader({ form, onApply, onClose }) {
       if (file) body.append("file", file);
       const { data } = await api.post("/staff/ai/suggest-rules", body);
       setResult(data);
-      // Tick everything except the documents (they are ticked in Required documents) and values to check.
       setPicked(Object.fromEntries(Object.entries(data.suggestions).map(([k, v]) => [k, k !== "required_documents" && !v.check])));
       if (!Object.keys(data.suggestions).length) toast.info("No rules were found in this memo.");
     } catch (err) {
@@ -76,7 +67,6 @@ export default function MemoReader({ form, onApply, onClose }) {
       const line = `For students in: ${s.fields_of_study.value.join(", ")}.`;
       if (!String(form.description || "").includes(line)) patch.description = `${line} ${form.description || ""}`.trim();
     }
-    // Keep where the values came from: the memo and the exact sentences used.
     const quotes = keys.filter((k) => picked[k] && s[k].quote).map((k) => `“${s[k].quote}”`);
     if (quotes.length) {
       const memo = file ? `memo file ${file.name}` : "pasted memo text";

@@ -13,12 +13,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Hosting platforms (Railway, Render, ...) put Laravel behind an HTTPS
-        // proxy. Trusting it makes Laravel see the real https:// address.
         $middleware->trustProxies(at: '*');
 
-        // There is no web login page: a signed-out call to the API gets a plain 401 answer
-        // ("Unauthenticated.") instead of a redirect to a missing "login" route (a 500 error).
         $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*') ? null : '/');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -26,8 +22,6 @@ return Application::configure(basePath: dirname(__DIR__))
             return $request->is('api/*') || $request->expectsJson();
         });
 
-        // MySQL is not running (XAMPP stopped it): say so in plain words instead of a long SQL error,
-        // so the page can show it instead of loading forever.
         $exceptions->render(function (\Illuminate\Database\QueryException $e, Request $request) {
             $code = (string) ($e->getPrevious()?->getCode() ?? $e->getCode());
             $text = $e->getMessage();

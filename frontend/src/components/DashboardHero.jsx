@@ -1,6 +1,5 @@
 import { CAMPUS_PHOTO, OFFICE, TAGLINE, UNIVERSITY } from "../lib/brand";
 
-/* Dashboard header: CSU Main Campus photo under a green layer, with a greeting. */
 export default function DashboardHero({ title, subtitle }) {
   const today = new Date().toLocaleDateString("en-PH", {
     weekday: "long",

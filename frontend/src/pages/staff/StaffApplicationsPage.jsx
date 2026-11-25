@@ -20,9 +20,6 @@ import SearchField from "../../components/SearchField";
 import { matchesWords, searchWords } from "../../lib/search";
 import Loading from "../../components/Loading";
 
-// "Still needs action" is the default: applications OAS must still review, those waiting for the
-// student's correction, and approved ones whose enrollment is not verified yet. Processed ones
-// (forwarded, approved and verified, rejected) leave this list but stay under their own status.
 const ACTION_STATUSES = ["submitted", "under_review", "needs_action"];
 
 const FILTERS = [
@@ -47,7 +44,7 @@ const SORTS = {
   submitted_new: "Newest submitted first",
 };
 
-const REFRESH_SECONDS = 20; // checks for changes made by others or by Auto-Review
+const REFRESH_SECONDS = 20;
 
 const time = (value) => (value ? new Date(value).getTime() : 0);
 const clock = () => new Date().toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" });
@@ -58,7 +55,6 @@ export default function StaffApplicationsPage() {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updatedAt, setUpdatedAt] = useState("");
-  // The address can preselect a list, e.g. /staff/applications?filter=needs_action
   const location = useLocation();
   const [filter, setFilter] = useState(() => {
     const wanted = new URLSearchParams(location.search).get("filter");
@@ -68,14 +64,11 @@ export default function StaffApplicationsPage() {
   const [program, setProgram] = useState("all");
   const [sort, setSort] = useState("student");
   const [schoolYear, setSchoolYear] = useState("all");
-  // ?batch=<id> (from Processing Batches) shows only that processing batch.
   const [batch, setBatch] = useState(() => new URLSearchParams(location.search).get("batch") || "all");
   const [selected, setSelected] = useState(null);
   const [verifying, setVerifying] = useState(null);
   const version = useRef(null);
 
-  // Written with .then() (not await) so React's lint rule can see that the
-  // state is set later, when the server answers, not during the effect.
   const load = useCallback(
     () =>
       api
@@ -93,8 +86,6 @@ export default function StaffApplicationsPage() {
     load();
   }, [load]);
 
-  // Stay up to date: every few seconds (and when you come back to this tab)
-  // ask the server for a small "version"; reload the list only if it changed.
   useEffect(() => {
     function check() {
       if (document.visibilityState !== "visible") return;
@@ -116,8 +107,6 @@ export default function StaffApplicationsPage() {
     };
   }, [load]);
 
-  // /staff/applications?review=<id> opens that application's review window
-  // (used by Auto-Review). .then() so the state is set when the server answers.
   useEffect(() => {
     const wanted = new URLSearchParams(location.search).get("review");
     if (!wanted) return;
@@ -125,7 +114,6 @@ export default function StaffApplicationsPage() {
       .get(`/applications/${wanted}`)
       .then((response) => setSelected(response.data))
       .catch((err) => toast.error(errMsg(err, "Unable to load application.")));
-    // Also when the staff bell links here while this page is already open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search]);
 
@@ -138,20 +126,16 @@ export default function StaffApplicationsPage() {
     }
   }
 
-  // Refresh both the table and the open review window.
   async function refresh(id) {
     await load();
     if (selected?.id === id) await openApplication(id);
   }
 
-  // All programs: one block per student (a student can apply to several programs).
-  // A program tab lists its students A to Z (like a sheet in Excel).
   function chooseProgram(key) {
     setProgram(key);
     setSort(key === "all" ? "student" : "name");
   }
 
-  // An application in a completed batch is history: it is not shown as work still to do.
   const openWork = (application) => application.processing_batch?.status !== "completed";
 
   const inFilter = (application, key) => {
@@ -170,7 +154,6 @@ export default function StaffApplicationsPage() {
     return application.status === key;
   };
 
-  // Search by student name, student ID or scholarship (every word must match).
   const words = searchWords(query);
   const matchesSearch = (application) => {
     const haystack = [
@@ -188,7 +171,6 @@ export default function StaffApplicationsPage() {
   const tabs = programTabs(searched, (a) => a.scholarship);
   const activeProgram = tabs.some((tab) => tab.key === program) ? program : "all";
 
-  // Grouped by student: students A to Z by surname, then each student's applications (newest first).
   const countOf = {};
   const shown = searched
     .filter((application) => activeProgram === "all" || String(application.scholarship_id) === activeProgram)
@@ -196,20 +178,18 @@ export default function StaffApplicationsPage() {
     .filter((application) => batch === "all" || String(application.processing_batch_id) === batch)
     .sort((a, b) => {
       if (sort === "student") {
-        // One block per student, students A to Z by surname (the student's applications stay together, newest first).
         return byLastName(a.student, b.student) || a.student_id - b.student_id || time(b.updated_at) - time(a.updated_at);
       }
       if (sort === "submitted_new") return time(b.submitted_at) - time(a.submitted_at);
       if (sort === "submitted_old") return (time(a.submitted_at) || Infinity) - (time(b.submitted_at) || Infinity);
       if (sort === "name") return byLastName(a.student, b.student);
-      return time(b.updated_at) - time(a.updated_at); // the backend's default order
+      return time(b.updated_at) - time(a.updated_at);
     });
   shown.forEach((a) => {
     countOf[a.student_id] = (countOf[a.student_id] || 0) + 1;
   });
   const grouped = sort === "student";
 
-  // Long lists: 25 rows first, then Show more (resets on another tab, filter or search).
   const page = usePaged(shown, `${activeProgram}|${schoolYear}|${batch}|${shown.length}|${shown[0]?.id}`);
   const batches = [...new Map(applications.filter((a) => a.processing_batch).map((a) => [a.processing_batch.id, a.processing_batch])).values()]
     .filter((b) => activeProgram === "all" || applications.some((a) => a.processing_batch_id === b.id && String(a.scholarship_id) === activeProgram))
@@ -411,17 +391,12 @@ export default function StaffApplicationsPage() {
   );
 }
 
-/* ---------- AI flag column: how many documents the AI flagged ---------- */
-
 function FlagCell({ application }) {
   const flagged = flaggedCount(application);
   if (flagged) return <span className="status status-warning">⚠ {flagged}</span>;
   return <span className="muted">—</span>;
 }
 
-/* ---------- Review one application ---------- */
-
-// Buttons for each next status the backend allows (Application::STAFF_NEXT).
 const ACTIONS = {
   under_review: { label: "Mark under review", className: "button-secondary" },
   needs_action: { label: "Needs action (send remarks)", className: "button-warning" },
@@ -430,7 +405,6 @@ const ACTIONS = {
   rejected: { label: "Rejected by agency", className: "button-danger" },
 };
 
-// What staff see after changing the status (plain words, not status codes).
 const DONE_MESSAGE = {
   under_review: "Marked as under review.",
   needs_action: "Sent back to the student with your remarks.",
@@ -439,7 +413,6 @@ const DONE_MESSAGE = {
   rejected: "Recorded: not approved by the agency.",
 };
 
-// What staff should do next, for each status.
 const NEXT_HINT = {
   draft: "The student has not submitted this application yet. Nothing to review.",
   submitted: "Check each document. Ask for corrections (Needs action) or forward the complete application to the agency.",
@@ -477,8 +450,6 @@ export function ReviewModal({ application, onClose, onChanged, onVerify }) {
         status === application.status ? "Remarks saved." : DONE_MESSAGE[status] || `Status changed to "${status.replaceAll("_", " ")}".`
       );
 
-      // Approval e-mail to the student (see Reports → E-mails sent).
-      // E-mail to CSU accounts is off during the study (log only) or goes to one test inbox: say so honestly.
       if (data.email?.mode === "off" && data.email.status !== "failed")
         toast.info("E-mail is off: the approval e-mail was written to the log only. The student sees the update in their notifications.");
       else if (data.email?.mode === "test" && data.email.status !== "failed")
@@ -494,8 +465,6 @@ export function ReviewModal({ application, onClose, onChanged, onVerify }) {
     }
   }
 
-  // One "Checking..." state per document (checking one no longer resets another). A check that runs in the
-  // AI worker is followed until it finishes, also after the window was closed and opened again.
   const confirmAi = useConfirm();
   const ai = useAiChecks({ toast, onChange: onChanged, confirm: confirmAi });
   const { resume } = ai;
@@ -503,7 +472,6 @@ export function ReviewModal({ application, onClose, onChanged, onVerify }) {
     resume(application?.documents);
   }, [application, resume]);
 
-  // A person's confirmation that the document is genuine (the AI cannot prove this).
   async function verifyDocument(document, verified) {
     const note = verified ? (verifyNotes[document.id] || "").trim() : "";
     setBusyDocumentId(document.id);
@@ -524,7 +492,6 @@ export function ReviewModal({ application, onClose, onChanged, onVerify }) {
   const student = application.student || {};
   const others = application.other_applications || [];
   const grants = application.scholar_records || [];
-  // A flag that a staff member already checked and verified is not counted as open.
   const flagged = (application.documents || []).filter((d) => d.status === "flagged" && !d.staff_verified_at).length;
   const docs = application.documents || [];
   const overview = {
@@ -780,8 +747,6 @@ export function ReviewModal({ application, onClose, onChanged, onVerify }) {
   );
 }
 
-/* ---------- Enrollment verification form ---------- */
-
 export function VerifyEnrollmentModal({ application, onClose, onDone }) {
   const toast = useToast();
 
@@ -867,8 +832,6 @@ export function VerifyEnrollmentModal({ application, onClose, onDone }) {
   );
 }
 
-/* ---------- What the AI found (it only FLAGS; staff decide) ---------- */
-
 function AiResult({ result }) {
   if (!result) {
     return <p className="muted">AI check: not run yet</p>;
@@ -922,8 +885,6 @@ function AiResult({ result }) {
   );
 }
 
-// A draft is "Not submitted". An approved application with no submit date was added from the agency's
-// approved list (the student applied at the agency, not in ScholarGuide).
 function submittedText(application) {
   if (application.submitted_at) return formatDate(application.submitted_at);
   return application.status === "draft" ? "Not submitted" : "From agency list";

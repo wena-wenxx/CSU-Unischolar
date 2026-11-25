@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { initials, photoUrl } from "../lib/format";
 
-/* The user's photo, or their initials when there is no photo (or it fails to load). */
 export default function Avatar({ user, name, className = "", silhouette = false }) {
   const src = photoUrl(user);
   const [failed, setFailed] = useState(null);
@@ -15,7 +14,6 @@ export default function Avatar({ user, name, className = "", silhouette = false 
   }
 
   if (silhouette) {
-    // No photo yet: a plain person shape, like the CSU MySchool portal.
     return (
       <span className={`avatar avatar-silhouette ${className}`} aria-hidden="true">
         <svg viewBox="0 0 64 64" focusable="false">

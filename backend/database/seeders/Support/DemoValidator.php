@@ -2,21 +2,12 @@
 
 namespace Database\Seeders\Support;
 
-/**
- * PHP copy of the rules in ai-service/validation.py, used ONLY to pre-fill
- * demo AI results while seeding. Because the same rules run on the same
- * text, pressing "Re-run AI check" on a seeded document gives the same
- * result. If you change validation.py, change this file the same way.
- *
- * The AI only FLAGS possible problems; staff always decide.
- */
 class DemoValidator
 {
     private const NAME_MATCH_MIN = 95;
     private const NAME_SIMILAR_MIN = 75;
     private const MIN_TEXT_CHARS = 30;
 
-    // kind, label pattern, keywords, shows student ID?, name mode
     private const DOC_KINDS = [
         ['registration', '/registration|\bcor\b|enrol/', ['REGISTRATION', 'ENROLL', 'UNITS', 'SUBJECT', 'SEMESTER'], true, 'full'],
         ['grades', '/grade|report card|transcript|\btor\b/', ['GRADE', 'GRADES', 'GWA', 'AVERAGE', 'SEMESTER', 'SUBJECT', 'UNITS', 'REPORT'], true, 'full'],
@@ -37,7 +28,6 @@ class DemoValidator
         return trim(preg_replace('/\s+/u', ' ', $text));
     }
 
-    /** rapidfuzz fuzz.ratio: 2 * LCS / (len_a + len_b) * 100 */
     private static function ratio(string $a, string $b): float
     {
         $la = strlen($a);
@@ -62,7 +52,6 @@ class DemoValidator
         return 200.0 * $prev[$lb] / ($la + $lb);
     }
 
-    /** @var array<string, float> remembered comparisons (speeds up seeding) */
     private static array $cache = [];
 
     private static function tokenSortRatio(string $a, string $b): float
@@ -99,7 +88,6 @@ class DemoValidator
         return array_merge($with, self::combinations($rest, $k));
     }
 
-    /** Same as best_name_match() in validation.py. Returns [score, window]. */
     public static function bestNameMatch(string $expectedName, string $text): array
     {
         $expected = self::normalize($expectedName);
@@ -130,8 +118,6 @@ class DemoValidator
                         $bestScore = $score;
                         $bestWindow = implode(' ', $window);
 
-                        // Python only replaces the best on a HIGHER score, and
-                        // nothing beats 100, so stopping here gives the same result.
                         if ($bestScore >= 100.0) {
                             return [round($bestScore, 2), $bestWindow];
                         }
@@ -143,7 +129,6 @@ class DemoValidator
         return [round($bestScore, 2), $bestWindow];
     }
 
-    /** Write a score the way Python prints a float: 90.0, 86.67, 47.1 */
     private static function pyFloat(float $value): string
     {
         $text = rtrim(rtrim(sprintf('%.2f', $value), '0'), '.');
@@ -164,7 +149,6 @@ class DemoValidator
         return null;
     }
 
-    /** Same output as validate_text() in validation.py. */
     public static function validate(string $text, string $expectedName, string $studentId, string $label, string $lastName): array
     {
         $flags = [];
@@ -190,7 +174,6 @@ class DemoValidator
             [$score, $window] = self::bestNameMatch($target, $text);
 
             if ($score >= self::NAME_MATCH_MIN) {
-                // matches
             } elseif ($surnameOnly) {
                 $hasMismatch = true;
                 $flags[] = "Applicant's surname (" . trim($target) . ") was not found on this parent's document (best match " . self::pyFloat($score) . "%).";

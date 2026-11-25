@@ -11,14 +11,6 @@ import Loading from "../../components/Loading";
 import { SEMESTERS } from "../../lib/terms";
 import FileDrop from "../../components/FileDrop";
 
-/*
-  Enrollment (staff):
-  1. Upload the Registrar's list of enrolled students (CSV, Excel, Word or PDF) for the term.
-  2. Verify All Enrollments: approved applicants (and/or active grantees) are
-     matched by Student ID -> Enrolled / Not on the list / Needs manual check.
-  3. Record: nothing is saved until staff press a Record button.
-  There is no live link to the Registrar; the list is the Registrar's export.
-*/
 const GROUPS = [
   ["enrolled", "Enrolled", "success", "Student ID on the Registrar's list and the surname matches."],
   ["not_enrolled", "Not on the list", "danger", "Student ID not on the Registrar's list. Check before recording."],
@@ -30,11 +22,9 @@ function guessColumn(headers, patterns) {
   return index >= 0 ? String(index) : "";
 }
 
-// Used only when the server could not send its term list (e.g. MySQL was stopped), so the Term box is
-// never empty. Same wording as the server: "1st Semester AY 2026-2027".
 function fallbackTerms() {
   const now = new Date();
-  const start = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1; // school year starts in August
+  const start = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
   const names = SEMESTERS;
   const list = [];
   for (const year of [start - 1, start]) {
@@ -52,25 +42,22 @@ export default function EnrollmentPage() {
   const [info, setInfo] = useState(null);
   const [periods, setPeriods] = useState({ current: "", periods: [] });
 
-  // upload
   const [period, setPeriod] = useState("");
   const [fileName, setFileName] = useState("");
   const [rows, setRows] = useState([]);
   const [columns, setColumns] = useState({ id: "", last: "", first: "", course: "" });
   const [fileKey, setFileKey] = useState(0);
   const [uploading, setUploading] = useState(false);
-  const [reading, setReading] = useState(""); // name of the file being read
-  const readControl = useRef(null); // "Cancel reading"
-  const [viewing, setViewing] = useState(null); // an earlier list whose rows are shown
+  const [reading, setReading] = useState("");
+  const readControl = useRef(null);
+  const [viewing, setViewing] = useState(null);
 
-  // verify
   const [scope, setScope] = useState("approved");
   const [check, setCheck] = useState(null);
   const [tab, setTab] = useState("enrolled");
-  const [picked, setPicked] = useState([]); // "kind-id"
+  const [picked, setPicked] = useState([]);
   const [busy, setBusy] = useState(false);
 
-  // .then() (not await) so React's lint rule sees the state is set later.
   const load = useCallback(
     () =>
       Promise.all([api.get("/staff/enrollment-lists"), api.get("/payroll/periods")])
@@ -96,7 +83,6 @@ export default function EnrollmentPage() {
   const headers = useMemo(() => (rows.length ? rows[0].map((h, i) => h.trim() || `Column ${i + 1}`) : []), [rows]);
   const dataRows = rows.slice(1);
 
-  // CSV is read here; Excel and Word by Laravel; PDF and pictures by the AI service.
   async function readFile(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -507,8 +493,6 @@ export default function EnrollmentPage() {
   );
 }
 
-
-// Before saving: every row that was read, in the chosen columns (so staff see all 55, not only the first).
 function ReadPreview({ rows, columns }) {
   const cell = (row, key) => (columns[key] === "" ? "" : row[Number(columns[key])] || "");
   return (
@@ -547,7 +531,6 @@ const ROW_GROUPS = [
   ["not_in_system", "Not in the system"],
 ];
 
-// Step 2: every row of a saved list with what the system found. Read-only.
 function ListRows({ list, latestId, onBack }) {
   const toast = useToast();
   const [data, setData] = useState(null);
@@ -631,7 +614,6 @@ function ListRows({ list, latestId, onBack }) {
   );
 }
 
-// Why there is nobody to verify, from the real counts (instead of an empty list with no reason).
 function WhyEmpty({ why }) {
   if (!why) return null;
   const reasons = [];

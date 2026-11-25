@@ -9,25 +9,6 @@ use App\Support\DemoListFiles;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 
-/*
-| php artisan demo:approved-lists
-|
-| Writes SAMPLE "approved by the agency" lists to test Staff -> Approved
-| Lists with each file type the page accepts:
-|   approved-<program>.pdf    PDF with real text (a table)
-|   approved-<program>.docx   Word table
-|   approved-<program>.xlsx   Excel
-|   approved-<program>.csv    CSV
-| The students are the applications FORWARDED to the agency (status
-| "complete") in YOUR database, so the Student IDs always match. Each list
-| has the forwarded students who hold no other scholarship (all but one:
-| that one stays forwarded), ONE student who already holds another
-| scholarship (shows as an error: the one-scholarship rule), and one
-| Student ID that is not in ScholarGuide (shows as "unmatched").
-| All names are the fictional demo students. The layouts are made up for
-| testing, NOT any agency's official form. Run it again after processing a
-| list to get new files. Output: storage/app/demo-approved-lists/
-*/
 class MakeDemoApprovedLists extends Command
 {
     protected $signature = 'demo:approved-lists {--dir= : Save somewhere else (the tests use a temporary folder)}';
@@ -40,12 +21,10 @@ class MakeDemoApprovedLists extends Command
         File::ensureDirectoryExists($dir);
         File::cleanDirectory($dir);
 
-        // Students who already hold a scholarship (in ScholarGuide or an outside one from External Grantees).
         $grantees = ScholarRecord::where('status', 'active')->pluck('student_id')
             ->merge(ExternalGrantee::where('status', 'active')->where('match_status', 'matched')->whereNotNull('student_id')->pluck('student_id'))
             ->unique()->flip();
 
-        // Programs with the most forwarded (and free) students first.
         $groups = Application::with(['student', 'scholarship'])
             ->where('status', 'complete')
             ->get()
@@ -70,8 +49,6 @@ class MakeDemoApprovedLists extends Command
             $program = $apps->first()->scholarship;
             $short = $program->short_name ?: $program->name;
 
-            // Free students: all but one (that one stays forwarded); plus one who already holds
-            // another scholarship (the system refuses it), A to Z; plus one unknown ID.
             $free = $apps->reject(fn ($a) => isset($grantees[$a->student_id]))->values();
             $holder = $apps->first(fn ($a) => isset($grantees[$a->student_id]));
             $approved = $free->slice(0, max(1, $free->count() - 1))

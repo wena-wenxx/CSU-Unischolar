@@ -4,18 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-/*
-|--------------------------------------------------------------------------
-| Processing batch: one processing cycle of one program
-|--------------------------------------------------------------------------
-| e.g. "TES - 1st Semester AY 2026-2027". Applications, approved lists,
-| scholar records and payroll entries of the cycle point to it. Completing a
-| batch only changes its status: no record is deleted, and the Data Bank keeps
-| every student and their history.
-*/
 class ProcessingBatch extends Model
 {
-    /** Application statuses that still need OAS action. */
     public const PENDING_STATUSES = ['submitted', 'under_review', 'needs_action'];
 
     protected $fillable = [
@@ -40,7 +30,6 @@ class ProcessingBatch extends Model
         return $query->where('status', 'open');
     }
 
-    /** Default name: "TES - 1st Semester AY 2026-2027". */
     public static function defaultName(Scholarship $scholarship, ?string $schoolYear, ?string $semester): string
     {
         $label = $scholarship->short_name ?: $scholarship->name;
@@ -49,11 +38,6 @@ class ProcessingBatch extends Model
         return mb_substr($period !== '' ? "{$label} - {$period}" : $label, 0, 140);
     }
 
-    /*
-    | The open batch new work of this program and period goes into. A batch for
-    | the same semester is preferred, then one with no semester. When there is
-    | none, a new open batch is created, so no record is ever left without one.
-    */
     public static function forWork(int $scholarshipId, ?string $schoolYear, ?string $semester = null, ?int $userId = null): ?self
     {
         $scholarship = Scholarship::find($scholarshipId);
@@ -85,7 +69,6 @@ class ProcessingBatch extends Model
         ]);
     }
 
-    /** "TES - AY 2026-2027", "TES - AY 2026-2027 (2)", ... */
     public static function uniqueName(int $scholarshipId, string $name, ?int $exceptId = null): string
     {
         $candidate = $name;
@@ -99,7 +82,6 @@ class ProcessingBatch extends Model
         return $candidate;
     }
 
-    /** Counts shown on the Processing Batches page. */
     public function counts(): array
     {
         $applications = $this->applications()->selectRaw('status, count(*) as n')->groupBy('status')->pluck('n', 'status');
@@ -121,7 +103,6 @@ class ProcessingBatch extends Model
         ];
     }
 
-    /** What still needs action before the batch should be completed (empty = ready). */
     public function openItems(?array $counts = null): array
     {
         $counts ??= $this->counts();
@@ -129,8 +110,6 @@ class ProcessingBatch extends Model
         if ($counts['pending']) {
             $items[] = "{$counts['pending']} application(s) still need OAS action (submitted, under review or needs action)";
         }
-        // Approved students who were not yet checked for enrollment or tagged would otherwise drop out of
-        // the queues when the batch is completed.
         $approved = $this->applications()->where('status', 'approved')->get(['id', 'student_id', 'scholarship_id', 'school_year', 'enrollment_verified']);
         $toVerify = $approved->where('enrollment_verified', false)->count();
         $toTag = $approved->where('enrollment_verified', true)->filter(fn ($a) => !\App\Models\ScholarRecord::where('student_id', $a->student_id)

@@ -8,7 +8,7 @@ class Student extends Model
 {
     protected $fillable = [
         'user_id',
-        'is_demo',     // demo account made by the seeders (only these can be removed by demo:reset)
+        'is_demo',
         'student_id',
         'first_name',
         'middle_name',
@@ -18,8 +18,7 @@ class Student extends Model
         'year_level',
         'college',
         'contact_number',
-        // Scholarship matching data (typed in by the student, checked by OAS)
-        'interests',   // optional "My field and goals" (AI field fit)
+        'interests',
         'gwa',
         'family_income',
         'eligibility_updated_at',
@@ -50,7 +49,6 @@ class Student extends Model
         return $this->hasMany(ScholarRecord::class);
     }
 
-    // Scholarships from outside parties (LGU, foundations, ...) read from uploaded lists.
     public function externalGrantees()
     {
         return $this->hasMany(ExternalGrantee::class);
@@ -61,7 +59,6 @@ class Student extends Model
         return $this->belongsTo(User::class, 'eligibility_verified_by');
     }
 
-    /** "Juan Abad", or with $middleInitial "Juan M. Abad" (used where the student is addressed, e.g. invitations). */
     public function fullName(bool $middleInitial = false): string
     {
         $middle = trim((string) $this->middle_name);
@@ -70,13 +67,6 @@ class Student extends Model
         return trim("{$this->first_name}{$initial} {$this->last_name}");
     }
 
-    /*
-    | One active scholarship per student: the scholarship this student holds
-    | right now, other than $exceptScholarshipId. Checks both the grantee
-    | records in ScholarGuide and the external grantee lists.
-    | Returns e.g. "CHED Tertiary Education Subsidy (TES)" or
-    | "LGU-Butuan City Scholarship (external, City Government of Butuan)", or null.
-    */
     public function otherActiveScholarship(?int $exceptScholarshipId = null): ?string
     {
         $record = ScholarRecord::with('scholarship:id,name')

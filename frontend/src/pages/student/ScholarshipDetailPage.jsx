@@ -24,7 +24,6 @@ export default function ScholarshipDetailPage() {
     Promise.all([api.get(`/scholarships/${id}`), api.get("/my-applications"), api.get("/profile")])
       .then(([scholarshipResponse, applicationsResponse, profileResponse]) => {
         setScholarship(scholarshipResponse.data);
-        // This year's application, or an older one still in process (a finished old one allows a new application).
         setMine(applicationsResponse.data.find((a) => String(a.scholarship_id) === String(id)
           && (a.this_school_year || !['approved', 'rejected'].includes(a.status))) || null);
         setGrant(profileResponse.data?.active_scholar_record || null);

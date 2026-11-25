@@ -11,7 +11,6 @@ import Icon from "./Icon";
 import { iconFor } from "../lib/icons";
 
 const NAVIGATION = {
-  // A student's order: find a program, prepare documents, apply, follow it.
   student: [
     ["/student/dashboard", "Dashboard"],
     ["/student/scholarships", "Scholarships"],
@@ -22,9 +21,6 @@ const NAVIGATION = {
     ["/student/contact", "Contact OAS"],
     ["/student/help", "Help"],
   ],
-  // Same order as the real OAS process (numbered headings):
-  //   1 programs and who may qualify -> 2 applications to the agency and its approved list
-  //   -> 3 enrollment, grantees, payroll. Office records come last.
   staff: [
     ["/staff/dashboard", "Dashboard"],
     { heading: "1 · Programs" },
@@ -47,7 +43,6 @@ const NAVIGATION = {
     ["/staff/reports", "Reports"],
     ["/staff/help", "Help"],
   ],
-  // The administrator manages accounts and settings; OAS staff process applications.
   admin: [
     ["/admin/dashboard", "Dashboard"],
     ["/admin/staff", "Manage Staff"],
@@ -60,7 +55,6 @@ const NAVIGATION = {
   ],
 };
 
-// Title shown in the top bar (and on printouts) for each address.
 function pageTitle(pathname, role) {
   if (/^\/student\/scholarships\/[^/]+$/.test(pathname)) return "Scholarship Details";
   if (/^\/student\/applications\/[^/]+$/.test(pathname)) return "Application";
@@ -76,24 +70,15 @@ function printedAt() {
   return new Date().toLocaleString("en-PH", { dateStyle: "long", timeStyle: "short" });
 }
 
-/*
-  The frame around every logged-in page: CSU Green sidebar + white top bar.
-  On phones the sidebar slides in from the left when the ☰ button is pressed.
-  When printing (Ctrl+P), the sidebar and top bar are hidden and a CSU
-  letterhead appears instead (see the PRINT section of index.css).
-*/
 export default function Layout() {
   const { user, logout } = useAuth();
   const location = useLocation();
-  // The phone menu remembers which page it was opened on, so it closes
-  // automatically as soon as the user moves to another page.
   const [menuOpenedOn, setMenuOpenedOn] = useState(null);
   const menuOpen = menuOpenedOn === location.pathname;
   const setMenuOpen = (open) => setMenuOpenedOn(open ? location.pathname : null);
   const [printTime, setPrintTime] = useState(printedAt);
   const [office, setOffice] = useState(null);
 
-  // OAS contact details for the footer (set by the admin in System Settings).
   useEffect(() => {
     api
       .get("/settings/public")
@@ -101,7 +86,6 @@ export default function Layout() {
       .catch(() => setOffice(null));
   }, []);
 
-  // Stamp the current time on the printout just before printing.
   useEffect(() => {
     const stamp = () => setPrintTime(printedAt());
     window.addEventListener("beforeprint", stamp);
@@ -156,7 +140,6 @@ export default function Layout() {
         </div>
       </aside>
 
-      {/* Dark layer behind the open phone menu; tap it to close the menu. */}
       <div className="sidebar-overlay" onClick={() => setMenuOpen(false)} />
 
       <main className="main-content">
@@ -186,7 +169,6 @@ export default function Layout() {
           </div>
         </header>
 
-        {/* Only visible on paper (Ctrl+P). */}
         <div className="print-header" aria-hidden="true">
           <img src={LOGO} alt="" className="print-logo" />
 
@@ -201,8 +183,6 @@ export default function Layout() {
           </div>
         </div>
 
-        {/* Keyed on the address: following a link with a different ?filter=
-            (e.g. from the search box) opens the page fresh with that filter. */}
         <div className="content" key={location.pathname + location.search}>
           <Outlet />
         </div>
@@ -219,7 +199,6 @@ export default function Layout() {
   );
 }
 
-// Contact details of the OAS on every page (only the fields that are set).
 function OfficeFooter({ office, isStudent }) {
   const parts = [office.oas_location, office.oas_email, office.oas_phone].filter(Boolean);
 

@@ -81,7 +81,6 @@ class AuthController extends Controller
             ]);
         }
 
-        // A deactivated account keeps its history but cannot log in.
         if (!$user->is_active) {
             throw ValidationException::withMessages([
                 'email' => ['This account is deactivated. Please contact the OAS.'],
@@ -107,11 +106,6 @@ class AuthController extends Controller
         );
     }
 
-    /*
-    | POST /change-password   Body: current_password, password, password_confirmation
-    | Every user can change their own password. Required after an admin
-    | gave the account a temporary password (must_change_password).
-    */
     public function changePassword(Request $request)
     {
         $user = $request->user();
@@ -140,7 +134,6 @@ class AuthController extends Controller
             'must_change_password' => false,
         ])->save();
 
-        // Sign out every other device; keep this session.
         $current = $user->currentAccessToken()?->id;
         $user->tokens()->when($current, fn ($q) => $q->where('id', '!=', $current))->delete();
 

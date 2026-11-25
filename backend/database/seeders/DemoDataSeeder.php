@@ -14,32 +14,11 @@ use Database\Seeders\Support\DemoPdf;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Storage;
 
-/**
- * Scholarship programs + the 10 NAMED demo scenarios used in the test plan
- * and the panel demo (student1 ... student10).
- *
- * FICTIONAL DEMO DATA ONLY. Every person is fictional and every attached
- * file is a watermarked SAMPLE from database/seeders/demo-files/.
- *
- * Program amounts and application dates are ILLUSTRATIVE demo values,
- * not official figures from CHED, DOST, CSU, the LGU or any foundation.
- * Replace them with official figures (Scholarships page, staff login)
- * before using the system for real.
- *
- * The AI check is NOT pre-run for the named scenarios: press "Run AI check"
- * during the demo so the panel sees real results.
- *
- * Safe to run more than once (it never creates duplicates):
- *   php artisan db:seed --class=DemoDataSeeder
- */
 class DemoDataSeeder extends Seeder
 {
-    // Requirement sets (names live in Support/DemoDocuments.php)
     private const GOV = [Doc::COR, Doc::GRADES, Doc::BIRTH, Doc::INDIGENCY, Doc::VALID_ID, Doc::GOOD_MORAL, Doc::ITR, Doc::BARANGAY];
     private const TALENT = [Doc::COR, Doc::GRADES, Doc::VALID_ID, Doc::BIRTH, Doc::GOOD_MORAL, Doc::RECOMMENDATION];
 
-    // The scholarship programs listed by the CSU Office of Admission and
-    // Scholarship (OAS). Names follow the OAS list.
     public const CMSP = 'CHED Merit Scholarship Program (CMSP)';
     public const TDP_TES = 'CHED Tulong-Dunong Program (TDP-TES)';
     public const TES = 'CHED Tertiary Education Subsidy (TES)';
@@ -54,20 +33,10 @@ class DemoDataSeeder extends Seeder
     public const NGCP = 'The National Grid Corporation of the Philippines (NGCP) Scholarship Program';
     public const MEKONG = 'Enfants du Mekong Scholarship';
 
-    // Older names used by the test plan (same programs).
     public const CSU_SA = self::SA;
 
     private const AGENCY_DIRECT_NOTE = 'Apply directly to the scholarship-giving agency; requirements and allowances are handled by its office. The OAS posts announcements and updates when the agency requests it.';
 
-    /*
-     * Who each agency-direct program is for, from the agencies' own pages
-     * (checked 24 Oct 2026), so the AI field fit has something to match:
-     *   DOST-SEI   region6.dost.gov.ph/?p=5123
-     *   ACEF       acef.da.gov.ph/index.php/grant-in-aid/ (RA 10848)
-     *   Landbank   landbank.com/news/landbank-launches-scholarship-program-for-dependents-of-arbs-farmers-fishers
-     *   NGCP       sorsu.edu.ph/attention-engineering-students-call-for-ngcp-scholarship-program-application/
-     * OAS staff should keep these up to date from each new memo.
-     */
     public const FOCUS = [
         self::DOST => 'For students in priority science and technology fields: basic sciences, engineering, applied sciences, and science and mathematics education.',
         self::DA_ACEF => 'For students taking agriculture, forestry, fisheries, veterinary medicine and related agricultural programs.',
@@ -76,14 +45,7 @@ class DemoDataSeeder extends Seeder
         self::NGCP => 'For engineering students, with priority to BS Electrical Engineering.',
     ];
 
-    /**
-     * [name, short name, provider, category, mode, amount, start, end, status, description, requirements]
-     * mode: oas = apply in ScholarGuide; agency_direct = apply at the agency (no requirements here).
-     * Amounts and dates of the OAS-processed programs are DEMO values: replace
-     * them with the official figures (Scholarships page) before real use.
-     */
     public const PROGRAMS = [
-        // CHED-funded (processed through the OAS)
         [self::CMSP, 'CMSP', 'Commission on Higher Education (CHED)', 'ched', 'oas', 20000, '2026-06-15', '2026-08-31', 'closed',
             'CHED-funded merit scholarship processed through the OAS, with Full SSP and Half SSP grantees.', self::GOV],
         [self::TDP_TES, 'TDP-TES', 'Commission on Higher Education (CHED)', 'ched', 'oas', 7500, '2026-07-01', '2026-10-31', 'active',
@@ -96,32 +58,22 @@ class DemoDataSeeder extends Seeder
             'CHED-funded Tulong-Dunong assistance for students of state universities and colleges, processed through the OAS.',
             [Doc::COR, Doc::GRADES, Doc::VALID_ID, Doc::INDIGENCY, Doc::ITR]],
 
-        // University-funded scholarship / financial assistance
         [self::SA, 'SA', 'Caraga State University', 'csu', 'oas', 5000, '2026-07-15', '2026-10-30', 'active',
             'University-funded student assistantship program.',
             [Doc::COR, Doc::GRADES, Doc::INDIGENCY, Doc::VALID_ID, Doc::GOOD_MORAL, Doc::ITR, Doc::BARANGAY, Doc::RECOMMENDATION]],
         [self::CULTURE, 'Culture & Arts', 'Caraga State University', 'csu', 'oas', 6000, '2026-08-01', '2026-11-15', 'active',
             'University-funded financial assistance for students in CSU culture and arts groups.', self::TALENT],
 
-        // Other government-funded (agency-direct)
         [self::LANDBANK, 'Landbank', 'Land Bank of the Philippines', 'government', 'agency_direct', null, null, null, 'active', self::AGENCY_DIRECT_NOTE, []],
         [self::DA_ACEF, 'DA-ACEF', 'Department of Agriculture', 'government', 'agency_direct', null, null, null, 'active', self::AGENCY_DIRECT_NOTE, []],
         [self::GIAHEP, 'ACEF-GIAHEP', 'Department of Agriculture', 'government', 'agency_direct', null, null, null, 'active', self::AGENCY_DIRECT_NOTE, []],
         [self::DOST, 'DOST', 'Department of Science and Technology', 'government', 'agency_direct', null, null, null, 'active', self::AGENCY_DIRECT_NOTE, []],
         [self::BAYUGAN, 'LGU-Bayugan', 'Local Government Unit of Bayugan', 'government', 'agency_direct', null, null, null, 'active', self::AGENCY_DIRECT_NOTE, []],
 
-        // Private-funded (agency-direct)
         [self::NGCP, 'NGCP', 'National Grid Corporation of the Philippines', 'private', 'agency_direct', null, null, null, 'active', self::AGENCY_DIRECT_NOTE, []],
         [self::MEKONG, 'Enfants du Mekong', 'Enfants du Mekong', 'private', 'agency_direct', null, null, null, 'active', self::AGENCY_DIRECT_NOTE, []],
     ];
 
-    /*
-     * SAMPLE eligibility rules for AI Recommendations, so the demo shows
-     * eligible and not-eligible students. They are NOT the official criteria
-     * of CHED or CSU: OAS staff replace them on the Scholarships page
-     * (Manage -> Eligibility rules) with the criteria in each program's memo.
-     * [highest GWA allowed, highest annual family income, year levels, colleges]
-     */
     public const SAMPLE_RULES = [
         self::CMSP => [1.75, 400000, null, null],
         self::TDP_TES => [null, 300000, null, null],
@@ -140,9 +92,6 @@ class DemoDataSeeder extends Seeder
     private function seedPrograms(): void
     {
         foreach (self::PROGRAMS as [$name, $short, $provider, $category, $mode, $amount, $start, $end, $status, $description, $requirements]) {
-            // The demo must still work weeks after these dates were written (the defense, OAS try-outs):
-            // an active program whose application period already ended is moved forward so that it
-            // closes about 45 days from today. Closed programs keep their real past dates.
             if ($status === 'active' && $end && $end < now()->toDateString()) {
                 $shift = now()->startOfDay()->diffInDays(\Illuminate\Support\Carbon::parse($end)->startOfDay(), true) + 45;
                 $start = \Illuminate\Support\Carbon::parse($start)->addDays($shift)->min(now())->toDateString();
@@ -156,7 +105,7 @@ class DemoDataSeeder extends Seeder
                     'category' => $category,
                     'application_mode' => $mode,
                     'description' => isset(self::FOCUS[$name]) ? self::FOCUS[$name].' '.$description : $description,
-                    'amount' => $amount, // demo amount per semester
+                    'amount' => $amount,
                     'application_start' => $start,
                     'application_end' => $end,
                     'status' => $status,
@@ -181,23 +130,10 @@ class DemoDataSeeder extends Seeder
         [$gwa, $income, $years, $colleges] = self::SAMPLE_RULES[$name];
 
         return ['max_gwa' => $gwa, 'max_family_income' => $income, 'year_levels' => $years, 'colleges' => $colleges,
-            // Shown in the AI Recommendations "Why?" window, so nobody mistakes demo rules for official ones.
             'rules_source' => 'SAMPLE rules for the demonstration only. They are NOT the official criteria of the provider. '
                 .'OAS: replace them with the rules in the current program memo (Scholarships → Manage → Eligibility rules).'];
     }
 
-    /**
-     *  Juan   CMSP      approved + enrollment verified -> ready to TAG as grantee
-     *  Maria  TES       submitted; her "Indigency" upload is really a Barangay Clearance (AI should flag it)
-     *  Ana    TDP-SUC   under review; also a COMPLETED past SA scholarship with processed payroll (Data Bank history)
-     *  Pedro  TDP-TES   needs action (OAS asked for a clearer document)
-     *  Liza   SA        rejected (applies live to Culture and Arts during the demo)
-     *  Carlo  Culture   draft, only 1 of 6 documents uploaded
-     *  Rosa   SA        complete (forwarded); her COR belongs to another person (AI should flag the name)
-     *  Mark   TES       approved, enrollment NOT yet verified -> demo "Verify enrollment"
-     *  Jose   TES       active grantee with a READY payroll entry
-     *  Grace  CMSP      active grantee with no payroll yet -> demo batch payroll
-     */
     private function seedNamedScenarios(): void
     {
         $this->scenario('2026-00001', self::CMSP, [
@@ -298,7 +234,7 @@ class DemoDataSeeder extends Seeder
                 PayrollRecord::firstOrCreate(
                     ['scholar_record_id' => $record->id, 'period' => $g['payroll']['period']],
                     [
-                        'amount' => $g['payroll']['amount'], // demo amount
+                        'amount' => $g['payroll']['amount'],
                         'bank_atm_status' => $g['has_atm'] ? 'Yes' : 'No',
                         'status' => $g['payroll']['status'],
                     ]
@@ -327,7 +263,6 @@ class DemoDataSeeder extends Seeder
                 $source = $folder ? $folder . '/' . $fileName : null;
             }
 
-            // Use the prepared sample file; if it is missing, generate one.
             if ($source && is_file($source)) {
                 $pdf = file_get_contents($source);
             } else {

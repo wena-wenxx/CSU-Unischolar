@@ -11,12 +11,6 @@ use App\Models\Student;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
-/**
- * FICTIONAL DEMO DATA: a Registrar enrollment list for the current term,
- * so "Verify All Enrollments" can be shown. Almost every demo student is on
- * it; on purpose a few are missing (-> Not enrolled) and two have a
- * different surname on the list (-> Needs manual check).
- */
 class EnrollmentListSeeder extends Seeder
 {
     public function run(): void
@@ -25,7 +19,6 @@ class EnrollmentListSeeder extends Seeder
             return;
         }
 
-        // Students the demo will check: approved and waiting, or active grantees.
         $checked = Application::where('status', 'approved')->where('enrollment_verified', false)->pluck('student_id')
             ->merge(ScholarRecord::where('status', 'active')->pluck('student_id'))
             ->unique()->sort()->values();

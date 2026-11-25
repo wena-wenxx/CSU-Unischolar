@@ -5,21 +5,6 @@ namespace App\Support;
 use App\Models\Application;
 use App\Models\Document;
 
-/*
-|--------------------------------------------------------------------------
-| Suggested remark to a student, from THEIR application's actual problems
-|--------------------------------------------------------------------------
-| Used by Auto-Review. It is only a suggestion: staff read and edit it, and nothing is sent until
-| they press "Send back". Each student gets their own text:
-|   missing document        -> which document to upload
-|   wrong document          -> which file to replace with the right one
-|   name not found          -> upload a copy that shows the name (or say why)
-|   unclear / unreadable    -> upload a clearer copy
-|   old / expired           -> upload a recent copy
-|   missing information     -> what the AI could not find on it
-| Documents verified by staff, and files the AI simply has not checked yet, are left out
-| (they are not something the student has to fix).
-*/
 class RemarkSuggester
 {
     public static function forApplication(Application $application, array $missing = []): ?string
@@ -65,7 +50,7 @@ class RemarkSuggester
         }
 
         if ($document->status !== 'flagged' || !$result) {
-            return null;   // passed, or not checked by the AI yet: nothing for the student to fix
+            return null;
         }
 
         if ($result->has_wrong_document) {

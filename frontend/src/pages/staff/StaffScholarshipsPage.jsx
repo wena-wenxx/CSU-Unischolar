@@ -22,7 +22,6 @@ const EMPTY_FORM = {
   application_start: "",
   application_end: "",
   status: "active",
-  // Eligibility rules (AI Recommendations); empty = no rule
   max_gwa: "",
   max_family_income: "",
   year_levels: [],
@@ -31,7 +30,6 @@ const EMPTY_FORM = {
   rules_source: "",
 };
 
-// The rule fields as the API expects them ("" -> null).
 function rulesPayload(form) {
   return {
     max_gwa: form.max_gwa === "" ? null : Number(form.max_gwa),
@@ -47,7 +45,6 @@ const ruleCount = (form) =>
   [form.max_gwa !== "", form.max_family_income !== "", form.year_levels?.length > 0, form.colleges?.length > 0].filter(Boolean)
     .length;
 
-// How students apply: through ScholarGuide (OAS) or directly at the agency.
 function ModeSelect({ id, value, onChange }) {
   return (
     <select id={id} value={value} onChange={onChange}>
@@ -74,7 +71,6 @@ export default function StaffScholarshipsPage() {
   const toast = useToast();
 
   const [scholarships, setScholarships] = useState([]);
-  // ?manage=<id> opens that program (search box); ?new=1 jumps to the create form.
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const createRef = useRef(null);
@@ -87,8 +83,6 @@ export default function StaffScholarshipsPage() {
   const [ruleOptions, setRuleOptions] = useState({ year_levels: [], colleges: [] });
   const [saving, setSaving] = useState(false);
 
-  // Written with .then() (not await) so React's lint rule can see that the
-  // state is set later, when the server answers, not during the effect.
   const load = useCallback(
     () =>
       Promise.all([
@@ -339,7 +333,6 @@ export default function StaffScholarshipsPage() {
   );
 }
 
-// "GWA ≤ 2.50 · ₱300,000" for the program list.
 function ruleText(scholarship) {
   const parts = [];
   if (scholarship.max_gwa !== null && scholarship.max_gwa !== undefined) parts.push(`GWA ≤ ${Number(scholarship.max_gwa).toFixed(2)}`);

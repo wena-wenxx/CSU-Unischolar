@@ -11,23 +11,17 @@ import EmptyState from "../../components/EmptyState";
 import Loading from "../../components/Loading";
 
 const EMPTY = { title: "", body: "", expires_at: "", image_path: null };
-const MAX_IMAGE = 2 * 1024 * 1024; // 2 MB
+const MAX_IMAGE = 2 * 1024 * 1024;
 
 const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
-/*
-  OAS announcements: new openings, deadline reminders, payout schedules.
-  Students see the latest three (not yet expired) on their dashboard.
-*/
 export default function StaffAnnouncementsPage() {
   const toast = useToast();
   const confirm = useConfirm();
 
   const [items, setItems] = useState(null);
-  const [editing, setEditing] = useState(null); // null = closed, {} = new, {id,...} = edit
+  const [editing, setEditing] = useState(null);
 
-  // Written with .then() (not await) so React's lint rule can see that the
-  // state is set later, when the server answers, not during the effect.
   const load = useCallback(
     () =>
       api
@@ -151,13 +145,12 @@ function AnnouncementModal({ initial, onClose, onSaved }) {
   const toast = useToast();
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
-  const [image, setImage] = useState(null); // new File
+  const [image, setImage] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [removeImage, setRemoveImage] = useState(false);
 
   const field = (key) => (event) => setForm({ ...form, [key]: event.target.value });
 
-  // Free the preview picture's memory when it changes or the window closes.
   useEffect(() => () => previewUrl && URL.revokeObjectURL(previewUrl), [previewUrl]);
 
   function chooseImage(event) {
@@ -184,7 +177,6 @@ function AnnouncementModal({ initial, onClose, onSaved }) {
     event.preventDefault();
     setSaving(true);
 
-    // FormData so a picture can be sent; an edit is POST + _method=PUT.
     const data = new FormData();
     data.append("title", form.title.trim());
     data.append("body", form.body.trim());
