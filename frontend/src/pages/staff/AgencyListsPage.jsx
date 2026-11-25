@@ -338,6 +338,7 @@ export default function AgencyListsPage() {
   const countMismatch = details.expected_count !== "" && Number(details.expected_count) !== dataRows.length;
   const amountSum = dataRows.reduce((sum, row) => sum + (Number(String(row[amountColumn] || "").replaceAll(",", "")) || 0), 0);
   const amountMismatch = details.expected_total !== "" && Math.abs(amountSum - Number(details.expected_total)) > 0.01;
+  const nothingToCompare = details.expected_count === "" && details.expected_total === "";
   const chosenProgram = scholarships.find((s) => String(s.id) === scholarshipId);
   const wrongProgram = programMismatch(metadata.program, chosenProgram);
   const pastYear = details.school_year && defaults.current_school_year && details.school_year < defaults.current_school_year;
@@ -526,11 +527,11 @@ export default function AgencyListsPage() {
               </div>
             ))}
           </div>
-          <div className={`alert ${countMismatch || amountMismatch ? "alert-warning" : "alert-success"}`}>
+          <div className={`alert ${countMismatch || amountMismatch ? "alert-warning" : nothingToCompare ? "alert-info" : "alert-success"}`}>
             Rows read: {dataRows.length} vs expected: {details.expected_count || "—"} · Summed amount: {amountSum.toLocaleString(undefined, { minimumFractionDigits: 2 })} vs printed: {details.expected_total || "—"}
             {countMismatch || amountMismatch ? (
               <label className="choice"><input type="checkbox" checked={confirmedMismatch} onChange={(event) => setConfirmedMismatch(event.target.checked)} /> I reviewed the mismatch and want to continue.</label>
-            ) : " — Match"}
+            ) : nothingToCompare ? " — No printed count or total to compare. Check the rows below." : " — Match"}
           </div>
 
           <h2>3. Which column is which?</h2>
